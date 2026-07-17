@@ -10,18 +10,16 @@
 |------|--------|---------------------|
 | Fase 0: Setup e Infraestrutura | ✅ Concluída | — |
 | Fase 1: Backend Core (domain + app + infra) | ✅ Concluída | — |
-| Fase 2: Backend API (endpoints) | 🔲 Pendente | Sync messages (PG) + surveys |
+| Fase 2: Backend API (endpoints) | 🔄 Em andamento | APScheduler, dados reais |
 | Fase 3: Frontend Dashboard | 🔲 Pendente | — |
 | Fase 4: Integração e Deploy | 🔲 Pendente | — |
 
-> **Migração SQLite → PostgreSQL concluída (estrutural):**
-> - Schema Postgres (`001_initial.sql`, `models.py`, migration Alembic `001_initial.py`) — ✅
-> - `PostgresReportRepository` com colunas `cnvs_*` reais — ✅
-> - `queries_pg.py` com queries asyncpg — ✅
+> **Migração SQLite → PostgreSQL (sync pipeline) concluída:**
 > - `PostgresSyncConnection` (asyncpg) — ✅
-> - `pg_sync_engine.py` (PgSyncManager para sync estrutural) — ✅
-> - `api/dependencies.py` injeta pool asyncpg — ✅
-> - Sync de *messages* e *surveys* no PG pendente — 🔲
+> - `queries_pg.py` com `$1-$N` params — ✅
+> - `pg_sync_engine.py` (PgSyncManager) — ✅
+> - Message sync, survey extraction, reopen detection — ✅
+> - `client.py` tipado com params de filtro — ✅
 
 ---
 
@@ -85,84 +83,69 @@
 
 ---
 
-## Fase 2: Backend API 🔲
+## Fase 2: Backend API 🔄
 
-> **Bloqueador principal:** O pipeline de sync (`sync.py`, 1253 linhas) é 100% SQLite.
-> Precisa ser reescrito para PostgreSQL (asyncpg) antes de qualquer endpoint funcionar com dados reais.
+### ⚠️ Migração Sync Pipeline SQLite → PostgreSQL ✅
 
-### ⚠️ Migração Sync Pipeline SQLite → PostgreSQL (CRÍTICO)
-
-> Itens nesta seção são PREREQUISITOS para os endpoints de sync/admin.
-
-- [ ] Criar `PostgresSyncConnection` — equivalente asyncpg de `SyncConnection` (aiosqlite)
-  - Substituir `aiosqlite.connect()` por `asyncpg.create_pool()`
-  - Remover PRAGMAs (WAL, synchronous, foreign_keys)
-  - Manter interface `transaction()`, `execute_query()`, `execute_many()`
-- [ ] Criar queries PostgreSQL compatíveis (`queries_pg.py`)
-  - Substituir `?` placeholders por `$1, $2, ...` (estilo asyncpg)
-  - Substituir `datetime('now', ?)` por `NOW() - INTERVAL '...'`
-  - Substituir `INSERT OR IGNORE` por `ON CONFLICT DO NOTHING`
-  - Substituir `INSERT OR REPLACE` por `ON CONFLICT ... DO UPDATE SET`
-- [ ] Adaptar `sync.py` para usar `PostgresSyncConnection`
-  - `SyncManager.initialize()` → usar asyncpg pool em vez de aiosqlite
-  - `SyncManager._upsert_contacts()` → queries PostgreSQL
-  - `SyncManager._upsert_conversations()` → queries PostgreSQL
-  - `SyncManager._upsert_messages()` → queries PostgreSQL
-  - `SyncManager._sync_surveys()` → queries PostgreSQL
-  - Todas as 1253 linhas precisam de revisão
-- [ ] Adaptar `infrastructure/api/config.py`
-  - Substituir `DB_FILENAME = "m_bird.db"` por `DATABASE_URL` (env var)
-  - Manter `API_KEY`, `LOOKBACK_MINUTES` etc. inalterados
-- [ ] Adaptar `application/use_cases/sync_database.py`
-  - Substituir `db_path="m_bird.db"` por conexão PostgreSQL via DI
-- [ ] Marcar `sqlite_repository.py`, `connection.py`, `sync_connection.py`, `init_db.py` como "legado — apenas CLI"
-- [ ] Renomear `domain/logic.py:to_utc_sqlite_string()` → `to_utc_string()`
+- [x] Criar `PostgresSyncConnection` — asyncpg pool wrapper (`sync_connection_pg.py`)
+- [x] Criar queries PostgreSQL compatíveis (`queries_pg.py`) — `$1-$N` params, `ON CONFLICT`, `NOW()`
+- [x] Criar `pg_sync_engine.py` (PgSyncManager) — contact sync, conversation sync
+- [x] Implementar message sync (`sync_messages`, `_sync_messages_internal`, `sync_all_messages`)
+- [x] Implementar survey extraction (`update_conversation_surveys`, `backfill_surveys`)
+- [x] Implementar reopen detection (`cnvs_reopened_count`)
+- [x] Adaptar `infrastructure/api/client.py` — tipos + params de filtro (`createdDatetimeAfter`, etc.)
+- [x] Adaptar `application/use_cases/sync_database.py` — delega para `trigger_sync_pg()`
+- [x] Marcar `sqlite_repository.py`, `connection.py`, `sync_connection.py`, `init_db.py` como "legado"
 
 ### Configuração
 
-- [ ] Integrar APScheduler no `api/main.py` (sync incremental a cada 15 min)
-- [ ] Configurar CORS dinâmico via `CORS_ORIGINS` do `.env`
-- [ ] Garantir que `config_loader.py` funciona com PostgreSQL (verificar: YAML loaders são DB-agnostic, mas `KPI_CONFIG` e `DEPT_MAP` precisam ser carregados antes dos endpoints)
+- [ ] Integrar APScheduler no `api/main.py` (sync incremental a cada 15 min, full diário 3:00 AM)
+- [x] Configurar CORS dinâmico via `CORS_ORIGINS` do `.env` (middleware.py)
+- [x] Garantir que `config_loader.py` funciona com PostgreSQL (YAML loaders são DB-agnostic)
 
 ### Auth
 
-- [ ] Implementar `POST /api/v1/auth/login` (validar credenciais, retornar JWT)
+- [x] Implementar `POST /api/v1/auth/login` — body `LoginRequest`, retorna `TokenResponse` JWT
 - [ ] Implementar `POST /api/v1/auth/refresh` (renovar token)
-- [ ] Implementar middleware de autenticação JWT
+- [x] Implementar middleware de autenticação JWT (`get_current_user` dependency)
 
 ### Dashboard
 
-- [ ] Implementar `GET /api/v1/dashboard/summary` (métricas gerais)
-- [ ] Implementar `GET /api/v1/dashboard/bsc` (dados BSC T1 + T2)
-- [ ] Implementar `GET /api/v1/dashboard/evolution` (evolução mensal 12 meses)
-- [ ] Implementar `GET /api/v1/dashboard/agents` (ranking de agentes)
-- [ ] Implementar `GET /api/v1/dashboard/channels` (métricas por canal)
+- [x] Implementar `GET /api/v1/dashboard/summary` — `response_model=DashboardSummaryResponse`
+- [x] Implementar `GET /api/v1/dashboard/bsc` — `response_model=BSCResponse`
+- [x] Implementar `GET /api/v1/dashboard/kpis` — `response_model=KPIResponse`
+- [x] Implementar `GET /api/v1/dashboard/evolution` — `response_model=EvolutionResponse`
+- [x] Implementar `GET /api/v1/dashboard/agents` — `response_model=AgentRankingResponse`
+- [x] Implementar `GET /api/v1/dashboard/channels` — `response_model=ChannelResponse`
 
 ### Conversations
 
-- [ ] Implementar `GET /api/v1/conversations` (lista paginada + filtros)
-- [ ] Implementar `GET /api/v1/conversations/{id}` (detalhe da conversa)
-- [ ] Implementar `GET /api/v1/conversations/{id}/messages` (mensagens)
+- [x] Implementar `GET /api/v1/conversations/` — `response_model=ConversationListResponse`, 11 filtros
+- [x] Implementar `GET /api/v1/conversations/{id}` — `response_model=ConversationDetailResponse`
+- [x] Implementar `GET /api/v1/conversations/{id}/messages` — `response_model=ConversationMessagesResponse`
 
 ### Reports
 
-- [ ] Implementar `POST /api/v1/reports/generate` (gerar relatório sob demanda)
-- [ ] Implementar `GET /api/v1/reports/{id}/download` (download do arquivo)
-- [ ] Implementar `GET /api/v1/reports/available` (listar relatórios)
+- [x] Implementar `POST /api/v1/reports/generate` — body `ReportRequest`, `response_model=GenerateReportResponse`
+- [x] Implementar `GET /api/v1/reports/{id}/download` — `response_model=DownloadReportResponse`
+- [x] Implementar `GET /api/v1/reports/available` — `response_model=AvailableReportsResponse`
 
 ### Admin
 
-- [ ] Implementar `GET /api/v1/admin/sync/status` (status da última sync)
-- [ ] Implementar `POST /api/v1/admin/sync/trigger` (disparar sync manual)
-- [ ] Implementar `GET /api/v1/admin/agents` (lista de agentes)
-- [ ] Implementar `GET /api/v1/admin/departments` (departamentos)
+- [x] Implementar `GET /api/v1/admin/sync/status` — `response_model=SyncStatusResponse`
+- [x] Implementar `POST /api/v1/admin/sync/trigger` — body `SyncTriggerRequest`, `response_model=SyncTriggerResponse`
+- [x] Implementar `GET /api/v1/admin/agents` — dados reais de `domain.constants.AGENTS`
+- [x] Implementar `GET /api/v1/admin/departments` — dados reais de `domain.constants.DEPT_MAP`
+- [x] Implementar `GET /api/v1/admin/health` — `response_model=HealthResponse`
 
-### Pydantic Schemas
+### Pydantic Schemas ✅
 
-- [ ] Criar `api/schemas/auth.py` (LoginRequest, TokenResponse)
-- [ ] Criar `api/schemas/dashboard.py` (DashboardSummary, BSCEvolution, etc.)
-- [ ] Criar `api/schemas/conversations.py` (ConversationList, ConversationDetail, Message)
-- [ ] Criar `api/schemas/reports.py` (ReportRequest, ReportResponse)
+- [x] Criar `api/schemas/auth.py` (LoginRequest, TokenResponse, UserResponse)
+- [x] Criar `api/schemas/dashboard.py` (DashboardSummaryResponse, BSCResponse, KPIResponse, EvolutionResponse, AgentRankingResponse, ChannelResponse)
+- [x] Criar `api/schemas/conversations.py` (ConversationListResponse, ConversationDetailResponse, ConversationMessagesResponse, MessageResponse)
+- [x] Criar `api/schemas/reports.py` (ReportRequest, GenerateReportResponse, DownloadReportResponse, AvailableReportsResponse)
+- [x] Criar `api/schemas/admin.py` (SyncStatusResponse, SyncTriggerRequest, SyncTriggerResponse, AgentListResponse, DepartmentListResponse, HealthResponse)
+- [x] Criar `api/schemas/__init__.py` (exports centralizados)
 
 ### Migração SQLite → PostgreSQL (dados)
 

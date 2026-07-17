@@ -2,21 +2,23 @@
 Auth Routes
 """
 
-from fastapi import APIRouter, HTTPException
+from typing import Any
 
-from api.auth import create_access_token
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.auth import create_access_token, get_current_user
+from api.schemas.auth import LoginRequest, TokenResponse, UserResponse
 
 router = APIRouter()
 
 
-@router.post("/login")
-async def login(email: str, password: str):
+@router.post("/login", response_model=TokenResponse)
+async def login(request: LoginRequest):
     """Login endpoint - returns JWT token."""
     # TODO: Implement user lookup from database
-    # For now, hardcoded admin
-    if email == "admin@empresa.com" and password == "admin123":
-        token = create_access_token({"sub": email, "role": "admin"})
-        return {"access_token": token, "token_type": "bearer"}
+    if request.email == "admin@empresa.com" and request.password == "admin123":
+        token = create_access_token({"sub": request.email, "role": "admin"})
+        return TokenResponse(access_token=token, token_type="bearer")
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
@@ -27,8 +29,7 @@ async def register():
     pass
 
 
-@router.get("/me")
-async def get_me():
-    """Get current user info."""
-    # TODO: Implement with JWT dependency
-    return {"email": "admin@empresa.com", "role": "admin"}
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: dict[str, Any] = Depends(get_current_user)):
+    """Get current user info from JWT token."""
+    return UserResponse(email=current_user.get("sub", ""), role=current_user.get("role", ""))

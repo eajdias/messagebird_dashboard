@@ -2,44 +2,66 @@
 Admin Routes
 """
 
-from fastapi import APIRouter
+from typing import Any
+
+from fastapi import APIRouter, Depends
+
+from api.auth import get_current_user
+from api.schemas.admin import (
+    AgentItem,
+    AgentListResponse,
+    DepartmentItem,
+    DepartmentListResponse,
+    HealthResponse,
+    SyncStatusResponse,
+    SyncTriggerRequest,
+    SyncTriggerResponse,
+)
+from domain.constants import AGENTS, DEPT_MAP
 
 router = APIRouter()
 
 
-@router.get("/sync/status")
-async def get_sync_status():
+@router.get("/sync/status", response_model=SyncStatusResponse)
+async def get_sync_status(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get last sync status."""
-    # TODO: Implement
-    return {
-        "last_sync": None,
-        "status": "idle",
-        "records_synced": 0,
-    }
+    # TODO: Read from sync table in PG
+    return SyncStatusResponse()
 
 
-@router.post("/sync/trigger")
-async def trigger_sync():
+@router.post("/sync/trigger", response_model=SyncTriggerResponse)
+async def trigger_sync(
+    request: SyncTriggerRequest,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Trigger manual sync."""
-    # TODO: Implement
-    return {"status": "triggered"}
+    # TODO: Wire to SyncDatabaseUseCase
+    return SyncTriggerResponse(status="triggered", message="Sync started")
 
 
-@router.get("/agents")
-async def list_agents():
+@router.get("/agents", response_model=AgentListResponse)
+async def list_agents(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """List all agents."""
-    # TODO: Implement
-    return {"agents": []}
+    items = [
+        AgentItem(bird_id=bird_id, name=info["name"], group=info.get("group", "")) for bird_id, info in AGENTS.items()
+    ]
+    return AgentListResponse(agents=items)
 
 
-@router.get("/departments")
-async def list_departments():
+@router.get("/departments", response_model=DepartmentListResponse)
+async def list_departments(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """List all departments."""
-    # TODO: Implement
-    return {"departments": []}
+    items = [DepartmentItem(dept_id=dept_id, label=label) for dept_id, label in DEPT_MAP.items()]
+    return DepartmentListResponse(departments=items)
 
 
-@router.get("/health")
+@router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "version": "2.0.0"}
+    """Health check endpoint (no auth required)."""
+    return HealthResponse(status="healthy", version="2.0.0")

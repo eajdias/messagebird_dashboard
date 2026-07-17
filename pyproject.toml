@@ -46,6 +46,7 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = ["B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["api", "domain", "application", "infrastructure"]

@@ -2,53 +2,78 @@
 Dashboard Routes
 """
 
-from fastapi import APIRouter
+from typing import Any
+
+from fastapi import APIRouter, Depends
+
+from api.auth import get_current_user
+from api.schemas.dashboard import (
+    AgentRankingResponse,
+    BSCResponse,
+    ChannelResponse,
+    DashboardSummaryResponse,
+    EvolutionResponse,
+    KPIResponse,
+)
 
 router = APIRouter()
 
 
-@router.get("/summary")
-async def get_summary(start_date: str = None, end_date: str = None):
+@router.get("/summary", response_model=DashboardSummaryResponse)
+async def get_summary(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get dashboard summary metrics."""
-    # TODO: Implement
-    return {
-        "total_conversations": 0,
-        "nps_score": 0,
-        "frt_avg_minutes": 0,
-        "art_avg_minutes": 0,
-    }
+    # TODO: Wire to application layer (ReportAggregator)
+    return DashboardSummaryResponse()
 
 
-@router.get("/bsc")
-async def get_bsc(start_date: str = None, end_date: str = None):
+@router.get("/bsc", response_model=BSCResponse)
+async def get_bsc(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get BSC data (T1 + T2)."""
-    # TODO: Implement
-    return {"header": [], "data_t1": [], "data_t2": []}
+    # TODO: Wire to application layer
+    return BSCResponse()
 
 
-@router.get("/kpis")
-async def get_kpis(department: str = None):
+@router.get("/kpis", response_model=KPIResponse)
+async def get_kpis(
+    department: str | None = None,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get KPIs by department."""
-    # TODO: Implement
-    return {"kpis": []}
+    # TODO: Wire to application layer
+    return KPIResponse(department=department or "")
 
 
-@router.get("/evolution")
-async def get_evolution(months: int = 12):
+@router.get("/evolution", response_model=EvolutionResponse)
+async def get_evolution(
+    months: int = 12,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get monthly evolution (last N months)."""
-    # TODO: Implement
-    return {"evolution": []}
+    # TODO: Wire to application layer
+    return EvolutionResponse()
 
 
-@router.get("/agents")
-async def get_agents_ranking():
+@router.get("/agents", response_model=AgentRankingResponse)
+async def get_agents_ranking(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get agent ranking."""
-    # TODO: Implement
-    return {"agents": []}
+    # TODO: Wire to application layer
+    return AgentRankingResponse()
 
 
-@router.get("/channels")
-async def get_channels():
+@router.get("/channels", response_model=ChannelResponse)
+async def get_channels(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
     """Get metrics by channel."""
-    # TODO: Implement
-    return {"channels": []}
+    # TODO: Wire to application layer
+    return ChannelResponse()
