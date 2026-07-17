@@ -1,0 +1,56 @@
+# ============================================================
+# new_bird - Docker Compose (Development)
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: mbird_postgres
+    environment:
+      POSTGRES_DB: mbird_reports
+      POSTGRES_USER: mbird
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mbird_dev_2024}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mbird -d mbird_reports"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mbird_api
+    command: >
+      sh -c "alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports upgrade head &&
+             uvicorn api.main:app --reload --host 0.0.0.0 --port 8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app/api
+      - ./domain:/app/domain
+      - ./application:/app/application
+      - ./infrastructure:/app/infrastructure
+      - ./reports:/app/reports
+    restart: unless-stopped
+
+  # Frontend será adicionado na Fase 3
+  # frontend:
+  #   build: ./frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - api
+
+volumes:
+  pgdata:

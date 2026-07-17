@@ -1,0 +1,66 @@
+# =============================================================================
+# business_bsc.yaml.example — MODELO/TEMPLATE
+# Copie para business_bsc.yaml e ajuste as metas/pesos da SUA empresa.
+# (Este arquivo de exemplo É versionado; o business_bsc.yaml real é ignorado)
+#
+# Veja business_bsc.yaml (ou a documentação em docs/configuracao.md) para a
+# lista completa de campos e dos valores possíveis em "tipo".
+# =============================================================================
+
+KPI_CONFIG:
+  # Nome do departamento (deve bater com DEPT_ROUTING / DEPT_MAP)
+  "Suporte Tecnico":
+    t1:
+      - name: "Elogios de atendimento / Feedback"
+        description: "Notas 4 e 5 são consideradas Feedback positivo."
+        metric: "% em cima do total de avaliados com nota"
+        meta: ">40%"
+        peso: 30
+        tipo: "escalonado_percentual"
+        niveis:
+          - { min: 40, pts: 30, extra_per_unit: 0.75 }
+          - { min: 35, pts: 15 }
+          - { min: 30, pts: 10 }
+        cap: 60
+      - name: "NPS (Net Promoter Score)"
+        description: "NPS individual do agente. Cálculo: ((Promotores - Detratores) / Total) × 100"
+        metric: "NPS individual do agente"
+        meta: ">=70/63/50"
+        peso: 30
+        tipo: "escalonado_nps"
+        niveis:
+          - { min: 70, pts: 30 }
+          - { min: 63, pts: 15 }
+          - { min: 50, pts: 5 }
+      - name: "Atendimentos | Ligações Finalizados"
+        description: "Quantidade total de chats encerrados no mês."
+        metric: "Individual de chats encerrados no mês"
+        meta: 150
+        peso: 10
+        tipo: "proporcional"
+    t2:
+      - { name: "Updates",      meta: 1, peso: 1, tipo: "proporcional" }
+      - { name: "Treinamentos", meta: 1, peso: 1, tipo: "proporcional" }
+      - { name: "Tarefa N1",    meta: 1, peso: 2, tipo: "proporcional" }
+      - { name: "Tarefa N2",    meta: 1, peso: 3, tipo: "proporcional" }
+      - { name: "Tarefa N3",    meta: 1, peso: 5, tipo: "proporcional" }
+    penalidades_setoriais:
+      - name: "Ligações Perdidas (Setor)"
+        description: "Penalidade setorial aplicada a todo o grupo."
+        metric: "Ligações perdidas pelo grupo no mês"
+        meta: 0
+        peso: -2
+        tipo: "penalidade"
+
+# Cortes do NPS (escala 0-10): promoter_min = mínimo p/ promotor;
+# passive_min = mínimo p/ neutro (abaixo disso é detrator)
+NPS_CONFIG:
+  promoter_min: 9
+  passive_min: 7
+
+# Limites dos cálculos de métricas (minutos / segundos)
+METRIC_THRESHOLDS:
+  sla_frt_minutes: 60
+  sla_frt_seconds: 3600
+  max_art_minutes: 480
+  max_duration_minutes: 630

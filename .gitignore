@@ -1,0 +1,74 @@
+# ============================================================
+# new_bird - Python
+# ============================================================
+
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Distribution
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Reports (generated)
+reports/*.xlsx
+reports/*.pdf
+reports/*.md
+!reports/.gitkeep
+
+# Business configs (contain real company data — use .example variants)
+business_config.yaml
+business_bsc.yaml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# ============================================================
+# Frontend (Next.js)
+# ============================================================
+
+node_modules/
+.next/
+out/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================================
+# Docker
+# ============================================================
+
+docker-compose.override.yml
+
+# ============================================================
+# OS
+# ============================================================
+
+.DS_Store
+Thumbs.db

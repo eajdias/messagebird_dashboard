@@ -1,0 +1,60 @@
+# =============================================================================
+# business_config.yaml.example — MODELO/TEMPLATE
+# Copie para business_config.yaml e ajuste os valores da SUA empresa.
+# (Este arquivo de exemplo É versionado; o business_config.yaml real é ignorado)
+# =============================================================================
+
+# ID do departamento (na API) -> nome exibido no relatório
+DEPT_MAP:
+  1: "Suporte Tecnico"
+  2: "Comercial"
+  3: "Financeiro"
+  4: "Ouvidoria"
+  5: "Nova Instalacao | Migracao"
+
+# Motivos de contato por departamento: departamento -> motivo_id -> nome
+REASON_MAP:
+  1:
+    1: "Problemas tecnicos"
+    2: "Agendamentos"
+    3: "Manuais de uso (PDF ou videos)"
+  2:
+    1: "Falar com um consultor comercial"
+    2: "Agendar uma demonstracao"
+  3:
+    1: "Boleto"
+    2: "Nota Fiscal"
+    3: "Sistema bloqueado"
+    4: "Mensagem de cobranca"
+    5: "Nao consta"
+  4:
+    1: "Reclamacao"
+    2: "Sugestao"
+    3: "Elogio"
+
+# Ocorrências por departamento e motivo: departamento -> motivo -> ocorrencia_id -> nome
+OCCURRENCE_MAP:
+  1:
+    1:
+      1: "Ocorrencia 1"
+      2: "Ocorrencia 2"
+      3: "Ocorrencia 3"
+
+# ID do idioma (na API) -> nome exibido
+LANG_MAP:
+  1: "Portugues"
+  2: "English"
+  3: "Espanol"
+
+# Roteamento: nome do departamento detectado -> grupo de atendimento no relatório
+DEPT_ROUTING:
+  "Suporte Tecnico": "Suporte Tecnico"
+  "Comercial": "Comercial"
+  "Financeiro": "Financeiro"
+  "Ouvidoria": "Ouvidoria"
+  "Nova Instalacao | Migracao": "CS | Instalacao | Migracao"
+
+# Agentes: bird_id (string) -> { name, group }
+AGENTS:
+  bird_id_do_agente_1: { name: "Nome do Agente 1", group: "Suporte Tecnico" }
+  bird_id_do_agente_2: { name: "Nome do Agente 2", group: "Comercial" }
