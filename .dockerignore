@@ -1,0 +1,17 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.env
+.venv
+node_modules
+frontend/.next
+frontend/node_modules
+reports/*.xlsx
+reports/*.pdf
+*.db
+docs/
+tests/

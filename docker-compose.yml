@@ -26,11 +26,13 @@ services:
       dockerfile: Dockerfile
     container_name: mbird_api
     command: >
-      sh -c "alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports upgrade head &&
+      sh -c "alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports upgrade head 2>/dev/null ||
+             alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports stamp head &&
              uvicorn api.main:app --reload --host 0.0.0.0 --port 8000"
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
+      CORS_ORIGINS: http://localhost:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,13 +46,21 @@ services:
       - ./reports:/app/reports
     restart: unless-stopped
 
-  # Frontend será adicionado na Fase 3
-  # frontend:
-  #   build: ./frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - api
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: mbird_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
 
 volumes:
   pgdata:
