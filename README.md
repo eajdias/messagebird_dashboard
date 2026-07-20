@@ -68,9 +68,7 @@ new_bird/
 ## Deploy
 
 - **Docker Compose**: PostgreSQL + API + Frontend
-- **Cloudflare Tunnels**: HTTPS sem nginx
-  - `zsc-sac.eajdias.com` → Frontend (:3050)
-  - `zsc-sac-api.eajdias.com` → API (:8050)
+- **Cloudflare Tunnels**: exposição HTTPS (configuração externa na VPS)
 
 ## License
 

@@ -208,8 +208,8 @@
 - [x] Testar `docker compose up` completo — 3/3 serviços healthy
 
 ### Cloudflare Tunnel
-- [x] Configurar `zsc-sac.eajdias.com` → `localhost:3050`
-- [x] Configurar `zsc-sac-api.eajdias.com` → `localhost:8050`
+- [x] Portas definidas: API `:8050`, Frontend `:3050`
+- [ ] Configurar tunnel na VPS (externo ao projeto)
 - [ ] Testar acesso externo via HTTPS
 
 ### Migração de Dados

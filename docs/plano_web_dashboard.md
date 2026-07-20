@@ -352,30 +352,7 @@ volumes:
 
 > **Nota:** Portas expostas apenas em `127.0.0.1` (localhost) para que apenas o Cloudflare Tunnel tenha acesso externo.
 
-#### 4.2 Cloudflare Tunnel Config
-
-O tunnel deve rotear:
-
-| Hostname | Destino |
-|----------|---------|
-| `zsc-sac.eajdias.com` | `http://localhost:3050` |
-| `zsc-sac-api.eajdias.com` | `http://localhost:8050` |
-
-Exemplo de configuração `~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: <TUNNEL_ID>
-credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: zsc-sac.eajdias.com
-    service: http://localhost:3050
-  - hostname: zsc-sac-api.eajdias.com
-    service: http://localhost:8050
-  - service: http_status:404
-```
-
-#### 4.3 Migrar Dados Existentes
+#### 4.2 Migrar Dados Existentes
 
 - Script para exportar do SQLite → importar no PostgreSQL
 - Preserva: contacts, agents, conversations, messages, sync, sync_errors
