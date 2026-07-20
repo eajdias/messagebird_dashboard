@@ -7,7 +7,7 @@ from domain.entities.report_data import RawConversationData
 class ReportRepository(ABC):
     @abstractmethod
     async def fetch_raw_data_range(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> list[RawConversationData]:
         pass
 
@@ -25,25 +25,25 @@ class ReportRepository(ABC):
 
     @abstractmethod
     async def fetch_auditoria_contatos_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         pass
 
     @abstractmethod
     async def fetch_auditoria_os_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         pass
 
     @abstractmethod
     async def fetch_auditoria_chats_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         pass
 
     @abstractmethod
     async def fetch_auditoria_demanda_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         pass
 
@@ -56,7 +56,7 @@ class ReportRepository(ABC):
         pass
 
     @abstractmethod
-    async def fetch_raw_data_all(self, agent_group: str = None) -> list[RawConversationData]:
+    async def fetch_raw_data_all(self, agent_group: str | None = None) -> list[RawConversationData]:
         pass
 
     @abstractmethod

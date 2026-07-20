@@ -9,15 +9,16 @@ class SyncDatabaseUseCase:
         self,
         full_sync: bool = False,
         sync_messages: bool = False,
-        messages_days: int = None,
+        messages_days: int | None = None,
         lookback_minutes: int = 60,
-        year: int = None,
-        month: int = None,
+        year: int | None = None,
+        month: int | None = None,
         backfill_surveys: bool = False,
     ):
         pool = self._pool
         if pool is None:
             from api.dependencies import get_pool
+
             pool = await get_pool()
         return await trigger_sync_pg(
             pool,

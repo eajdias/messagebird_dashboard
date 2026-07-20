@@ -12,7 +12,7 @@ class SqliteReportRepository(ReportRepository):
         self.db = db
 
     async def fetch_raw_data_range(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> list[RawConversationData]:
         """
         Returns pure raw data for the given date range.
@@ -44,8 +44,8 @@ class SqliteReportRepository(ReportRepository):
                     contact=r["cnts_name"] or "Unknown",
                     phone=r["cnts_phone"] or "",
                     contact_id=r["cnts_id"] or 0,
-                    start_time=logic.format_local_dt(r["cnvs_created"]),
-                    end_time=logic.format_local_dt(r["cnvs_updated"]),
+                    start_time=logic.format_local_dt(r["cnvs_created"]) or "",
+                    end_time=logic.format_local_dt(r["cnvs_updated"]) or "",
                     queue_time=logic.get_effective_start_time(raw_msgs, r["cnvs_created"]),
                     raw_created=r["cnvs_created"],
                     raw_updated=r["cnvs_updated"],
@@ -90,7 +90,7 @@ class SqliteReportRepository(ReportRepository):
         return await self.db.fetch_all(query, (start_dt, end_dt))
 
     async def fetch_auditoria_contatos_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_contatos_service import AuditoriaContatosService
 
@@ -98,7 +98,7 @@ class SqliteReportRepository(ReportRepository):
         return await service.build_report(start_date, end_date, agent_group)
 
     async def fetch_auditoria_chats_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         # This is a complex one, for now we will implement a simplified version or just return empty
         # to focus on the main executive reports which are already working.
@@ -111,7 +111,7 @@ class SqliteReportRepository(ReportRepository):
         )
 
     async def fetch_auditoria_demanda_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_demanda_service import AuditoriaDemandaService
 
@@ -123,7 +123,7 @@ class SqliteReportRepository(ReportRepository):
         return await self.db.fetch_all(queries.OS_DATA_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc))
 
     async def fetch_auditoria_os_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_os_service import AuditoriaOSService
 
@@ -163,7 +163,7 @@ class SqliteReportRepository(ReportRepository):
 
         return sorted(list(groups))
 
-    async def fetch_raw_data_all(self, agent_group: str = None) -> list[RawConversationData]:
+    async def fetch_raw_data_all(self, agent_group: str | None = None) -> list[RawConversationData]:
         rows = await self.db.fetch_all(queries.SURVEY_DATA_METADATA_QUERY_ALL)
 
         conversations: dict[str, RawConversationData] = {}
@@ -184,8 +184,8 @@ class SqliteReportRepository(ReportRepository):
                     id=cid,
                     contact=r["cnts_name"] or "Unknown",
                     phone=r["cnts_phone"] or "",
-                    start_time=logic.format_local_dt(r["cnvs_created"]),
-                    end_time=logic.format_local_dt(r["cnvs_updated"]),
+                    start_time=logic.format_local_dt(r["cnvs_created"]) or "",
+                    end_time=logic.format_local_dt(r["cnvs_updated"]) or "",
                     queue_time=logic.get_effective_start_time(raw_msgs, r["cnvs_created"]),
                     raw_created=r["cnvs_created"],
                     raw_updated=r["cnvs_updated"],

@@ -120,7 +120,7 @@ class PostgresReportRepository(ReportRepository):
         self._pool = pool
 
     async def fetch_raw_data_range(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> list[RawConversationData]:
         cache_key = f"raw_range:{start_date}:{end_date}:{agent_group or ''}"
         s, e = _utc_range(start_date, end_date)
@@ -137,7 +137,7 @@ class PostgresReportRepository(ReportRepository):
 
         return await repo_cache.get_or_set(cache_key, _fetch)
 
-    async def fetch_raw_data_all(self, agent_group: str = None) -> list[RawConversationData]:
+    async def fetch_raw_data_all(self, agent_group: str | None = None) -> list[RawConversationData]:
         cache_key = f"raw_all:{agent_group or ''}"
 
         async def _fetch():
@@ -159,7 +159,7 @@ class PostgresReportRepository(ReportRepository):
         return await self._pool.fetch_all(queries_pg.AUDITORIA_CONTATOS_QUERY_ALL)
 
     async def fetch_auditoria_contatos_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_contatos_service import AuditoriaContatosService
 
@@ -171,7 +171,7 @@ class PostgresReportRepository(ReportRepository):
         return await self._pool.fetch_all(queries_pg.AGENT_MSG_CNVS_QUERY, s, e, s, e)
 
     async def fetch_auditoria_demanda_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_demanda_service import AuditoriaDemandaService
 
@@ -186,7 +186,7 @@ class PostgresReportRepository(ReportRepository):
         return await self._pool.fetch_all(queries_pg.OS_DATA_QUERY_ALL)
 
     async def fetch_auditoria_os_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_os_service import AuditoriaOSService
 
@@ -194,7 +194,7 @@ class PostgresReportRepository(ReportRepository):
         return await service.build_report(start_date, end_date, agent_group)
 
     async def fetch_auditoria_chats_data(
-        self, start_date: str, end_date: str, agent_group: str = None
+        self, start_date: str, end_date: str, agent_group: str | None = None
     ) -> tuple[list[str], list[Any]]:
         return constants.CHATS_HEADER, []
 
