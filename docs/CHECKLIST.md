@@ -149,7 +149,7 @@
 
 ### Migração SQLite → PostgreSQL (dados)
 
-- [ ] Criar script `scripts/migrate_sqlite_to_pg.py`
+- [x] Criar script `scripts/migrate_sqlite_to_pg.py`
   - Ler `m_bird.db` (SQLite) via aiosqlite
   - Inserir no PostgreSQL via asyncpg
   - Handle denormalização: SQLite usa FKs inteiros, PG usa colunas legíveis
