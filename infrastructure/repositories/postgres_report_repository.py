@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from application.interfaces.repository import ReportRepository
@@ -38,6 +38,82 @@ def _utc_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
     return _parse_dt(s), _parse_dt(e)  # type: ignore[return-value]
 
 
+def _format_dt_direct(dt: datetime | None) -> str | None:
+    """Format a datetime object with timezone offset applied.
+
+    Avoids the str -> datetime round-trip when asyncpg already returns datetime.
+    """
+    if dt is None:
+        return None
+    return (dt + timedelta(hours=logic.TIMEZONE_OFFSET)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> list[RawConversationData]:
+    """Two-pass assembly: group rows by conversation, then build objects.
+
+    Pass 1 -- group rows and collect message tuples (no expensive per-message calls).
+    Pass 2 -- build RawConversationData with queue_time computed once per conversation.
+
+    This eliminates the O(N^2) get_effective_start_time calls that previously
+    happened inside the single-pass loop.
+    """
+    # Pass 1: group by conversation ID, collect message tuples
+    conv_groups: dict[str, tuple[Any, list[tuple[str, str, int | None, str]]]] = {}
+    for r in rows:
+        cid = str(r["cnvs_id"])
+        msg_agnt_name: str = r["message_agent_name"] or ""
+        msg = (str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name)
+
+        if cid not in conv_groups:
+            conv_groups[cid] = (r, [msg])
+        else:
+            conv_groups[cid][1].append(msg)
+
+    # Pass 2: build RawConversationData (queue_time computed once per conversation)
+    result: list[RawConversationData] = []
+    for cid, (r, raw_msg_tuples) in conv_groups.items():
+        conv_agnt_name: str = r["conversation_agent_name"] or "Desconhecido"
+
+        if agent_group:
+            conv_dept_label = constants.resolve_dept(r["cnvs_dept"])
+            if constants.resolve_conversation_group(conv_agnt_name, conv_dept_label) != agent_group:
+                continue
+
+        raw_msgs = [
+            RawMessageData(created, direction, str(agent_id) if agent_id is not None else None, ag_name)
+            for created, direction, agent_id, ag_name in raw_msg_tuples
+        ]
+
+        raw_created_str = str(r["cnvs_created"] or "")
+        conv = RawConversationData(
+            id=cid,
+            contact=r["cnts_name"] or "Unknown",
+            phone=r["cnts_phone"] or "",
+            contact_id=r["cnts_id"] or 0,
+            start_time=_format_dt_direct(r["cnvs_created"]) or "",
+            end_time=_format_dt_direct(r["cnvs_updated"]) or "",
+            queue_time=logic.get_effective_start_time(raw_msgs, raw_created_str),
+            raw_created=raw_created_str,
+            raw_updated=str(r["cnvs_updated"] or ""),
+            msgs=raw_msgs,
+            rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
+            nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
+            dept_label=constants.resolve_dept(r["cnvs_dept"]),
+            contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
+            occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+            metadata={
+                "agent_name": conv_agnt_name,
+                "software": r["cnvs_software"],
+                "channel": r["cnvs_channel"],
+                "channel_name": constants.resolve_channel(r["cnvs_channel"]),
+                "description": r["cnvs_description"],
+            },
+        )
+        result.append(conv)
+
+    return result
+
+
 class PostgresReportRepository(ReportRepository):
     def __init__(self, pool: PostgresPool):
         self._pool = pool
@@ -53,120 +129,11 @@ class PostgresReportRepository(ReportRepository):
             s,
             e,
         )
-
-        conversations: dict[str, RawConversationData] = {}
-
-        for r in rows:
-            cid = str(r["cnvs_id"])
-            conv_agnt_name = r["conversation_agent_name"] or "Desconhecido"
-            msg_agnt_name = r["message_agent_name"] or ""
-
-            if agent_group:
-                conv_dept_label = constants.resolve_dept(r["cnvs_dept"])
-                if constants.resolve_conversation_group(conv_agnt_name, conv_dept_label) != agent_group:
-                    continue
-
-            if cid not in conversations:
-                raw_msgs = [
-                    RawMessageData(
-                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
-                    )
-                ]
-                conversations[cid] = RawConversationData(
-                    id=cid,
-                    contact=r["cnts_name"] or "Unknown",
-                    phone=r["cnts_phone"] or "",
-                    contact_id=r["cnts_id"] or 0,
-                    start_time=logic.format_local_dt(str(r["cnvs_created"])),
-                    end_time=logic.format_local_dt(str(r["cnvs_updated"])),
-                    queue_time=logic.get_effective_start_time(raw_msgs, str(r["cnvs_created"])),
-                    raw_created=str(r["cnvs_created"] or ""),
-                    raw_updated=str(r["cnvs_updated"] or ""),
-                    msgs=raw_msgs,
-                    rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
-                    nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
-                    dept_label=constants.resolve_dept(r["cnvs_dept"]),
-                    contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(
-                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
-                    ),
-                    metadata={
-                        "agent_name": conv_agnt_name,
-                        "software": r["cnvs_software"],
-                        "channel": r["cnvs_channel"],
-                        "channel_name": constants.resolve_channel(r["cnvs_channel"]),
-                        "description": r["cnvs_description"],
-                    },
-                )
-            else:
-                conversations[cid].msgs.append(
-                    RawMessageData(
-                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
-                    )
-                )
-                conversations[cid].queue_time = logic.get_effective_start_time(
-                    conversations[cid].msgs, conversations[cid].raw_created
-                )
-
-        return list(conversations.values())
+        return _rows_to_conversations(rows, agent_group)
 
     async def fetch_raw_data_all(self, agent_group: str = None) -> list[RawConversationData]:
         rows = await self._pool.fetch_all(queries_pg.SURVEY_DATA_METADATA_QUERY_ALL)
-
-        conversations: dict[str, RawConversationData] = {}
-
-        for r in rows:
-            cid = str(r["cnvs_id"])
-            conv_agnt_name = r["conversation_agent_name"] or "Desconhecido"
-            msg_agnt_name = r["message_agent_name"] or ""
-
-            if agent_group:
-                conv_dept_label = constants.resolve_dept(r["cnvs_dept"])
-                if constants.resolve_conversation_group(conv_agnt_name, conv_dept_label) != agent_group:
-                    continue
-
-            if cid not in conversations:
-                raw_msgs = [
-                    RawMessageData(
-                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
-                    )
-                ]
-                conversations[cid] = RawConversationData(
-                    id=cid,
-                    contact=r["cnts_name"] or "Unknown",
-                    phone=r["cnts_phone"] or "",
-                    start_time=logic.format_local_dt(str(r["cnvs_created"])),
-                    end_time=logic.format_local_dt(str(r["cnvs_updated"])),
-                    queue_time=logic.get_effective_start_time(raw_msgs, str(r["cnvs_created"])),
-                    raw_created=str(r["cnvs_created"] or ""),
-                    raw_updated=str(r["cnvs_updated"] or ""),
-                    msgs=raw_msgs,
-                    rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
-                    nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
-                    dept_label=constants.resolve_dept(r["cnvs_dept"]),
-                    contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(
-                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
-                    ),
-                    metadata={
-                        "agent_name": conv_agnt_name,
-                        "software": r["cnvs_software"],
-                        "channel": r["cnvs_channel"],
-                        "channel_name": constants.resolve_channel(r["cnvs_channel"]),
-                        "description": r["cnvs_description"],
-                    },
-                )
-            else:
-                conversations[cid].msgs.append(
-                    RawMessageData(
-                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
-                    )
-                )
-                conversations[cid].queue_time = logic.get_effective_start_time(
-                    conversations[cid].msgs, conversations[cid].raw_created
-                )
-
-        return list(conversations.values())
+        return _rows_to_conversations(rows, agent_group)
 
     async def fetch_auditoria_contatos_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         s, e = _utc_range(start_date, end_date)
