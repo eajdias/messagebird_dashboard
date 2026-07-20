@@ -4,21 +4,23 @@
 
 ---
 
-## 🏗️ Estrutura
+## Estrutura
 
 ```
 docs/
-├── plano_web_dashboard.md       # Plano de transformação CLI → Web
-├── deploy.md                    # Guia de deploy (Docker + Cloudflare)
-├── banco_de_dados.md            # Schema completo do banco
-├── arquitetura.md               # Arquitetura Clean Architecture
-├── api_reference.md             # Documentação dos endpoints
-└── changelog.md                 # Histórico de versões
+├── README.md              # Visão geral, setup, quick start
+├── API.md                 # Todos os 20 endpoints documentados
+├── FRONTEND.md            # Arquitetura, componentes, páginas
+├── DATABASE.md            # Schema PostgreSQL, migrations, queries
+├── ARCHITECTURE.md        # Clean Architecture, fluxo de dependências
+├── CHECKLIST.md           # Checklist de desenvolvimento por fase
+├── plano_web_dashboard.md # Plano de transformação CLI → Web
+└── AGENTS.md              # Este arquivo
 ```
 
 ---
 
-## 📐 Regras
+## Regras
 
 ### Formato
 - Markdown para toda documentação
@@ -36,12 +38,12 @@ docs/
 
 ---
 
-## 📝 Template para Novas Páginas
+## Template para Novas Páginas
 
 ```markdown
 # Título
 
-> **Descrição breve do que este documento cobre.
+> Descrição breve do que este documento cobre.
 
 ## Seção 1
 ...
