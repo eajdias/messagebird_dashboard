@@ -101,7 +101,8 @@ class PgSyncManager:
 
     async def get_last_sync_time(self, conn: PostgresSyncConnection, resource: str):
         row = await conn.fetch_one(
-            "SELECT sync_created, sync_cursor, sync_offset FROM sync WHERE sync_resource = $1 ORDER BY sync_id DESC LIMIT 1",
+            "SELECT sync_created, sync_cursor, sync_offset "
+            "FROM sync WHERE sync_resource = $1 ORDER BY sync_id DESC LIMIT 1",
             (resource,),
         )
         if row:
@@ -118,7 +119,9 @@ class PgSyncManager:
         self, conn: PostgresSyncConnection, resource: str, duration=None, records_count=None, cursor=None, offset=0
     ):
         await conn.execute_query(
-            "INSERT INTO sync (sync_resource, sync_duration, sync_records_count, sync_cursor, sync_offset) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO sync "
+            "(sync_resource, sync_duration, sync_records_count, sync_cursor, sync_offset) "
+            "VALUES ($1, $2, $3, $4, $5)",
             (resource, duration, records_count, cursor, offset),
         )
 
@@ -305,9 +308,13 @@ class PgSyncManager:
 
                     old_data = existing_map.get(cnvs_bird)
                     reopened_increment = 0
-                    if old_data and old_data["status"] != cnvs_status:
-                        if old_data["status"] == "archived" and cnvs_status == "active":
-                            reopened_increment = 1
+                    if (
+                        old_data
+                        and old_data["status"] != cnvs_status
+                        and old_data["status"] == "archived"
+                        and cnvs_status == "active"
+                    ):
+                        reopened_increment = 1
 
                     assigned = c.get("assignedTo") or {}
                     new_agnt_bird = assigned.get("id") if isinstance(assigned, dict) else None
@@ -388,10 +395,7 @@ class PgSyncManager:
             )
             if last_msg and last_msg["msgs_created"]:
                 df = last_msg["msgs_created"]
-                if isinstance(df, datetime):
-                    date_from = df.isoformat()
-                else:
-                    date_from = str(df)
+                date_from = df.isoformat() if isinstance(df, datetime) else str(df)
                 if "+" in date_from:
                     date_from = date_from.split("+")[0] + "Z"
                 elif not date_from.endswith("Z"):
@@ -590,7 +594,8 @@ class PgSyncManager:
             logger.info(f"  ...processed {min(i + chunk_size, total)}/{total} convs")
 
         logger.info(
-            f"Monthly messages sync completed. {total} conversations, {msg_count} messages from {year:04d}-{month:02d} onward."
+            f"Monthly messages sync completed. {total} conversations, "
+            f"{msg_count} messages from {year:04d}-{month:02d} onward."
         )
         return msg_count
 
@@ -640,7 +645,7 @@ class PgSyncManager:
             return
         cnvs_id = cnvs_row["cnvs_id"]
 
-        QUESTIONS = {
+        questions = {
             "lang": r"(?:Escolha|Selecione) seu idioma",
             "software": r"Qual seria o sistema",
             "tax_id": r"Informe por favor o CNPJ de sua empresa ou CPF",
@@ -662,10 +667,10 @@ class PgSyncManager:
             content = msg["msgs_content"] or ""
 
             if msg["msgs_direction"] == "sent" and config.PHRASE_TICKET_HEADER in content:
-                lines = [l.strip() for l in content.split("\n")]
+                lines = [ln.strip() for ln in content.split("\n")]
                 try:
-                    idx = next(j for j, l in enumerate(lines) if config.PHRASE_TICKET_HEADER in l)
-                    ticket_lines = [l for l in lines[idx + 1 :] if l and not l.startswith("===")]
+                    idx = next(j for j, ln in enumerate(lines) if config.PHRASE_TICKET_HEADER in ln)
+                    ticket_lines = [ln for ln in lines[idx + 1 :] if ln and not ln.startswith("===")]
                     if len(ticket_lines) >= 4:
                         if "cnvs_contact_reason" not in updates:
                             reason_text = ticket_lines[2]
@@ -684,7 +689,7 @@ class PgSyncManager:
                 continue
 
             matched_key = None
-            for key, pattern in QUESTIONS.items():
+            for key, pattern in questions.items():
                 if re.search(pattern, content, re.IGNORECASE | re.DOTALL):
                     matched_key = key
                     break
