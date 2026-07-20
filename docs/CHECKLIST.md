@@ -209,12 +209,8 @@
 
 ### Cloudflare Tunnel
 - [x] Portas definidas: API `:8050`, Frontend `:3050`
-- [ ] Configurar tunnel na VPS (externo ao projeto)
-- [ ] Testar acesso externo via HTTPS
 
-### Migração de Dados
-- [ ] Executar script de migração SQLite → PostgreSQL
-- [ ] Validar integridade dos dados migrados
+### Dados
 - [ ] Testar sync automático com MessageBird API
 
 ### Testes Finais

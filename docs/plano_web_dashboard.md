@@ -352,12 +352,7 @@ volumes:
 
 > **Nota:** Portas expostas apenas em `127.0.0.1` (localhost) para que apenas o Cloudflare Tunnel tenha acesso externo.
 
-#### 4.2 Migrar Dados Existentes
-
-- Script para exportar do SQLite → importar no PostgreSQL
-- Preserva: contacts, agents, conversations, messages, sync, sync_errors
-
-#### 4.4 Variáveis de Ambiente
+#### 4.2 Variáveis de Ambiente
 
 ```env
 # Database
