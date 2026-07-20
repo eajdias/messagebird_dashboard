@@ -8,6 +8,9 @@ Usage:
 Reads all rows from SQLite contacts, agents, conversations, messages tables
 and inserts them into PostgreSQL preserving integer IDs and FK relationships.
 
+The script dynamically detects columns from both databases and only migrates
+the intersection, so it handles schema differences gracefully.
+
 The sync and sync_errors tables are skipped (runtime data, will be recreated by pg_sync_engine).
 """
 
@@ -16,6 +19,7 @@ import asyncio
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,95 +28,28 @@ import asyncpg
 
 BATCH_SIZE = 500
 
-# ── Table migration order (respects FK dependencies) ────────────────────────
-TABLES: list[dict[str, Any]] = [
-    {
-        "name": "contacts",
-        "pg_columns": [
-            "cnts_id",
-            "cnts_name",
-            "cnts_phone",
-            "cnts_bird",
-            "cnts_created",
-            "cnts_updated",
-        ],
-        "sqlite_query": (
-            "SELECT cnts_id, cnts_name, cnts_phone, cnts_bird, "
-            "cnts_created, cnts_updated FROM contacts ORDER BY cnts_id"
-        ),
-    },
-    {
-        "name": "agents",
-        "pg_columns": [
-            "agnt_id",
-            "agnt_name",
-            "agnt_bird",
-            "agnt_created",
-            "agnt_updated",
-            "agnt_grp",
-        ],
-        "sqlite_query": (
-            "SELECT agnt_id, agnt_name, agnt_bird, agnt_created, agnt_updated, agnt_grp FROM agents ORDER BY agnt_id"
-        ),
-    },
-    {
-        "name": "conversations",
-        "pg_columns": [
-            "cnvs_id",
-            "cnvs_msgcount",
-            "cnvs_cnts",
-            "cnvs_agnt",
-            "cnvs_status",
-            "cnvs_channel",
-            "cnvs_bird",
-            "cnvs_created",
-            "cnvs_updated",
-            "cnvs_last",
-            "cnvs_lang",
-            "cnvs_software",
-            "cnvs_tax_id",
-            "cnvs_dept",
-            "cnvs_rating_agent",
-            "cnvs_rating_nps",
-            "cnvs_reopened_count",
-            "cnvs_contact_reason",
-            "cnvs_occurrence",
-            "cnvs_description",
-        ],
-        "sqlite_query": (
-            "SELECT cnvs_id, cnvs_msgcount, cnvs_cnts, cnvs_agnt, "
-            "cnvs_status, cnvs_channel, cnvs_bird, "
-            "cnvs_created, cnvs_updated, cnvs_last, "
-            "cnvs_lang, cnvs_software, cnvs_tax_id, "
-            "cnvs_dept, cnvs_rating_agent, cnvs_rating_nps, "
-            "cnvs_reopened_count, cnvs_contact_reason, "
-            "cnvs_occurrence, cnvs_description "
-            "FROM conversations ORDER BY cnvs_id"
-        ),
-    },
-    {
-        "name": "messages",
-        "pg_columns": [
-            "msgs_id",
-            "msgs_cnvs",
-            "msgs_agnt",
-            "msgs_direction",
-            "msgs_status",
-            "msgs_type",
-            "msgs_content",
-            "msgs_bird",
-            "msgs_created",
-            "msgs_updated",
-        ],
-        "sqlite_query": (
-            "SELECT msgs_id, msgs_cnvs, msgs_agnt, "
-            "msgs_direction, msgs_status, msgs_type, "
-            "msgs_content, msgs_bird, "
-            "msgs_created, msgs_updated "
-            "FROM messages ORDER BY msgs_id"
-        ),
-    },
-]
+# Tables in FK dependency order
+TABLE_NAMES = ["contacts", "agents", "conversations", "messages"]
+
+# Columns that are TIMESTAMP in PG and stored as strings in SQLite.
+# Any column name matching this pattern will be auto-detected as needing conversion.
+TIMESTAMP_SUFFIXES = ("_created", "_updated", "_last")
+
+
+async def get_sqlite_columns(db: aiosqlite.Connection, table: str) -> list[str]:
+    """Get column names from SQLite table via PRAGMA."""
+    cursor = await db.execute(f"PRAGMA table_info({table})")
+    rows = await cursor.fetchall()
+    return [row[1] for row in rows]
+
+
+async def get_pg_columns(conn: asyncpg.PoolConnectionProxy, table: str) -> list[str]:
+    """Get column names from PostgreSQL table via information_schema."""
+    rows = await conn.fetch(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = $1 ORDER BY ordinal_position",
+        table,
+    )
+    return [r["column_name"] for r in rows]
 
 
 def build_insert_sql(table_name: str, columns: list[str]) -> str:
@@ -122,37 +59,97 @@ def build_insert_sql(table_name: str, columns: list[str]) -> str:
     return f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
 
 
+def parse_dt(value: Any) -> datetime | None:
+    """Parse a datetime string from SQLite into a naive datetime for asyncpg."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%dT%H:%M:%SZ",
+        "%Y-%m-%dT%H:%M:%S.%fZ",
+        "%Y-%m-%d",
+    ):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=None)
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(value).replace(tzinfo=None)
+    except ValueError, TypeError:
+        return None
+
+
+def is_timestamp_column(col: str) -> bool:
+    """Check if a column name looks like a timestamp column."""
+    return any(col.endswith(suffix) for suffix in TIMESTAMP_SUFFIXES)
+
+
 async def count_rows(sqlite_path: str) -> dict[str, int]:
     """Count all rows in each SQLite table."""
     counts: dict[str, int] = {}
     async with aiosqlite.connect(sqlite_path) as db:
-        for table in TABLES:
-            cursor = await db.execute(f"SELECT COUNT(*) FROM {table['name']}")
+        for name in TABLE_NAMES:
+            cursor = await db.execute(f"SELECT COUNT(*) FROM {name}")
             row = await cursor.fetchone()
-            counts[table["name"]] = row[0] if row else 0
+            counts[name] = row[0] if row else 0
     return counts
+
+
+async def detect_columns(
+    sqlite_path: str,
+    pg_pool: asyncpg.Pool,
+) -> dict[str, list[str]]:
+    """Detect the intersection of columns between SQLite and PG for each table."""
+    result: dict[str, list[str]] = {}
+    async with aiosqlite.connect(sqlite_path) as sqlite_db, pg_pool.acquire() as pg_conn:
+        for name in TABLE_NAMES:
+            sqlite_cols = set(await get_sqlite_columns(sqlite_db, name))
+            pg_cols = set(await get_pg_columns(pg_conn, name))
+            common = sorted(sqlite_cols & pg_cols)
+            result[name] = common
+            dropped = sorted(sqlite_cols - pg_cols)
+            if dropped:
+                print(f"  {name}: skipping extra SQLite cols: {', '.join(dropped)}")
+    return result
 
 
 async def migrate_table(
     sqlite_path: str,
     pg_pool: asyncpg.Pool,
-    table: dict,
+    table_name: str,
+    columns: list[str],
     dry_run: bool = False,
 ) -> int:
-    """Migrate a single table from SQLite to PostgreSQL. Returns row count."""
-    table_name = table["name"]
-    columns = table["pg_columns"]
+    """Migrate a single table. Returns row count."""
     insert_sql = build_insert_sql(table_name, columns)
     total = 0
 
     async with aiosqlite.connect(sqlite_path) as sqlite_db:
         sqlite_db.row_factory = aiosqlite.Row
-        cursor = await sqlite_db.execute(table["sqlite_query"])
+        cols_sql = ", ".join(columns)
+        cursor = await sqlite_db.execute(
+            f"SELECT {cols_sql} FROM {table_name} ORDER BY 1",
+        )
         batch: list[tuple[object, ...]] = []
 
         async for row in cursor:
-            values = tuple(row[col] for col in columns)  # type: ignore[index]
-            batch.append(values)
+            values = []
+            for col in columns:
+                val = row[col]  # type: ignore[index]
+                if is_timestamp_column(col):
+                    val = parse_dt(val)
+                values.append(val)
+            batch.append(tuple(values))
 
             if len(batch) >= BATCH_SIZE:
                 if not dry_run:
@@ -161,7 +158,6 @@ async def migrate_table(
                 total += len(batch)
                 batch.clear()
 
-        # Flush remaining
         if batch:
             if not dry_run:
                 async with pg_pool.acquire() as conn:
@@ -186,23 +182,24 @@ async def reset_sequences(pg_pool: asyncpg.Pool) -> None:
             if row:
                 next_val = row[0]
                 await conn.execute(f"SELECT setval('{seq}', {next_val})")
-                print(f"  Sequence {seq} → {next_val}")
+                print(f"  Sequence {seq} -> {next_val}")
 
 
-async def verify_migration(sqlite_path: str, pg_pool: asyncpg.Pool) -> bool:
+async def verify_migration(
+    sqlite_path: str,
+    pg_pool: asyncpg.Pool,
+    counts: dict[str, int],
+) -> bool:
     """Compare row counts between SQLite and PostgreSQL."""
-    print("\n── Verification ──")
+    print("\n-- Verification --")
     all_ok = True
 
-    async with aiosqlite.connect(sqlite_path) as sqlite_db, pg_pool.acquire() as pg_conn:
-        for table in TABLES:
-            name = table["name"]
-            cursor = await sqlite_db.execute(f"SELECT COUNT(*) FROM {name}")
-            sqlite_row = await cursor.fetchone()
+    async with pg_pool.acquire() as pg_conn:
+        for name in TABLE_NAMES:
             pg_row = await pg_conn.fetchrow(f"SELECT COUNT(*) FROM {name}")
-            sqlite_count = sqlite_row[0] if sqlite_row else 0
             pg_count = pg_row[0] if pg_row else 0
-            match = "✓" if sqlite_count == pg_count else "✗ MISMATCH"
+            sqlite_count = counts.get(name, 0)
+            match = "OK" if sqlite_count == pg_count else "MISMATCH"
             if sqlite_count != pg_count:
                 all_ok = False
             print(f"  {name}: SQLite={sqlite_count}  PG={pg_count}  {match}")
@@ -211,7 +208,7 @@ async def verify_migration(sqlite_path: str, pg_pool: asyncpg.Pool) -> bool:
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description="Migrate SQLite → PostgreSQL")
+    parser = argparse.ArgumentParser(description="Migrate SQLite to PostgreSQL")
     parser.add_argument(
         "--sqlite-path",
         default="m_bird.db",
@@ -237,7 +234,6 @@ async def main() -> None:
     # Resolve SQLite path
     sqlite_path = args.sqlite_path
     if not os.path.isabs(sqlite_path):
-        # Try relative to project root
         project_root = Path(__file__).resolve().parent.parent
         candidate = project_root / sqlite_path
         if candidate.exists():
@@ -280,17 +276,23 @@ async def main() -> None:
     pg_pool = await asyncpg.create_pool(pg_dsn, min_size=2, max_size=5)
 
     try:
+        # Detect column intersection
+        print("Detecting columns...")
+        columns_map = await detect_columns(sqlite_path, pg_pool)
+        print()
+
         # Migrate each table in FK order
         t0 = time.monotonic()
-        for table in TABLES:
-            name = table["name"]
+        for name in TABLE_NAMES:
             count = counts.get(name, 0)
             if count == 0:
                 print(f"  {name}: skipped (0 rows)")
                 continue
 
+            cols = columns_map[name]
+            print(f"  {name}: migrating {len(cols)} columns...")
             t_start = time.monotonic()
-            migrated = await migrate_table(sqlite_path, pg_pool, table)
+            migrated = await migrate_table(sqlite_path, pg_pool, name, cols)
             elapsed = time.monotonic() - t_start
             rate = migrated / elapsed if elapsed > 0 else 0
             print(f"  {name}: {migrated} rows in {elapsed:.1f}s ({rate:.0f} rows/s)")
@@ -299,12 +301,12 @@ async def main() -> None:
         print(f"\nMigration completed in {elapsed_total:.1f}s")
 
         # Reset sequences
-        print("\n── Resetting sequences ──")
+        print("\n-- Resetting sequences --")
         await reset_sequences(pg_pool)
 
         # Verify
         if not args.skip_verify:
-            ok = await verify_migration(sqlite_path, pg_pool)
+            ok = await verify_migration(sqlite_path, pg_pool, counts)
             if not ok:
                 print("\nWARNING: Some table counts mismatch!")
                 sys.exit(1)

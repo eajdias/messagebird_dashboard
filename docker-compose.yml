@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: mbird
       POSTGRES_PASSWORD: ${DB_PASSWORD:-mbird_dev_2024}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     ports:
       - "5432:5432"
     healthcheck:

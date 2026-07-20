@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 from typing import Any
 
 from application.interfaces.repository import ReportRepository
@@ -8,15 +9,49 @@ from infrastructure.database import queries_pg
 from infrastructure.database.postgres_connection import PostgresPool
 
 
+def _parse_dt(value: str | datetime | None) -> datetime | None:
+    """Convert a date/time string to a naive datetime for asyncpg parameters."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    value = str(value).strip()
+    if not value:
+        return None
+    for fmt in (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%Y-%m-%d %H:%M:%S.%f",
+        "%Y-%m-%d",
+    ):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return datetime.fromisoformat(value).replace(tzinfo=None)
+
+
+def _utc_range(start_date: str, end_date: str) -> tuple[datetime, datetime]:
+    """Get UTC datetime range from date strings (parsed for asyncpg)."""
+    s, e = logic.get_utc_range(start_date, end_date)
+    return _parse_dt(s), _parse_dt(e)  # type: ignore[return-value]
+
+
 class PostgresReportRepository(ReportRepository):
     def __init__(self, pool: PostgresPool):
         self._pool = pool
 
-    async def fetch_raw_data_range(self, start_date: str, end_date: str, agent_group: str = None) -> list[RawConversationData]:
-        start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
+    async def fetch_raw_data_range(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> list[RawConversationData]:
+        s, e = _utc_range(start_date, end_date)
         rows = await self._pool.fetch_all(
             queries_pg.SURVEY_DATA_METADATA_QUERY,
-            start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc,
+            s,
+            e,
+            s,
+            e,
         )
 
         conversations: dict[str, RawConversationData] = {}
@@ -32,7 +67,11 @@ class PostgresReportRepository(ReportRepository):
                     continue
 
             if cid not in conversations:
-                raw_msgs = [RawMessageData(str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name)]
+                raw_msgs = [
+                    RawMessageData(
+                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
+                    )
+                ]
                 conversations[cid] = RawConversationData(
                     id=cid,
                     contact=r["cnts_name"] or "Unknown",
@@ -48,7 +87,9 @@ class PostgresReportRepository(ReportRepository):
                     nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
                     dept_label=constants.resolve_dept(r["cnvs_dept"]),
                     contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+                    occurrence=constants.resolve_occurrence(
+                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
+                    ),
                     metadata={
                         "agent_name": conv_agnt_name,
                         "software": r["cnvs_software"],
@@ -59,7 +100,9 @@ class PostgresReportRepository(ReportRepository):
                 )
             else:
                 conversations[cid].msgs.append(
-                    RawMessageData(str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name)
+                    RawMessageData(
+                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
+                    )
                 )
                 conversations[cid].queue_time = logic.get_effective_start_time(
                     conversations[cid].msgs, conversations[cid].raw_created
@@ -83,7 +126,11 @@ class PostgresReportRepository(ReportRepository):
                     continue
 
             if cid not in conversations:
-                raw_msgs = [RawMessageData(str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name)]
+                raw_msgs = [
+                    RawMessageData(
+                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
+                    )
+                ]
                 conversations[cid] = RawConversationData(
                     id=cid,
                     contact=r["cnts_name"] or "Unknown",
@@ -98,7 +145,9 @@ class PostgresReportRepository(ReportRepository):
                     nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
                     dept_label=constants.resolve_dept(r["cnvs_dept"]),
                     contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+                    occurrence=constants.resolve_occurrence(
+                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
+                    ),
                     metadata={
                         "agent_name": conv_agnt_name,
                         "software": r["cnvs_software"],
@@ -109,7 +158,9 @@ class PostgresReportRepository(ReportRepository):
                 )
             else:
                 conversations[cid].msgs.append(
-                    RawMessageData(str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name)
+                    RawMessageData(
+                        str(r["msgs_created"] or ""), r["msgs_direction"] or "", r["msgs_agnt"], msg_agnt_name
+                    )
                 )
                 conversations[cid].queue_time = logic.get_effective_start_time(
                     conversations[cid].msgs, conversations[cid].raw_created
@@ -118,39 +169,50 @@ class PostgresReportRepository(ReportRepository):
         return list(conversations.values())
 
     async def fetch_auditoria_contatos_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
-        start_dt, end_dt = logic.get_utc_range(start_date, end_date)
-        return await self._pool.fetch_all(queries_pg.AUDITORIA_CONTATOS_QUERY, start_dt, end_dt)
+        s, e = _utc_range(start_date, end_date)
+        return await self._pool.fetch_all(queries_pg.AUDITORIA_CONTATOS_QUERY, s, e)
 
     async def fetch_auditoria_contatos_raw_all(self) -> list[dict[str, Any]]:
         return await self._pool.fetch_all(queries_pg.AUDITORIA_CONTATOS_QUERY_ALL)
 
-    async def fetch_auditoria_contatos_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_contatos_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_contatos_service import AuditoriaContatosService
+
         service = AuditoriaContatosService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
     async def fetch_auditoria_demanda_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
-        start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
-        return await self._pool.fetch_all(queries_pg.AGENT_MSG_CNVS_QUERY, start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc)
+        s, e = _utc_range(start_date, end_date)
+        return await self._pool.fetch_all(queries_pg.AGENT_MSG_CNVS_QUERY, s, e, s, e)
 
-    async def fetch_auditoria_demanda_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_demanda_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_demanda_service import AuditoriaDemandaService
+
         service = AuditoriaDemandaService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
     async def fetch_auditoria_os_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
-        start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
-        return await self._pool.fetch_all(queries_pg.OS_DATA_QUERY, start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc)
+        s, e = _utc_range(start_date, end_date)
+        return await self._pool.fetch_all(queries_pg.OS_DATA_QUERY, s, e, s, e)
 
     async def fetch_auditoria_os_raw_all(self) -> list[dict[str, Any]]:
         return await self._pool.fetch_all(queries_pg.OS_DATA_QUERY_ALL)
 
-    async def fetch_auditoria_os_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_os_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_os_service import AuditoriaOSService
+
         service = AuditoriaOSService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
-    async def fetch_auditoria_chats_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_chats_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         return constants.CHATS_HEADER, []
 
     async def fetch_unmapped_counts(self) -> tuple[int, int]:
@@ -159,8 +221,8 @@ class PostgresReportRepository(ReportRepository):
         return unmapped_agents or 0, unmapped_depts or 0
 
     async def fetch_all_groups(self, start_date: str, end_date: str) -> list[str]:
-        start_dt, end_dt = logic.get_utc_range(start_date, end_date)
-        rows = await self._pool.fetch_all(queries_pg.FETCH_GROUPS_QUERY, start_dt, end_dt, start_dt, end_dt)
+        s, e = _utc_range(start_date, end_date)
+        rows = await self._pool.fetch_all(queries_pg.FETCH_GROUPS_QUERY, s, e, s, e)
         agents = [r["agnt_name"] for r in rows]
         groups = set()
         for a in agents:
@@ -168,9 +230,7 @@ class PostgresReportRepository(ReportRepository):
             if g != "OUTROS" and g != "N/A":
                 groups.add(g)
 
-        dept_rows = await self._pool.fetch_all(
-            queries_pg.DEPT_LIST_QUERY, start_dt, end_dt, start_dt, end_dt
-        )
+        dept_rows = await self._pool.fetch_all(queries_pg.DEPT_LIST_QUERY, s, e, s, e)
         for row in dept_rows:
             dept_id = row["cnvs_dept"]
             if dept_id is not None:
@@ -215,8 +275,3 @@ class PostgresReportRepository(ReportRepository):
         for r in rows:
             result[r["msgs_cnvs"]].append(dict(r))
         return dict(result)
-
-    async def fetch_auditoria_demanda_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
-        from application.services.auditoria_demanda_service import AuditoriaDemandaService
-        service = AuditoriaDemandaService(self)
-        return await service.build_report(start_date, end_date, agent_group)
