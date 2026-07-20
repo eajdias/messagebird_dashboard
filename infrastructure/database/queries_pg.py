@@ -283,3 +283,19 @@ CONVERSATION_DETAIL_QUERY = """
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
     WHERE c.cnvs_id = $1
 """
+
+# ── Materialized View queries (fast dashboard) ───────────────────────
+
+SURVEY_MV_RANGE = """
+    SELECT * FROM vw_survey_data
+    WHERE (cnvs_created::timestamp BETWEEN $1::timestamp AND $2::timestamp)
+       OR (cnvs_updated::timestamp BETWEEN $3::timestamp AND $4::timestamp)
+    ORDER BY cnvs_id, msgs_created ASC
+"""
+
+SURVEY_MV_ALL = """
+    SELECT * FROM vw_survey_data
+    ORDER BY cnvs_id, msgs_created ASC
+"""
+
+REFRESH_MV = "REFRESH MATERIALIZED VIEW CONCURRENTLY vw_survey_data"

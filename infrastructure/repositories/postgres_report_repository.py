@@ -5,6 +5,7 @@ from typing import Any
 from application.interfaces.repository import ReportRepository
 from domain import constants, logic
 from domain.entities.report_data import RawConversationData, RawMessageData
+from infrastructure.cache import repo_cache
 from infrastructure.database import queries_pg
 from infrastructure.database.postgres_connection import PostgresPool
 
@@ -121,19 +122,34 @@ class PostgresReportRepository(ReportRepository):
     async def fetch_raw_data_range(
         self, start_date: str, end_date: str, agent_group: str = None
     ) -> list[RawConversationData]:
+        cache_key = f"raw_range:{start_date}:{end_date}:{agent_group or ''}"
         s, e = _utc_range(start_date, end_date)
-        rows = await self._pool.fetch_all(
-            queries_pg.SURVEY_DATA_METADATA_QUERY,
-            s,
-            e,
-            s,
-            e,
-        )
-        return _rows_to_conversations(rows, agent_group)
+
+        async def _fetch():
+            rows = await self._pool.fetch_all(
+                queries_pg.SURVEY_MV_RANGE,
+                s,
+                e,
+                s,
+                e,
+            )
+            return _rows_to_conversations(rows, agent_group)
+
+        return await repo_cache.get_or_set(cache_key, _fetch)
 
     async def fetch_raw_data_all(self, agent_group: str = None) -> list[RawConversationData]:
-        rows = await self._pool.fetch_all(queries_pg.SURVEY_DATA_METADATA_QUERY_ALL)
-        return _rows_to_conversations(rows, agent_group)
+        cache_key = f"raw_all:{agent_group or ''}"
+
+        async def _fetch():
+            rows = await self._pool.fetch_all(queries_pg.SURVEY_MV_ALL)
+            return _rows_to_conversations(rows, agent_group)
+
+        return await repo_cache.get_or_set(cache_key, _fetch)
+
+    async def refresh_materialized_view(self) -> None:
+        """Refresh the materialized view after sync. Call from sync pipeline."""
+        await self._pool.execute(queries_pg.REFRESH_MV)
+        await repo_cache.clear()
 
     async def fetch_auditoria_contatos_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         s, e = _utc_range(start_date, end_date)

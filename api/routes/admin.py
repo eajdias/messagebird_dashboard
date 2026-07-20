@@ -37,8 +37,18 @@ async def trigger_sync(
     _current_user: dict[str, Any] = Depends(get_current_user),
 ):
     """Trigger manual sync."""
-    # TODO: Wire to SyncDatabaseUseCase
-    return SyncTriggerResponse(status="triggered", message="Sync started")
+    from api.main import _refresh_mv
+    from application.use_cases.sync_database import SyncDatabaseUseCase
+
+    use_case = SyncDatabaseUseCase()
+    await use_case.execute(
+        full_sync=request.full_sync,
+        sync_messages=request.sync_messages,
+        messages_days=request.messages_days,
+        backfill_surveys=request.backfill_surveys,
+    )
+    await _refresh_mv()
+    return SyncTriggerResponse(status="completed", message="Sync and MV refresh completed")
 
 
 @router.get("/agents", response_model=AgentListResponse)

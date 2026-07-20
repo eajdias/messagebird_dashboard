@@ -168,25 +168,33 @@ async def get_evolution(
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
+    import asyncio
+
     now = datetime.now()
     agg = _make_aggregator()
-    evolution: list[EvolutionMonth] = []
 
+    async def _month_stats(m: int, y: int):
+        _, last_day = calendar.monthrange(y, m)
+        start = f"{y}-{m:02d}-01"
+        end = f"{y}-{m:02d}-{last_day}"
+        _, processed = await _fetch_and_process(repo, start, end)
+        return agg.aggregate_statistics(processed)
+
+    # Build month list (oldest to newest)
+    month_list: list[tuple[int, int]] = []
     for i in range(months - 1, -1, -1):
-        # Calculate month year/month
         m = now.month - i
         y = now.year
         while m <= 0:
             m += 12
             y -= 1
+        month_list.append((m, y))
 
-        _, last_day = calendar.monthrange(y, m)
-        start = f"{y}-{m:02d}-01"
-        end = f"{y}-{m:02d}-{last_day}"
+    # Fetch all months in parallel (cache hits are instant)
+    results = await asyncio.gather(*[_month_stats(m, y) for m, y in month_list])
 
-        _, processed = await _fetch_and_process(repo, start, end)
-        stats = agg.aggregate_statistics(processed)
-
+    evolution: list[EvolutionMonth] = []
+    for (m, y), stats in zip(month_list, results, strict=True):
         evolution.append(
             EvolutionMonth(
                 year=y,

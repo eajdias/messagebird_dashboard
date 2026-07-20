@@ -15,6 +15,21 @@ from infrastructure.config.config_loader import load_and_configure_business, loa
 logger = logging.getLogger("m_bird.scheduler")
 
 
+async def _refresh_mv():
+    """Refresh materialized view and invalidate cache after sync."""
+    from api.dependencies import get_pool
+    from infrastructure.cache import repo_cache
+    from infrastructure.database import queries_pg
+
+    try:
+        pool = await get_pool()
+        await pool.execute(queries_pg.REFRESH_MV)
+        await repo_cache.clear()
+        logger.info("Materialized view refreshed, cache cleared")
+    except Exception:
+        logger.exception("MV refresh failed")
+
+
 async def _run_incremental_sync():
     """Background job: incremental sync (contacts + conversations, last 60 min)."""
     from application.use_cases.sync_database import SyncDatabaseUseCase
@@ -22,6 +37,7 @@ async def _run_incremental_sync():
     try:
         use_case = SyncDatabaseUseCase()
         await use_case.execute(full_sync=False, sync_messages=False, lookback_minutes=60)
+        await _refresh_mv()
         logger.info("Incremental sync completed successfully")
     except Exception:
         logger.exception("Incremental sync failed")
@@ -34,6 +50,7 @@ async def _run_full_sync():
     try:
         use_case = SyncDatabaseUseCase()
         await use_case.execute(full_sync=True, sync_messages=True, backfill_surveys=True)
+        await _refresh_mv()
         logger.info("Full sync completed successfully")
     except Exception:
         logger.exception("Full sync failed")
