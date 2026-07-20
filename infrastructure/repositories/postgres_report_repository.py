@@ -242,3 +242,92 @@ class PostgresReportRepository(ReportRepository):
         for r in rows:
             result[r["msgs_cnvs"]].append(dict(r))
         return dict(result)
+
+    # ── Conversation list / detail ────────────────────────────────────
+
+    async def list_conversations(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        department: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+        sort_by: str = "cnvs_created",
+        sort_order: str = "desc",
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List conversations with filters and pagination. Returns (rows, total_count)."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        idx = 1
+
+        if start_date and end_date:
+            s, e = _utc_range(start_date, end_date)
+            conditions.append(
+                f"(c.cnvs_created::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp"
+                f" OR c.cnvs_updated::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp)"
+            )
+            params.extend([s, e])
+            idx += 2
+
+        if department:
+            # Department is a label resolved in Python from cnvs_dept integer
+            # Filter post-query to avoid Python function in SQL
+            pass
+
+        if agent:
+            conditions.append(f"a.agnt_name ILIKE ${idx}")
+            params.append(f"%{agent}%")
+            idx += 1
+
+        if channel:
+            conditions.append(f"c.cnvs_channel = ${idx}")
+            params.append(channel)
+            idx += 1
+
+        if status:
+            conditions.append(f"c.cnvs_status = ${idx}")
+            params.append(status)
+            idx += 1
+
+        if search:
+            conditions.append(f"(ct.cnts_name ILIKE ${idx} OR ct.cnts_phone ILIKE ${idx})")
+            params.append(f"%{search}%")
+            idx += 1
+
+        where = ""
+        if conditions:
+            where = " AND " + " AND ".join(conditions)
+
+        # Validate sort column
+        allowed_sort = {
+            "created_at": "cnvs_created",
+            "updated_at": "cnvs_updated",
+            "status": "cnvs_status",
+            "rating": "cnvs_rating_agent",
+        }
+        sort_col = allowed_sort.get(sort_by, "cnvs_created")
+        order = "DESC" if sort_order.lower() == "desc" else "ASC"
+
+        # Count query
+        count_sql = queries_pg.CONVERSATION_LIST_COUNT + where
+        total = await self._pool.fetch_val(count_sql, *params)
+        total = total or 0
+
+        # Data query with LIMIT/OFFSET
+        offset = (page - 1) * per_page
+        data_sql = (
+            queries_pg.CONVERSATION_LIST_QUERY + where + f" ORDER BY {sort_col} {order} LIMIT ${idx} OFFSET ${idx + 1}"
+        )
+        params.extend([per_page, offset])
+        rows = await self._pool.fetch_all(data_sql, *params)
+
+        return [dict(r) for r in rows], total
+
+    async def get_conversation_detail(self, conversation_id: int) -> dict[str, Any] | None:
+        """Get a single conversation with all metadata."""
+        row = await self._pool.fetch_one(queries_pg.CONVERSATION_DETAIL_QUERY, conversation_id)
+        return dict(row) if row else None

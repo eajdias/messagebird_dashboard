@@ -227,3 +227,59 @@ DEPT_LIST_QUERY = """
 DEPT_LIST_QUERY_ALL = """
     SELECT DISTINCT c.cnvs_dept FROM conversations c
 """
+
+# ── Conversation list / detail queries ───────────────────────────────
+
+CONVERSATION_LIST_QUERY = """
+    SELECT
+        c.cnvs_id,
+        c.cnvs_created,
+        c.cnvs_updated,
+        c.cnvs_status,
+        c.cnvs_dept,
+        c.cnvs_rating_agent,
+        c.cnvs_rating_nps,
+        c.cnvs_msgcount,
+        c.cnvs_reopened_count,
+        c.cnvs_channel,
+        ct.cnts_id,
+        ct.cnts_name,
+        ct.cnts_phone,
+        a.agnt_name
+    FROM conversations c
+    LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
+    LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    WHERE 1=1
+"""
+
+CONVERSATION_LIST_COUNT = """
+    SELECT COUNT(*) FROM conversations c
+    LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
+    LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    WHERE 1=1
+"""
+
+CONVERSATION_DETAIL_QUERY = """
+    SELECT
+        c.cnvs_id,
+        c.cnvs_created,
+        c.cnvs_updated,
+        c.cnvs_status,
+        c.cnvs_dept,
+        c.cnvs_rating_agent,
+        c.cnvs_rating_nps,
+        c.cnvs_contact_reason,
+        c.cnvs_occurrence,
+        c.cnvs_msgcount,
+        c.cnvs_reopened_count,
+        c.cnvs_channel,
+        c.cnvs_description,
+        ct.cnts_id,
+        ct.cnts_name,
+        ct.cnts_phone,
+        a.agnt_name
+    FROM conversations c
+    LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
+    LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    WHERE c.cnvs_id = $1
+"""

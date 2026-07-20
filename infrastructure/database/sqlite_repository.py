@@ -11,14 +11,18 @@ class SqliteReportRepository(ReportRepository):
     def __init__(self, db: DatabaseConnection):
         self.db = db
 
-    async def fetch_raw_data_range(self, start_date: str, end_date: str, agent_group: str = None) -> list[RawConversationData]:
+    async def fetch_raw_data_range(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> list[RawConversationData]:
         """
         Returns pure raw data for the given date range.
         This method is a pure data provider - no aggregation logic.
         """
         start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
         # Pass the date range twice to satisfy the (created OR updated) logic in the query
-        rows = await self.db.fetch_all(queries.SURVEY_DATA_METADATA_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc))
+        rows = await self.db.fetch_all(
+            queries.SURVEY_DATA_METADATA_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc)
+        )
 
         conversations: dict[str, RawConversationData] = {}
 
@@ -50,19 +54,25 @@ class SqliteReportRepository(ReportRepository):
                     nps=r["cnvs_rating_nps"],
                     dept_label=constants.resolve_dept(r["cnvs_dept"]),
                     contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+                    occurrence=constants.resolve_occurrence(
+                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
+                    ),
                     metadata={
                         "agent_name": conv_agnt_name,
                         "software": r["cnvs_software"],
                         "channel": r["cnvs_channel"],
                         "channel_name": constants.resolve_channel(r["cnvs_channel"]),
-                        "description": r["cnvs_description"]
-                    }
+                        "description": r["cnvs_description"],
+                    },
                 )
             else:
-                conversations[cid].msgs.append(RawMessageData(r["msgs_created"], r["msgs_direction"], r["msgs_agnt"], msg_agnt_name))
+                conversations[cid].msgs.append(
+                    RawMessageData(r["msgs_created"], r["msgs_direction"], r["msgs_agnt"], msg_agnt_name)
+                )
                 # Update queue_time as more messages are added
-                conversations[cid].queue_time = logic.get_effective_start_time(conversations[cid].msgs, conversations[cid].raw_created)
+                conversations[cid].queue_time = logic.get_effective_start_time(
+                    conversations[cid].msgs, conversations[cid].raw_created
+                )
 
         return list(conversations.values())
 
@@ -79,22 +89,32 @@ class SqliteReportRepository(ReportRepository):
         """
         return await self.db.fetch_all(query, (start_dt, end_dt))
 
-    async def fetch_auditoria_contatos_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_contatos_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_contatos_service import AuditoriaContatosService
+
         service = AuditoriaContatosService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
-    async def fetch_auditoria_chats_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_chats_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         # This is a complex one, for now we will implement a simplified version or just return empty
         # to focus on the main executive reports which are already working.
         return constants.CHATS_HEADER, []
 
     async def fetch_auditoria_demanda_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
-        return await self.db.fetch_all(queries.AGENT_MSG_CNVS_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc))
+        return await self.db.fetch_all(
+            queries.AGENT_MSG_CNVS_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc)
+        )
 
-    async def fetch_auditoria_demanda_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_demanda_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_demanda_service import AuditoriaDemandaService
+
         service = AuditoriaDemandaService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
@@ -102,8 +122,11 @@ class SqliteReportRepository(ReportRepository):
         start_dt_utc, end_dt_utc = logic.get_utc_range(start_date, end_date)
         return await self.db.fetch_all(queries.OS_DATA_QUERY, (start_dt_utc, end_dt_utc, start_dt_utc, end_dt_utc))
 
-    async def fetch_auditoria_os_data(self, start_date: str, end_date: str, agent_group: str = None) -> tuple[list[str], list[Any]]:
+    async def fetch_auditoria_os_data(
+        self, start_date: str, end_date: str, agent_group: str = None
+    ) -> tuple[list[str], list[Any]]:
         from application.services.auditoria_os_service import AuditoriaOSService
+
         service = AuditoriaOSService(self)
         return await service.build_report(start_date, end_date, agent_group)
 
@@ -127,7 +150,7 @@ class SqliteReportRepository(ReportRepository):
             "SELECT DISTINCT c.cnvs_dept FROM conversations c "
             "WHERE (datetime(c.cnvs_created) BETWEEN ? AND ?) "
             "   OR (datetime(c.cnvs_updated) BETWEEN ? AND ?)",
-            (start_dt, end_dt, start_dt, end_dt)
+            (start_dt, end_dt, start_dt, end_dt),
         )
         for row in dept_rows:
             dept_id = row[0]
@@ -171,19 +194,25 @@ class SqliteReportRepository(ReportRepository):
                     nps=r["cnvs_rating_nps"],
                     dept_label=constants.resolve_dept(r["cnvs_dept"]),
                     contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-                    occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+                    occurrence=constants.resolve_occurrence(
+                        r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]
+                    ),
                     metadata={
                         "agent_name": conv_agnt_name,
                         "software": r["cnvs_software"],
                         "channel": r["cnvs_channel"],
                         "channel_name": constants.resolve_channel(r["cnvs_channel"]),
-                        "description": r["cnvs_description"]
-                    }
+                        "description": r["cnvs_description"],
+                    },
                 )
             else:
-                conversations[cid].msgs.append(RawMessageData(r["msgs_created"], r["msgs_direction"], r["msgs_agnt"], msg_agnt_name))
+                conversations[cid].msgs.append(
+                    RawMessageData(r["msgs_created"], r["msgs_direction"], r["msgs_agnt"], msg_agnt_name)
+                )
                 # Update queue_time as more messages are added
-                conversations[cid].queue_time = logic.get_effective_start_time(conversations[cid].msgs, conversations[cid].raw_created)
+                conversations[cid].queue_time = logic.get_effective_start_time(
+                    conversations[cid].msgs, conversations[cid].raw_created
+                )
 
         return list(conversations.values())
 
@@ -197,9 +226,7 @@ class SqliteReportRepository(ReportRepository):
                 groups.add(g)
 
         # Add groups from DEPT_ROUTING
-        dept_rows = await self.db.fetch_all(
-            "SELECT DISTINCT c.cnvs_dept FROM conversations c"
-        )
+        dept_rows = await self.db.fetch_all("SELECT DISTINCT c.cnvs_dept FROM conversations c")
         for row in dept_rows:
             dept_id = row[0]
             if dept_id is not None:
@@ -241,3 +268,22 @@ class SqliteReportRepository(ReportRepository):
                 result[cid] = []
             result[cid].append(r)
         return result
+
+    async def list_conversations(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        department: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        page: int = 1,
+        per_page: int = 20,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> tuple[list[dict[str, Any]], int]:
+        return [], 0
+
+    async def get_conversation_detail(self, conversation_id: int) -> dict[str, Any] | None:
+        return None
