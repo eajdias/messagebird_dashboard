@@ -36,6 +36,23 @@ def to_bird_iso(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
+def _parse_dt(value: str | datetime | None) -> datetime | None:
+    """Convert an ISO datetime string (with 'Z' suffix) to a naive UTC datetime.
+
+    The DB columns use ``TIMESTAMP`` (without timezone), so we strip tzinfo
+    after parsing to avoid ``offset-naive vs offset-aware`` errors in asyncpg.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    s = str(value).strip()
+    if not s:
+        return None
+    dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    return dt.replace(tzinfo=None)
+
+
 class PgSyncManager:
     def __init__(self):
         self.client = MessageBirdClient()
@@ -158,7 +175,9 @@ class PgSyncManager:
                 contact_name = c.get("displayName") or None
                 if contact_name and str(contact_name).strip().lower() in ("none", "null", ""):
                     contact_name = None
-                contacts_data.append((contact_name, phone, c.get("id"), c.get("createdAt"), c.get("updatedAt")))
+                contacts_data.append(
+                    (contact_name, phone, c.get("id"), _parse_dt(c.get("createdAt")), _parse_dt(c.get("updatedAt")))
+                )
             if contacts_data:
                 async with conn.transaction():
                     await conn.execute_many(
@@ -302,9 +321,9 @@ class PgSyncManager:
                     cnvs_msgcount = c.get("messages", {}).get("totalCount", 0)
                     cnvs_status = c.get("status")
                     cnvs_channel = c.get("lastUsedChannelId")
-                    cnvs_created = c.get("createdDatetime")
-                    cnvs_updated = c.get("updatedDatetime")
-                    cnvs_last = c.get("lastReceivedDatetime")
+                    cnvs_created = _parse_dt(c.get("createdDatetime"))
+                    cnvs_updated = _parse_dt(c.get("updatedDatetime"))
+                    cnvs_last = _parse_dt(c.get("lastReceivedDatetime"))
 
                     old_data = existing_map.get(cnvs_bird)
                     reopened_increment = 0
@@ -480,8 +499,8 @@ class PgSyncManager:
                         m_data["type"],
                         m_data["content"],
                         m_data["id"],
-                        m_data["created"],
-                        m_data["updated"],
+                        _parse_dt(m_data["created"]),
+                        _parse_dt(m_data["updated"]),
                     )
                 )
 
@@ -819,8 +838,11 @@ async def trigger_sync_pg(
     month: int | None = None,
     backfill_surveys: bool = False,
 ) -> str:
+    from infrastructure.database.postgres_connection import PostgresPool
+
+    raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
     manager = PgSyncManager()
-    conn = PostgresSyncConnection(pool)
+    conn = PostgresSyncConnection(raw_pool)
 
     await manager._load_caches(conn)
     await manager.seed_known_agents(conn)

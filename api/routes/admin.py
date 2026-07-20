@@ -46,6 +46,8 @@ async def trigger_sync(
         sync_messages=request.sync_messages,
         messages_days=request.messages_days,
         backfill_surveys=request.backfill_surveys,
+        year=request.year,
+        month=request.month,
     )
     await _refresh_mv()
     return SyncTriggerResponse(status="completed", message="Sync and MV refresh completed")

@@ -8,6 +8,7 @@ from infrastructure.repositories.postgres_report_repository import PostgresRepor
 @lru_cache
 def get_database_url() -> str:
     import os
+
     return os.getenv("DATABASE_URL", "postgresql://mbird:mbird_dev_2024@localhost:5432/mbird_reports")
 
 
@@ -17,8 +18,13 @@ _pool: PostgresPool | None = None
 async def get_pool() -> PostgresPool:
     global _pool
     if _pool is None:
-        _pool = PostgresPool(dsn=get_database_url())
-        await _pool.start()
+        pool = PostgresPool(dsn=get_database_url())
+        try:
+            await pool.start()
+        except Exception:
+            _pool = None
+            raise
+        _pool = pool
     return _pool
 
 

@@ -26,12 +26,10 @@ services:
       dockerfile: Dockerfile
     container_name: mbird_api
     command: >
-      sh -c "alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports upgrade head 2>/dev/null ||
-             alembic -x sqlalchemy.url=postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports stamp head &&
-             uvicorn api.main:app --reload --host 0.0.0.0 --port 8000"
+      uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
+      DATABASE_URL: postgresql://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
       CORS_ORIGINS: https://zsc-sac.eajdias.com,http://localhost:3050
     depends_on:
       postgres:

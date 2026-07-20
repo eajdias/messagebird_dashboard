@@ -59,6 +59,30 @@ async def _run_full_sync():
 scheduler = AsyncIOScheduler()
 
 
+async def _init_schema():
+    """Create tables + materialized view if they don't exist (idempotent)."""
+    import os
+
+    from api.dependencies import get_pool
+
+    migrations_dir = os.path.join(os.path.dirname(__file__), "..", "infrastructure", "database", "migrations")
+    for sql_file in ("001_initial.sql", "002_materialized_view.sql"):
+        path = os.path.join(migrations_dir, sql_file)
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            sql = f.read()
+        pool = await get_pool()
+        try:
+            for statement in sql.split(";"):
+                stmt = statement.strip()
+                if stmt:
+                    await pool.execute(stmt)
+            logger.info("Applied %s", sql_file)
+        except Exception:
+            logger.exception("Failed to apply %s", sql_file)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     import os
@@ -71,6 +95,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     bsc_path = os.path.join(os.path.dirname(__file__), "..", "business_bsc.yaml")
     load_and_configure_business(config_path)
     load_bsc_config(bsc_path)
+
+    await _init_schema()
 
     scheduler.add_job(
         _run_incremental_sync,
