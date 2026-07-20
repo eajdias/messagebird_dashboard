@@ -13,6 +13,7 @@ import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from infrastructure.api import config
 from infrastructure.api.client import MessageBirdClient
@@ -141,9 +142,9 @@ class PgSyncManager:
         while True:
             response = await self.client.list_contacts(limit=limit, offset=offset)
             if "error" in response:
-                await self.log_sync_error(conn, "contacts", response["error"], context={"offset": offset})
+                await self.log_sync_error(conn, "contacts", str(response["error"]), context={"offset": offset})
                 break
-            items = response.get("items", [])
+            items: list[dict[str, Any]] = response.get("items", [])  # type: ignore[assignment]
             if not items:
                 break
             contacts_data = []
@@ -211,7 +212,7 @@ class PgSyncManager:
             total_convs = 0
 
             while True:
-                conv_params: dict[str, object] = {"limit": limit}
+                conv_params: dict[str, Any] = {"limit": limit}
                 if page_token:
                     conv_params["pageToken"] = page_token
                 elif offset:
@@ -235,7 +236,7 @@ class PgSyncManager:
                 if not items:
                     break
 
-                pagination: dict[str, object] = response.get("pagination", {})  # type: ignore[assignment]
+                pagination: dict[str, Any] = response.get("pagination", {})  # type: ignore[assignment]
                 if total_convs == 0:
                     total_convs = int(pagination.get("totalCount", 0))  # type: ignore[arg-type]
                 next_page_token = pagination.get("nextPageToken") or response.get("nextPageToken")
@@ -259,7 +260,7 @@ class PgSyncManager:
                     for r in existing_rows
                 }
 
-                contacts_to_resolve: dict[str, tuple] = {}
+                contacts_to_resolve: dict[str, tuple[str | None, str]] = {}
                 for c in items:
                     c_id = c.get("contactId")
                     if c_id and c_id not in self._contact_cache:
@@ -409,12 +410,12 @@ class PgSyncManager:
                 await self.log_sync_error(
                     conn,
                     "messages",
-                    response["error"],
+                    str(response["error"]),
                     context={"cnvs_bird": conversation_bird_id, "offset": offset},
                 )
                 break
 
-            items = response.get("items", [])
+            items: list[dict[str, Any]] = response.get("items", [])  # type: ignore[assignment]
             if not items:
                 break
 

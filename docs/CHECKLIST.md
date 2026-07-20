@@ -99,7 +99,7 @@
 
 ### Configuração
 
-- [ ] Integrar APScheduler no `api/main.py` (sync incremental a cada 15 min, full diário 3:00 AM)
+- [x] Integrar APScheduler no `api/main.py` (sync incremental a cada 15 min, full diário 3:00 AM)
 - [x] Configurar CORS dinâmico via `CORS_ORIGINS` do `.env` (middleware.py)
 - [x] Garantir que `config_loader.py` funciona com PostgreSQL (YAML loaders são DB-agnostic)
 

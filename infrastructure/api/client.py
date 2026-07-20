@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any
 
 import httpx
 
@@ -40,8 +41,8 @@ class MessageBirdClient:
         await self.close()
 
     async def _make_request(
-        self, method: str, url: str, params: dict[str, object] | None = None, json_data: dict[str, object] | None = None
-    ) -> dict[str, object]:
+        self, method: str, url: str, params: dict[str, Any] | None = None, json_data: dict[str, Any] | None = None
+    ) -> Any:
         try:
             logger.debug(f"Making {method} request to {url}")
             response = await self.client.request(method, url, params=params, json=json_data)
@@ -69,7 +70,7 @@ class MessageBirdClient:
         updatedDatetimeAfter: str | None = None,
     ):
         url = f"{self.base_url_conv}/conversations"
-        params: dict[str, object] = {"limit": limit, "offset": offset, "status": status}
+        params: dict[str, Any] = {"limit": limit, "offset": offset, "status": status}
         if page_token:
             params["pageToken"] = page_token
         if createdDatetimeAfter:
@@ -82,12 +83,12 @@ class MessageBirdClient:
 
     async def get_messages(self, conversation_id: str, limit: int = 20, offset: int = 0, date_from: str | None = None):
         url = f"{self.base_url_conv}/conversations/{conversation_id}/messages"
-        params: dict[str, object] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         if date_from:
             params["dateFrom"] = date_from
         return await self._make_request("GET", url, params)
 
     async def list_contacts(self, limit: int = 20, offset: int = 0):
         url = f"{self.base_url_contacts}/contacts"
-        params: dict[str, object] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         return await self._make_request("GET", url, params)
