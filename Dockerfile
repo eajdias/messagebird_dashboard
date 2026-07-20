@@ -21,15 +21,15 @@ RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
     pydantic>=2.13.4 pydantic-settings>=2.13.0 \
     "python-jose[cryptography]>=3.5.0" "passlib[bcrypt]>=1.7.4" \
     asyncpg>=0.31.0 "sqlalchemy[asyncio]>=2.0.51" alembic>=1.18.5 \
-    python-dotenv pyyaml httpx apscheduler \
+    "pydantic[email]" python-dotenv pyyaml httpx apscheduler \
     xlsxwriter fpdf2
 
 # Copy application code
 COPY . .
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/admin/health').raise_for_status()"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://127.0.0.1:8000/api/v1/admin/health').raise_for_status()"
 
 EXPOSE 8000
 
