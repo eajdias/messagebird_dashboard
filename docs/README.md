@@ -74,10 +74,10 @@ npm run dev
 
 | Serviço | URL |
 |---------|-----|
-| Frontend | http://localhost:3000 |
-| API Docs (Swagger) | http://localhost:8000/docs |
-| API Docs (ReDoc) | http://localhost:8000/redoc |
-| Health Check | http://localhost:8000/api/v1/admin/health |
+| Frontend | http://localhost:3050 |
+| API Docs (Swagger) | http://localhost:8050/docs |
+| API Docs (ReDoc) | http://localhost:8050/redoc |
+| Health Check | http://localhost:8050/api/v1/admin/health |
 
 ## Credenciais Padrão
 

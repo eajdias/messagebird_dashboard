@@ -181,6 +181,6 @@ docker compose down
 
 - **Docker Compose**: PostgreSQL + API + Frontend orquestrados
 - **Cloudflare Tunnels**: exposição HTTPS sem nginx
-  - `app.empresa.com` → Frontend (:3000)
-  - `api.empresa.com` → API (:8000)
+  - `zsc-sac.eajdias.com` → Frontend (:3050)
+  - `zsc-sac-api.eajdias.com` → API (:8050)
 - Portas expostas apenas em `127.0.0.1` (acesso local via Tunnel)

@@ -110,7 +110,7 @@ npx shadcn-ui@latest add button
 
 ## 🚨 Erros Comuns
 
-1. **CORS**: Frontend roda em `:3000`, API em `:8000`. Configurar CORS no backend.
+1. **CORS**: Frontend roda em `:3050`, API em `:8050`. Configurar CORS no backend.
 2. **Hydration mismatch**: Usar `useEffect` para valores que só existem no client
 3. **Loading states**: Sempre mostrar skeleton/spinner durante fetch
 4. **Type errors**: Rodar `npm run build` antes de commitar

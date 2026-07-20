@@ -73,7 +73,7 @@ Todos usam `class-variance-authority` + `cn()`.
 ## API Client (`lib/api.ts`)
 
 Axios instance com:
-- Base URL: `NEXT_PUBLIC_API_URL` (default: `http://localhost:8000`)
+- Base URL: `NEXT_PUBLIC_API_URL` (default: `http://localhost:8050`)
 - Request interceptor: injeta `Authorization: Bearer {token}`
 - Response interceptor: redireciona `/login` em 401
 

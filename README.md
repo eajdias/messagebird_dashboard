@@ -18,8 +18,8 @@ cp .env.example .env
 docker compose up -d
 
 # 4. Acesse
-# Frontend: http://localhost:3000
-# API:      http://localhost:8000/docs
+# Frontend: http://localhost:3050
+# API:      http://localhost:8050/docs
 ```
 
 ## Desenvolvimento
@@ -69,8 +69,8 @@ new_bird/
 
 - **Docker Compose**: PostgreSQL + API + Frontend
 - **Cloudflare Tunnels**: HTTPS sem nginx
-  - `app.empresa.com` → Frontend (:3000)
-  - `api.empresa.com` → API (:8000)
+  - `zsc-sac.eajdias.com` → Frontend (:3050)
+  - `zsc-sac-api.eajdias.com` → API (:8050)
 
 ## License
 

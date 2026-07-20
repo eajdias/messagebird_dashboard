@@ -1,6 +1,6 @@
 # API Reference — MBird Dashboard
 
-Base URL: `http://localhost:8000/api/v1`
+Base URL: `http://localhost:8050/api/v1`
 
 Autenticação: Bearer JWT no header `Authorization`.
 

@@ -29,7 +29,7 @@
 │  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐   │
 │  │  Frontend   │  │  Backend API │  │  PostgreSQL   │   │
 │  │  Next.js    │  │  FastAPI     │  │  15           │   │
-│  │  :3000      │  │  :8000       │  │  :5432        │   │
+│  │  :3050      │  │  :8050       │  │  :5432        │   │
 │  └──────┬──────┘  └──────┬───────┘  └────────┬──────┘   │
 │         │                │                   │          │
 │         │           ┌────┴───────┐           │          │
@@ -69,10 +69,10 @@
 
 | Subdomínio | Serviço | Porta |
 |------------|---------|-------|
-| `app.empresa.com` | Frontend Next.js | 3000 |
-| `api.empresa.com` | Backend FastAPI | 8000 |
+| `zsc-sac.eajdias.com` | Frontend Next.js | 3050 |
+| `zsc-sac-api.eajdias.com` | Backend FastAPI | 8050 |
 
-O frontend consome a API via `api.empresa.com/api/v1/...`. CORS configura o domínio permitido (`app.empresa.com`).
+O frontend consome a API via `zsc-sac-api.eajdias.com/api/v1/...`. CORS configura o domínio permitido (`zsc-sac.eajdias.com`).
 
 ---
 
@@ -330,19 +330,19 @@ services:
 
   api:
     build: .
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8050
     env_file: .env
     depends_on:
       - postgres
     volumes:
       - ./reports:/app/reports
     ports:
-      - "127.0.0.1:8000:8000"  # Apenas localhost para Cloudflare Tunnel
+      - "127.0.0.1:8050:8000"  # Apenas localhost para Cloudflare Tunnel
 
   frontend:
     build: ./frontend
     ports:
-      - "127.0.0.1:3000:3000"  # Apenas localhost para Cloudflare Tunnel
+      - "127.0.0.1:3050:3000"  # Apenas localhost para Cloudflare Tunnel
     depends_on:
       - api
 
@@ -358,8 +358,8 @@ O tunnel deve rotear:
 
 | Hostname | Destino |
 |----------|---------|
-| `app.empresa.com` | `http://localhost:3000` |
-| `api.empresa.com` | `http://localhost:8000` |
+| `zsc-sac.eajdias.com` | `http://localhost:3050` |
+| `zsc-sac-api.eajdias.com` | `http://localhost:8050` |
 
 Exemplo de configuração `~/.cloudflared/config.yml`:
 
@@ -368,10 +368,10 @@ tunnel: <TUNNEL_ID>
 credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
 
 ingress:
-  - hostname: app.empresa.com
-    service: http://localhost:3000
-  - hostname: api.empresa.com
-    service: http://localhost:8000
+  - hostname: zsc-sac.eajdias.com
+    service: http://localhost:3050
+  - hostname: zsc-sac-api.eajdias.com
+    service: http://localhost:8050
   - service: http_status:404
 ```
 
