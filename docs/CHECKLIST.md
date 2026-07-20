@@ -203,9 +203,9 @@
 ## Fase 4: Integração e Deploy 🔲
 
 ### Docker
-- [ ] Criar `frontend/Dockerfile` (Node 22 Alpine, multi-stage)
-- [ ] Completar `docker-compose.yml` com serviço frontend
-- [ ] Testar `docker compose up` completo
+- [x] Criar `frontend/Dockerfile` (Node 22 Alpine, multi-stage)
+- [x] Completar `docker-compose.yml` com serviço frontend
+- [x] Testar `docker compose up` completo — 3/3 serviços healthy
 
 ### Cloudflare Tunnel
 - [ ] Configurar `app.empresa.com` → `localhost:3000`
