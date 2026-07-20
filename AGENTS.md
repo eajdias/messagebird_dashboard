@@ -171,8 +171,8 @@ docker compose down
 |------|--------|-----|
 | Fase 0: Setup e Infraestrutura | ✅ Concluída | [CHECKLIST.md](docs/CHECKLIST.md) |
 | Fase 1: Backend Core (domain + app + infra) | ✅ Concluída | [CHECKLIST.md](docs/CHECKLIST.md) |
-| Fase 2: Backend API (endpoints) | 🔲 Pendente | [CHECKLIST.md](docs/CHECKLIST.md) |
-| Fase 3: Frontend Dashboard | 🔲 Pendente | [CHECKLIST.md](docs/CHECKLIST.md) |
+| Fase 2: Backend API (endpoints) | ✅ Concluída | [CHECKLIST.md](docs/CHECKLIST.md) |
+| Fase 3: Frontend Dashboard | ✅ Concluída | [CHECKLIST.md](docs/CHECKLIST.md) |
 | Fase 4: Integração e Deploy | 🔲 Pendente | [CHECKLIST.md](docs/CHECKLIST.md) |
 
 ---

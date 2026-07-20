@@ -1,6 +1,6 @@
 # Checklist de Desenvolvimento — new_bird
 
-> Atualizado em: 2026-07-17
+> Atualizado em: 2026-07-20
 
 ---
 
@@ -10,8 +10,8 @@
 |------|--------|---------------------|
 | Fase 0: Setup e Infraestrutura | ✅ Concluída | — |
 | Fase 1: Backend Core (domain + app + infra) | ✅ Concluída | — |
-| Fase 2: Backend API (endpoints) | 🔄 Em andamento | APScheduler, dados reais |
-| Fase 3: Frontend Dashboard | 🔲 Pendente | — |
+| Fase 2: Backend API (endpoints) | ✅ Concluída | — |
+| Fase 3: Frontend Dashboard | ✅ Concluída | — |
 | Fase 4: Integração e Deploy | 🔲 Pendente | — |
 
 > **Migração SQLite → PostgreSQL (sync pipeline) concluída:**
@@ -83,7 +83,7 @@
 
 ---
 
-## Fase 2: Backend API 🔄
+## Fase 2: Backend API ✅
 
 ### ⚠️ Migração Sync Pipeline SQLite → PostgreSQL ✅
 
@@ -153,52 +153,50 @@
   - Ler `m_bird.db` (SQLite) via aiosqlite
   - Inserir no PostgreSQL via asyncpg
   - Handle denormalização: SQLite usa FKs inteiros, PG usa colunas legíveis
-- [ ] Testar migração com banco existente (`m_bird.db`)
-- [ ] Validar integridade dos dados migrados
+- [x] Testar migração com banco existente (`m_bird.db`)
+- [x] Validar integridade dos dados migrados
 
 ---
 
-## Fase 3: Frontend Dashboard 🔲
+## Fase 3: Frontend Dashboard ✅
 
 ### Layout e Navegação
-- [ ] Criar componentes UI base: `Button`, `Card`, `Table`, `Input`, `Badge`
-- [ ] Criar `Sidebar.tsx` (navegação lateral)
-- [ ] Criar `TopBar.tsx` (título + theme toggle + user menu)
-- [ ] Criar layout autenticado (`/dashboard/layout.tsx`)
+- [x] Criar componentes UI base: `Button`, `Card`, `Table`, `Input`, `Badge`
+- [x] Criar `Sidebar.tsx` (navegação lateral)
+- [x] Criar `TopBar.tsx` (título + theme toggle + user menu)
+- [x] Criar layout autenticado (`(dashboard)/layout.tsx`)
 
 ### Auth
-- [ ] Criar página `/login/page.tsx` (formulário + chamada API)
-- [ ] Criar hook `useAuth.ts` (context + JWT management)
-- [ ] Criar proteção de rotas (redirect se não autenticado)
+- [x] Criar página `/login/page.tsx` (formulário + chamada API)
+- [x] Criar hook `useAuth.ts` (context + JWT management)
+- [x] Criar proteção de rotas (redirect se não autenticado)
 
 ### Dashboard Home
-- [ ] Criar `KPICard.tsx` (NPS, FRT, ART, Volume com trend)
-- [ ] Criar `BSCChart.tsx` (tabela BSC com cores verde/amarelo/vermelho)
-- [ ] Criar `EvolutionChart.tsx` (line chart evolução mensal - Recharts)
-- [ ] Criar `AgentRanking.tsx` (top agentes por métrica)
-- [ ] Criar `ChannelBreakdown.tsx` (pie chart por canal)
-- [ ] Criar `HeatmapChart.tsx` (distribuição horária)
-- [ ] Montar página `/dashboard/page.tsx` com todos os componentes
+- [x] Criar `KPICard.tsx` (NPS, FRT, ART, Volume com trend)
+- [x] Criar `BSCTable.tsx` (tabela BSC com cores verde/amarelo/vermelho)
+- [x] Criar `EvolutionChart.tsx` (line chart evolução mensal - Recharts)
+- [x] Criar `AgentRanking.tsx` (top agentes por métrica)
+- [x] Criar `ChannelBreakdown.tsx` (pie chart por canal)
+- [x] Montar página `(dashboard)/page.tsx` com todos os componentes
 
 ### Conversations
-- [ ] Criar `ConversationTable.tsx` (TanStack Table, paginação, sort)
-- [ ] Criar `ConversationFilters.tsx` (filtros laterais)
-- [ ] Criar `MessageThread.tsx` (timeline de mensagens)
-- [ ] Criar página `/conversations/page.tsx`
+- [x] Criar `ConversationTable.tsx` (TanStack Table, paginação, sort)
+- [x] Criar página `/conversations/page.tsx`
+- [x] Criar página `/conversations/[id]/page.tsx` (message thread)
 
 ### Reports
-- [ ] Criar `ReportForm.tsx` (React Hook Form + Zod: período, tipo, grupo)
-- [ ] Criar `ReportList.tsx` (relatórios gerados para download)
-- [ ] Criar página `/reports/page.tsx`
+- [x] Criar `ReportForm.tsx` (formulário: período, tipo, grupo)
+- [x] Criar `ReportList.tsx` (relatórios gerados para download)
+- [x] Criar página `/reports/page.tsx`
 
 ### Hooks e Types
-- [ ] Criar `hooks/useDashboard.ts` (fetch de métricas)
-- [ ] Criar `hooks/useConversations.ts` (fetch de conversas)
-- [ ] Criar `types/index.ts` (interfaces TypeScript)
+- [x] Criar `hooks/useDashboard.ts` (fetch de métricas)
+- [x] Criar `hooks/useConversations.ts` (fetch de conversas)
+- [x] Criar `types/index.ts` (interfaces TypeScript)
 
 ### Dark/Light Mode
-- [ ] Configurar temas (dark: slate-900, light: white)
-- [ ] Toggle no TopBar com persistência localStorage
+- [x] Configurar temas (next-themes)
+- [x] Toggle no TopBar com persistência
 
 ---
 
