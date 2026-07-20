@@ -21,7 +21,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace("/dashboard");
+      router.replace("/");
     } catch {
       setError("Credenciais inválidas");
     } finally {
