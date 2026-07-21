@@ -42,8 +42,8 @@ new_bird/
 ├── infrastructure/         # Detalhes técnicos
 │   ├── api/                # MessageBirdClient (httpx), config, sync.py (1253 loc)
 │   ├── config/             # config_loader.py (YAML loaders)
-│   ├── database/           # SQLite (legado), queries, connection, init_db
-│   ├── repositories/       # PostgresReportRepository (asyncpg)
+│   ├── database/           # PostgreSQL (asyncpg), queries, migrations
+│   ├── repositories/       # PostgresReportRepository
 │   ├── exporters/          # Excel, PDF, Markdown, metrics_cache, _bsc_writer
 │   └── sync/               # (reservado para sync engine async)
 │

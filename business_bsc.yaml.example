@@ -61,6 +61,5 @@ NPS_CONFIG:
 # Limites dos cálculos de métricas (minutos / segundos)
 METRIC_THRESHOLDS:
   sla_frt_minutes: 60
-  sla_frt_seconds: 3600
   max_art_minutes: 480
   max_duration_minutes: 630

@@ -16,7 +16,7 @@ from infrastructure.config.config_loader import load_and_configure_business, loa
 logger = logging.getLogger("m_bird.scheduler")
 
 
-def _make_incremental_handler(lookback: int, messages_days: int | None):
+def _make_incremental_handler(messages_days: int | None):
     """Create an incremental sync handler bound to profile parameters."""
 
     async def _run():
@@ -28,14 +28,13 @@ def _make_incremental_handler(lookback: int, messages_days: int | None):
                 full_sync=False,
                 sync_messages=messages_days is not None,
                 messages_days=messages_days,
-                lookback_minutes=lookback,
             )
             from api.sync_utils import refresh_materialized_view
 
             await refresh_materialized_view()
-            logger.info("Incremental sync completed (lookback=%d, messages_days=%s)", lookback, messages_days)
+            logger.info("Sync completed (messages_days=%s)", messages_days)
         except Exception:
-            logger.exception("Incremental sync failed")
+            logger.exception("Sync failed")
 
     return _run
 
@@ -115,19 +114,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
         if profile.has_incremental:
             assert profile.incremental_minutes is not None
-            assert profile.incremental_lookback is not None
             handler = _make_incremental_handler(
-                lookback=profile.incremental_lookback,
                 messages_days=profile.messages_days,
             )
             scheduler.add_job(
                 handler,
                 trigger=IntervalTrigger(minutes=profile.incremental_minutes),
                 id="incremental_sync",
-                name=f"Incremental sync ({profile.incremental_minutes}min, lookback={profile.incremental_lookback}min)",
+                name=f"Sync ({profile.incremental_minutes}min, msgs={profile.messages_days}d)",
                 replace_existing=True,
             )
-            jobs_registered.append(f"incremental every {profile.incremental_minutes}min")
+            jobs_registered.append(f"sync every {profile.incremental_minutes}min")
 
         if profile.has_full_sync:
             assert profile.full_sync_hour is not None

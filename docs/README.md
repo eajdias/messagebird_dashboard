@@ -96,10 +96,6 @@ ruff check . && ruff format .
 
 # Testes
 pytest -v
-
-# Criar migração
-alembic revision --autogenerate -m "description"
-alembic upgrade head
 ```
 
 ### Frontend

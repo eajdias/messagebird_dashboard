@@ -29,7 +29,7 @@ class MessageBirdClient:
         self.base_url_bird = get_base_url_bird()
         self.client = httpx.AsyncClient(
             headers=self._get_headers(),
-            timeout=httpx.Timeout(HTTP_TIMEOUT, connect=10.0),
+            timeout=HTTP_TIMEOUT,
         )
 
     def _get_headers(self):

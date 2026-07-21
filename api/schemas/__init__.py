@@ -1,9 +1,14 @@
+from api.schemas._base import list_response
+
+# Each module is imported directly by routes via its own path.
+# Re-exports kept for backward compatibility.
 from api.schemas.admin import (
     AgentItem,
     AgentListResponse,
     DepartmentItem,
     DepartmentListResponse,
     HealthResponse,
+    SyncProfileResponse,
     SyncStatusResponse,
     SyncTriggerRequest,
     SyncTriggerResponse,
@@ -60,6 +65,7 @@ __all__ = [
     "DownloadReportResponse",
     "AvailableReportItem",
     "AvailableReportsResponse",
+    "SyncProfileResponse",
     "SyncStatusResponse",
     "SyncTriggerRequest",
     "SyncTriggerResponse",
@@ -68,4 +74,5 @@ __all__ = [
     "DepartmentItem",
     "DepartmentListResponse",
     "HealthResponse",
+    "list_response",
 ]

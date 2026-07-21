@@ -1,4 +1,4 @@
-"""Unit tests for PgSyncManager.sync_conversations (client-side filtering)."""
+"""Unit tests for sync_conversations (full structural sync)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from infrastructure.sync.pg_sync_engine import PgSyncManager, _parse_dt
+from infrastructure.sync.sync_core import PgSyncManager, parse_dt
+from infrastructure.sync.sync_conversations import sync_conversations
 
 
 # ── Helpers ─────────────────────────────────────────────────────
@@ -31,7 +32,7 @@ def _make_conversation(bird_id: str, updated: str, status: str = "active"):
 
 def _make_page(conversations: list[dict], next_page_token: str | None = None):
     """Build a Bird API list response."""
-    result = {"data": conversations, "pagination": {"totalCount": len(conversations)}}
+    result = {"items": conversations, "pagination": {"totalCount": len(conversations)}}
     if next_page_token:
         result["pagination"]["nextPageToken"] = next_page_token
     return result
@@ -63,19 +64,19 @@ def mock_conn():
     return conn
 
 
-# ── Tests: _parse_dt ────────────────────────────────────────────
+# ── Tests: parse_dt ────────────────────────────────────────────
 
 
 def test_parse_dt_none():
-    assert _parse_dt(None) is None
+    assert parse_dt(None) is None
 
 
 def test_parse_dt_empty_string():
-    assert _parse_dt("") is None
+    assert parse_dt("") is None
 
 
 def test_parse_dt_z_suffix():
-    dt = _parse_dt("2026-07-21T12:00:00Z")
+    dt = parse_dt("2026-07-21T12:00:00Z")
     assert dt.year == 2026
     assert dt.month == 7
     assert dt.hour == 12
@@ -84,7 +85,7 @@ def test_parse_dt_z_suffix():
 
 def test_parse_dt_datetime_passthrough():
     now = datetime.now(UTC)
-    result = _parse_dt(now)
+    result = parse_dt(now)
     assert result.tzinfo is None
     assert result.year == now.year
 
@@ -122,33 +123,33 @@ async def test_incremental_stops_at_cutoff(manager, mock_conn):
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(side_effect=[page1, page2, empty_page])
 
-    await manager.sync_conversations(mock_conn, lookback_minutes=60)
+    await sync_conversations(manager, mock_conn)
 
     # Should have processed c1, c2, c3 (3 items) and stopped at c4
     # API called 3 times: page1(active) + page2(active) + empty_page(archived)
     assert manager.client.list_conversations.call_count == 3
-    # Verify reverse=True was sent
+    # Verify reverse=False (full structural, no cutoff)
     first_call_kwargs = manager.client.list_conversations.call_args_list[0]
-    assert first_call_kwargs.kwargs.get("reverse") is True
+    assert first_call_kwargs.kwargs.get("reverse") is False
     # execute_many called twice: contacts INSERT + conversations UPSERT (2 pages)
     assert mock_conn.execute_many.call_count == 2
 
 
 @pytest.mark.asyncio
 async def test_incremental_no_reverse_in_full_sync(manager, mock_conn):
-    """Full sync should NOT send reverse=true."""
+    """Sync always uses reverse=false now."""
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(return_value=_make_page([]))
 
-    await manager.sync_conversations(mock_conn, full_sync=True)
+    await sync_conversations(manager, mock_conn)
 
     call_kwargs = manager.client.list_conversations.call_args_list[0]
-    assert call_kwargs.kwargs.get("reverse") is False or call_kwargs[1].get("reverse") is False
+    assert "reverse" in call_kwargs.kwargs and not call_kwargs.kwargs.get("reverse")
 
 
 @pytest.mark.asyncio
 async def test_incremental_processes_all_recent(manager, mock_conn):
-    """If all conversations are recent, should process all of them."""
+    """All conversations are synced (no cutoff)."""
     now = datetime.now(UTC)
     recent = (now - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
 
@@ -165,9 +166,7 @@ async def test_incremental_processes_all_recent(manager, mock_conn):
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(side_effect=[page, empty_page])
 
-    await manager.sync_conversations(mock_conn, lookback_minutes=60)
-    # execute_many called once: conversations UPSERT
-    # (contacts already cached → no INSERT)
+    await sync_conversations(manager, mock_conn)
     assert mock_conn.execute_many.call_count == 1
     batch = mock_conn.execute_many.call_args_list[0][0][1]
     assert len(batch) == 3
@@ -180,8 +179,7 @@ async def test_empty_response(manager, mock_conn):
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(return_value=_make_page([]))
 
-    await manager.sync_conversations(mock_conn, lookback_minutes=60)
-    # No batch_data → execute_many should not have been called with conversation data
+    await sync_conversations(manager, mock_conn)
     assert mock_conn.execute_many.call_count == 0
 
 
@@ -192,8 +190,7 @@ async def test_api_error_returns_zero(manager, mock_conn):
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(return_value={"error": "timeout"})
 
-    await manager.sync_conversations(mock_conn, lookback_minutes=60)
-    # Should not have inserted anything
+    await sync_conversations(manager, mock_conn)
     assert mock_conn.execute_many.call_count == 0
 
 
@@ -219,7 +216,7 @@ async def test_reopen_detection(manager, mock_conn):
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(return_value=page)
 
-    await manager.sync_conversations(mock_conn, lookback_minutes=60)
+    await sync_conversations(manager, mock_conn)
 
     # Verify UPSERT was called with reopened_increment=1
     execute_many_call = mock_conn.execute_many.call_args_list[-1]

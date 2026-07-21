@@ -49,7 +49,7 @@ tests/
 
 ### Fixtures
 - Usar `conftest.py` para fixtures compartilhadas
-- Banco de teste: PostgreSQL em container ou SQLite temporário
+- Banco de teste: PostgreSQL em container (SQLite removido em Julho 2026)
 - Dados de teste: fixtures com conversas simuladas
 
 ### Mocking

@@ -45,21 +45,22 @@ async def trigger_sync(
     from application.use_cases.sync_database import SyncDatabaseUseCase
 
     logger.info(
-        "Manual sync triggered: full=%s messages=%s days=%s surveys=%s",
+        "Manual sync triggered: full=%s messages=%s days=%s surveys=%s today=%s",
         request.full_sync,
         request.sync_messages,
         request.messages_days,
         request.backfill_surveys,
+        request.sync_today,
     )
     use_case = SyncDatabaseUseCase()
     await use_case.execute(
         full_sync=request.full_sync,
         sync_messages=request.sync_messages,
         messages_days=request.messages_days,
-        lookback_minutes=request.lookback_minutes,
         backfill_surveys=request.backfill_surveys,
         year=request.year,
         month=request.month,
+        sync_today=request.sync_today,
     )
     await refresh_materialized_view()
     logger.info("Manual sync completed")

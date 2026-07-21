@@ -206,10 +206,9 @@ class PostgresReportRepository(ReportRepository):
     async def fetch_all_groups(self, start_date: str, end_date: str) -> list[str]:
         s, e = _utc_range(start_date, end_date)
         rows = await self._pool.fetch_all(queries_pg.FETCH_GROUPS_QUERY, s, e, s, e)
-        agents = [r["agnt_name"] for r in rows]
         groups = set()
-        for a in agents:
-            g = constants.get_agent_group(a)
+        for r in rows:
+            g = r.get("agnt_grp") or constants.get_agent_group(r["agnt_name"])
             if g != "OUTROS" and g != "N/A":
                 groups.add(g)
 
@@ -227,10 +226,9 @@ class PostgresReportRepository(ReportRepository):
 
     async def fetch_all_groups_all(self) -> list[str]:
         rows = await self._pool.fetch_all(queries_pg.FETCH_GROUPS_QUERY_ALL)
-        agents = [r["agnt_name"] for r in rows]
         groups = set()
-        for a in agents:
-            g = constants.get_agent_group(a)
+        for r in rows:
+            g = r.get("agnt_grp") or constants.get_agent_group(r["agnt_name"])
             if g != "OUTROS" and g != "N/A":
                 groups.add(g)
 

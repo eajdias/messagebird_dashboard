@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 
 interface BSCTableProps {
   header: string[];
-  data_t1: string[][];
-  data_t2: string[][];
+  data_t1: (string | number | null)[][];
+  data_t2: (string | number | null)[][];
 }
 
 export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
@@ -45,7 +45,7 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
                       <tr key={ri} className="border-b">
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2">
-                            {cell}
+                            {cell ?? ""}
                           </td>
                         ))}
                       </tr>
@@ -72,7 +72,7 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
                       <tr key={ri} className="border-b">
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2">
-                            {cell}
+                            {cell ?? ""}
                           </td>
                         ))}
                       </tr>

@@ -160,11 +160,10 @@ conversations (1) ──< (N) messages (N) >── agents
 
 ## Migrations
 
-3 caminhos para aplicar schema:
+Aplicadas automaticamente na inicialização da API (`_init_schema()` em `api/main.py`):
 
-1. **Alembic (produção):** `alembic upgrade head`
-2. **SQL direto:** Rodar `infrastructure/database/migrations/001_initial.sql` + `002_materialized_view.sql`
-3. **SQLite legado:** `init_db.py` (não usado em PostgreSQL)
+1. `infrastructure/database/migrations/001_initial.sql` — schema inicial (tabelas)
+2. `infrastructure/database/migrations/002_materialized_view.sql` — materialized view para dashboard rápido
 
 ## Conexão
 

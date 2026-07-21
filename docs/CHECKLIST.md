@@ -14,12 +14,12 @@
 | Fase 3: Frontend Dashboard | ✅ Concluída | — |
 | Fase 4: Integração e Deploy | 🔲 Pendente | — |
 
-> **Migração SQLite → PostgreSQL (sync pipeline) concluída:**
-> - `PostgresSyncConnection` (asyncpg) — ✅
-> - `queries_pg.py` com `$1-$N` params — ✅
-> - `pg_sync_engine.py` (PgSyncManager) — ✅
-> - Message sync, survey extraction, reopen detection — ✅
-> - `client.py` tipado com params de filtro — ✅
+> **PostgreSQL é o único banco — SQLite removido (Julho 2026):**
+> - `scripts/migrate_sqlite_to_pg.py` removido
+> - `sqlite_repository.py`, `queries.py`, `connection.py` removidos
+> - `sync_connection.py`, `init_db.py` removidos
+> - `infrastructure/api/sync.py` (legado SQLite) removido
+> - Dependência `aiosqlite` removida do `pyproject.toml`
 
 ---
 
@@ -39,7 +39,7 @@
 - [x] Criar esqueleto FastAPI: `main.py`, `auth.py`, `middleware.py`, `dependencies.py`
 - [x] Criar route stubs: auth, dashboard, conversations, reports, admin
 - [x] Criar migration SQL: `001_initial.sql` (6 tabelas PostgreSQL)
-- [x] Configurar Alembic: `alembic.ini`, `alembic/env.py`, `models.py` (SQLAlchemy)
+- [x] Configurar Alembic: `alembic.ini`, `alembic/env.py`, `models.py` (SQLAlchemy) — **removido em Julho 2026** (app aplica raw SQL via `_init_schema()`)
 - [x] Copiar `business_config.yaml` + `business_bsc.yaml`
 - [x] Copiar testes básicos: `conftest.py`, `test_health.py`
 - [x] Adicionar `LICENSE` (MIT)
@@ -68,11 +68,9 @@
 ### Infrastructure Layer
 - [x] Copiar `infrastructure/api/client.py` (MessageBirdClient httpx async)
 - [x] Copiar `infrastructure/api/config.py` (env vars, agent lookup)
-- [x] Copiar `infrastructure/api/sync.py` (engine de sincronização 1253 linhas)
+- [x] Copiar `infrastructure/api/sync.py` (engine de sincronização 1253 linhas) — **removido em Julho 2026, substituído por `pg_sync_engine.py`**
 - [x] Copiar `infrastructure/config/config_loader.py` (loaders de YAML)
-- [x] Copiar `infrastructure/database/sqlite_repository.py` (referência legado)
-- [x] Copiar `infrastructure/database/queries.py` (queries SQLite — referência)
-- [x] Copiar `infrastructure/database/connection.py` + `sync_connection.py` + `init_db.py`
+- [x] Copiar `infrastructure/database/connection.py` + `sync_connection.py` + `init_db.py` — **removidos em Julho 2026**
 - [x] Copiar `infrastructure/exporters/` (excel, pdf, markdown, metrics_cache, _bsc_writer, mappers)
 - [x] Criar `infrastructure/repositories/postgres_report_repository.py` (asyncpg, 250+ linhas)
 
@@ -85,17 +83,15 @@
 
 ## Fase 2: Backend API ✅
 
-### ⚠️ Migração Sync Pipeline SQLite → PostgreSQL ✅
+### ⚠️ Migração SQLite → PostgreSQL: Concluída e SQLite Removido ✅
 
-- [x] Criar `PostgresSyncConnection` — asyncpg pool wrapper (`sync_connection_pg.py`)
-- [x] Criar queries PostgreSQL compatíveis (`queries_pg.py`) — `$1-$N` params, `ON CONFLICT`, `NOW()`
-- [x] Criar `pg_sync_engine.py` (PgSyncManager) — contact sync, conversation sync
+- [x] SQLite completamente removido do projeto (Julho 2026)
+- [x] `pg_sync_engine.py` (PgSyncManager) — contact sync, conversation sync
 - [x] Implementar message sync (`sync_messages`, `_sync_messages_internal`, `sync_all_messages`)
 - [x] Implementar survey extraction (`update_conversation_surveys`, `backfill_surveys`)
 - [x] Implementar reopen detection (`cnvs_reopened_count`)
 - [x] Adaptar `infrastructure/api/client.py` — tipos + params de filtro (`createdDatetimeAfter`, etc.)
 - [x] Adaptar `application/use_cases/sync_database.py` — delega para `trigger_sync_pg()`
-- [x] Marcar `sqlite_repository.py`, `connection.py`, `sync_connection.py`, `init_db.py` como "legado"
 
 ### Configuração
 
@@ -147,14 +143,10 @@
 - [x] Criar `api/schemas/admin.py` (SyncStatusResponse, SyncTriggerRequest, SyncTriggerResponse, AgentListResponse, DepartmentListResponse, HealthResponse)
 - [x] Criar `api/schemas/__init__.py` (exports centralizados)
 
-### Migração SQLite → PostgreSQL (dados)
+### Migração SQLite → PostgreSQL (dados) — Concluída e Removida
 
-- [x] Criar script `scripts/migrate_sqlite_to_pg.py`
-  - Ler `m_bird.db` (SQLite) via aiosqlite
-  - Inserir no PostgreSQL via asyncpg
-  - Handle denormalização: SQLite usa FKs inteiros, PG usa colunas legíveis
-- [x] Testar migração com banco existente (`m_bird.db`)
-- [x] Validar integridade dos dados migrados
+- [x] Script `scripts/migrate_sqlite_to_pg.py` removido (Julho 2026)
+- [x] Dados históricos migrados via PostgreSQL sync pipeline
 
 ---
 

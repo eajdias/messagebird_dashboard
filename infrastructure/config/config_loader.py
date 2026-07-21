@@ -68,8 +68,6 @@ def load_bsc_config(bsc_path: str):
         if "sla_frt_minutes" in thresholds:
             constants.SLA_FRT_THRESHOLD_MINUTES = int(thresholds["sla_frt_minutes"])
             MetricsCalculator.sla_threshold_minutes = int(thresholds["sla_frt_minutes"])
-        if "sla_frt_seconds" in thresholds:
-            constants.SLA_FRT_THRESHOLD_SECONDS = int(thresholds["sla_frt_seconds"])
         if "max_art_minutes" in thresholds:
             constants.MAX_ART_MINUTES = int(thresholds["max_art_minutes"])
         if "max_duration_minutes" in thresholds:

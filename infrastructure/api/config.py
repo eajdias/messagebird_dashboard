@@ -29,11 +29,12 @@ def get_database_url():
 
 HTTP_TIMEOUT = float(os.getenv("MESSAGEBIRD_HTTP_TIMEOUT", "60.0"))
 
-PHRASE_TRIAGEM_HEADER = os.getenv("MESSAGEBIRD_PHRASE_TRIAGEM_HEADER", "=== Dados da Triagem ===")
 PHRASE_TICKET_HEADER = os.getenv("MESSAGEBIRD_PHRASE_TICKET_HEADER", "=== Informações Ticket ===")
 SOFTWARE_NAMES = os.getenv("MESSAGEBIRD_SOFTWARE_NAMES", "SOFTWARE_A,SOFTWARE_B").split(",")
 DEFAULT_SOFTWARE = os.getenv("MESSAGEBIRD_DEFAULT_SOFTWARE", "UNKNOWN")
 
 
 def get_known_agents():
-    return {bird_id: info["name"] for bird_id, info in constants.AGENTS.items()}
+    return {
+        bird_id: {"name": info["name"], "group": info.get("group", "")} for bird_id, info in constants.AGENTS.items()
+    }

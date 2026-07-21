@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from api.schemas._base import list_response
+
 
 class DashboardSummaryResponse(BaseModel):
     total_conversations: int = 0
@@ -17,8 +19,8 @@ class DashboardSummaryResponse(BaseModel):
 
 class BSCResponse(BaseModel):
     header: list[str] = []
-    data_t1: list[list[str]] = []
-    data_t2: list[list[str]] = []
+    data_t1: list[list[str | int | float | None]] = []
+    data_t2: list[list[str | int | float | None]] = []
     kpi_config: dict[str, object] | None = None
 
 
@@ -48,8 +50,7 @@ class EvolutionMonth(BaseModel):
     rating_avg: float | None = None
 
 
-class EvolutionResponse(BaseModel):
-    evolution: list[EvolutionMonth] = []
+EvolutionResponse = list_response(EvolutionMonth, "evolution")
 
 
 class AgentRankingItem(BaseModel):
@@ -66,8 +67,7 @@ class AgentRankingItem(BaseModel):
     total_messages: int = 0
 
 
-class AgentRankingResponse(BaseModel):
-    agents: list[AgentRankingItem] = []
+AgentRankingResponse = list_response(AgentRankingItem, "agents")
 
 
 class ChannelItem(BaseModel):
@@ -79,5 +79,4 @@ class ChannelItem(BaseModel):
     rating_avg: float | None = None
 
 
-class ChannelResponse(BaseModel):
-    channels: list[ChannelItem] = []
+ChannelResponse = list_response(ChannelItem, "channels")

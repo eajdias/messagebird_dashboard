@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from api.schemas._base import StatusResponse, list_response
+
 
 class SyncStatusResponse(BaseModel):
     last_sync: str | None = None
@@ -15,15 +17,13 @@ class SyncTriggerRequest(BaseModel):
     full_sync: bool = False
     sync_messages: bool = False
     messages_days: int | None = None
-    lookback_minutes: int = 60
     year: int | None = None
     month: int | None = None
     backfill_surveys: bool = False
+    sync_today: bool = False
 
 
-class SyncTriggerResponse(BaseModel):
-    status: str
-    message: str = ""
+SyncTriggerResponse = StatusResponse
 
 
 class AgentItem(BaseModel):
@@ -32,8 +32,7 @@ class AgentItem(BaseModel):
     group: str = ""
 
 
-class AgentListResponse(BaseModel):
-    agents: list[AgentItem] = []
+AgentListResponse = list_response(AgentItem, "agents")
 
 
 class DepartmentItem(BaseModel):
@@ -41,8 +40,7 @@ class DepartmentItem(BaseModel):
     label: str
 
 
-class DepartmentListResponse(BaseModel):
-    departments: list[DepartmentItem] = []
+DepartmentListResponse = list_response(DepartmentItem, "departments")
 
 
 class HealthResponse(BaseModel):

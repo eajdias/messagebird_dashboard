@@ -2,6 +2,7 @@ SURVEY_DATA_METADATA_QUERY = """
     SELECT
         ca.agnt_name AS conversation_agent_name,
         ma.agnt_name AS message_agent_name,
+        ca.agnt_grp  AS agent_group,
         c.cnts_id,
         c.cnts_name,
         c.cnts_phone,
@@ -37,6 +38,7 @@ SURVEY_DATA_METADATA_QUERY_ALL = """
     SELECT
         ca.agnt_name AS conversation_agent_name,
         ma.agnt_name AS message_agent_name,
+        ca.agnt_grp  AS agent_group,
         c.cnts_id,
         c.cnts_name,
         c.cnts_phone,
@@ -108,7 +110,8 @@ OS_DATA_QUERY = """
         ct.cnts_id,
         ct.cnts_name,
         ct.cnts_phone,
-        a.agnt_name
+        a.agnt_name,
+        a.agnt_grp
     FROM conversations c
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
@@ -137,7 +140,8 @@ OS_DATA_QUERY_ALL = """
         ct.cnts_id,
         ct.cnts_name,
         ct.cnts_phone,
-        a.agnt_name
+        a.agnt_name,
+        a.agnt_grp
     FROM conversations c
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
@@ -156,7 +160,7 @@ UNMAPPED_DEPTS_QUERY = """
 """
 
 FETCH_GROUPS_QUERY = """
-    SELECT DISTINCT a.agnt_name
+    SELECT DISTINCT a.agnt_name, a.agnt_grp
     FROM agents a
     JOIN conversations c ON c.cnvs_agnt = a.agnt_id
     WHERE (c.cnvs_created::timestamp BETWEEN $1::timestamp AND $2::timestamp)
@@ -164,7 +168,7 @@ FETCH_GROUPS_QUERY = """
 """
 
 FETCH_GROUPS_QUERY_ALL = """
-    SELECT DISTINCT a.agnt_name
+    SELECT DISTINCT a.agnt_name, a.agnt_grp
     FROM agents a
     JOIN conversations c ON c.cnvs_agnt = a.agnt_id
 """
@@ -245,7 +249,8 @@ CONVERSATION_LIST_QUERY = """
         ct.cnts_id,
         ct.cnts_name,
         ct.cnts_phone,
-        a.agnt_name
+        a.agnt_name,
+        a.agnt_grp
     FROM conversations c
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt

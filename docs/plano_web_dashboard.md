@@ -82,16 +82,11 @@ O frontend consome a API via `zsc-sac-api.eajdias.com/api/v1/...`. CORS configur
 
 **Objetivo:** Adaptar o código existente para suportar PostgreSQL e preparar para API.
 
-#### 1.1 Migrar de SQLite para PostgreSQL
+#### 1.1 Migrar de SQLite para PostgreSQL (Concluído)
 
-- Criar `infrastructure/database/postgres_repository.py` implementando `ReportRepository`
-- Criar `infrastructure/database/migrations/` com SQL do schema PostgreSQL
-- Adaptar queries (sintaxe SQLite → PostgreSQL):
-  - `?` → `$1`, `$2`, ...
-  - `datetime()` → `NOW()`
-  - `PRAGMA` → `SET`
-- Usar `asyncpg` como driver async (substitui `aiosqlite`)
-- Manter compatibilidade SQLite para testes locais
+- PostgreSQL é o único banco desde Julho 2026
+- SQLite e todo código legado removidos
+- Sync pipeline usa `asyncpg` + `PgSyncManager`
 
 #### 1.2 Dockerizar o backend
 
@@ -414,7 +409,7 @@ MessageBird_API_Reports/
 │   │   ├── postgres_repository.py    # NOVO
 │   │   ├── migrations/               # NOVO
 │   │   │   └── 001_initial.sql
-│   │   └── sqlite_repository.py      # EXISTENTE
+│   │   └── sqlite_repository.py      # (removido Julho 2026)
 │   └── ...
 │
 ├── docker-compose.yml            # NOVO
@@ -453,8 +448,6 @@ MessageBird_API_Reports/
 | FastAPI | 0.139.0 | Framework web async |
 | Uvicorn | 0.51.0 | ASGI server |
 | Pydantic | 2.13.4 | Validação de dados |
-| SQLAlchemy | 2.0.51 | ORM + queries |
-| Alembic | 1.18.5 | Migrations |
 | asyncpg | 0.31.0 | Driver PostgreSQL async |
 | python-jose | 3.5.0 | JWT tokens |
 | passlib | 1.7.4 | Password hashing |
@@ -495,10 +488,10 @@ MessageBird_API_Reports/
 | **Risco** | Baixo | Alto |
 
 **Justificativa:** 50-70% do backend Python já existe e está testado:
-- `sync.py` (1253 linhas) — sincronização MessageBird
+- `pg_sync_engine.py` — sincronização MessageBird
 - `metrics_calculator.py` — NPS, FRT, ART, duração
 - `report_aggregator.py` — agregação e scoring BSC
-- `sqlite_repository.py` — queries SQL otimizadas
+- `postgres_report_repository.py` — queries SQL otimizadas
 - `_bsc_writer.py` — fórmulas Excel
 
 Migrar para NestJS significaria reescrever cada uma dessas peças em TypeScript.
@@ -510,7 +503,7 @@ Migrar para NestJS significaria reescrever cada uma dessas peças em TypeScript.
 | **Concorrência** | 1 writer por vez | Multi-writer |
 | **30 usuários** | Degrada | Confortável |
 | **Queries complexas** | Limitado | Full SQL |
-| **Migração** | N/A | Alembic/SQL |
+| **Migração** | N/A | Raw SQL + asyncpg |
 
 ### Por que Next.js e não React puro?
 
@@ -544,7 +537,7 @@ Migrar para NestJS significaria reescrever cada uma dessas peças em TypeScript.
 
 | Risco | Impacto | Mitigação |
 |-------|---------|-----------|
-| Migração SQLite → PostgreSQL quebra queries | Alto | Manter SQLite para testes unitários |
+| Migração SQLite → PostgreSQL quebra queries | Alto | PostgreSQL é o único banco desde Julho 2026 |
 | Sync durante alto tráfego bloqueia escritas | Médio | PostgreSQL resolve isso |
 | Frontend complexo demais | Médio | Focar MVP: Dashboard + Conversas |
 | VPS sem recursos suficientes | Baixo | Docker resource limits |

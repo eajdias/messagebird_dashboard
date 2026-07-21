@@ -27,8 +27,8 @@ export interface DashboardSummary {
 
 export interface BSCData {
   header: string[];
-  data_t1: string[][];
-  data_t2: string[][];
+  data_t1: (string | number | null)[][];
+  data_t2: (string | number | null)[][];
   kpi_config: Record<string, unknown> | null;
 }
 

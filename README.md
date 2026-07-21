@@ -49,8 +49,7 @@ new_bird/
 ├── application/    # Orquestração e use cases
 ├── infrastructure/ # PostgreSQL, exporters, API client
 ├── tests/          # Pytest
-├── alembic/        # Migrations PostgreSQL
-└── docs/           # Documentação
+├── docs/           # Documentação
 ```
 
 ## Tech Stack

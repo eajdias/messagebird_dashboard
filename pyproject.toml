@@ -14,8 +14,6 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     # Database
     "asyncpg>=0.31.0",
-    "sqlalchemy[asyncio]>=2.0.51",
-    "alembic>=1.18.5",
     # Config
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
@@ -26,9 +24,8 @@ dependencies = [
     # Reports
     "xlsxwriter>=3.1.9",
     "fpdf2>=2.8.0",
-    # CLI / Legacy compat
+    # CLI
     "rich>=13.7.0",
-    "aiosqlite>=0.20.0",
 ]
 
 [project.optional-dependencies]

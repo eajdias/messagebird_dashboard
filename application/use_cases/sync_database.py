@@ -10,10 +10,10 @@ class SyncDatabaseUseCase:
         full_sync: bool = False,
         sync_messages: bool = False,
         messages_days: int | None = None,
-        lookback_minutes: int = 60,
         year: int | None = None,
         month: int | None = None,
         backfill_surveys: bool = False,
+        sync_today: bool = False,
     ):
         pool = self._pool
         if pool is None:
@@ -25,8 +25,8 @@ class SyncDatabaseUseCase:
             full_sync=full_sync,
             sync_messages=sync_messages,
             messages_days=messages_days,
-            lookback_minutes=lookback_minutes,
             year=year,
             month=month,
             backfill_surveys=backfill_surveys,
+            sync_today=sync_today,
         )
