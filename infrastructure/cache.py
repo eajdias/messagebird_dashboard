@@ -7,7 +7,7 @@ import logging
 import time
 from typing import Any
 
-logger = logging.getLogger("cache")
+logger = logging.getLogger("m_bird.cache")
 
 
 class TTLCache:

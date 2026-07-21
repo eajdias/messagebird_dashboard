@@ -15,6 +15,7 @@ class SyncTriggerRequest(BaseModel):
     full_sync: bool = False
     sync_messages: bool = False
     messages_days: int | None = None
+    lookback_minutes: int = 60
     year: int | None = None
     month: int | None = None
     backfill_surveys: bool = False
@@ -48,3 +49,9 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     database: str = "unknown"
+
+
+class SyncProfileResponse(BaseModel):
+    active_profile: str
+    sync_enabled: bool
+    available_profiles: list[dict[str, object]]

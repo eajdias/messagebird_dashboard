@@ -2,12 +2,15 @@
 Auth Routes
 """
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import create_access_token, get_current_user
 from api.schemas.auth import LoginRequest, TokenResponse, UserResponse
+
+logger = logging.getLogger("m_bird.auth")
 
 router = APIRouter()
 
@@ -18,7 +21,9 @@ async def login(request: LoginRequest):
     # TODO: Implement user lookup from database
     if request.email == "admin@empresa.com" and request.password == "admin123":
         token = create_access_token({"sub": request.email, "role": "admin"})
+        logger.info("Login successful for user=%s", request.email)
         return TokenResponse(access_token=token, token_type="bearer")
+    logger.warning("Login failed for user=%s", request.email)
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 

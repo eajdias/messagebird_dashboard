@@ -1,10 +1,9 @@
 # frontend/ — Next.js Dashboard
-
 > **Mandato:** Camada de apresentação web. Consome a API via HTTP — NUNCA acessa o banco diretamente.
 
 ---
 
-## 🏗️ Estrutura
+## 🏗️ Estrutura Atualizada
 
 ```
 frontend/
@@ -28,7 +27,7 @@ frontend/
 │   ├── conversations/            # Tabela, filtros, mensagens
 │   └── layout/                   # Sidebar, TopBar
 ├── lib/
-│   ├── api.ts                    # API client (fetch wrapper)
+│   ├── api.ts                    # API client (wrapper do fetch)
 │   ├── auth.ts                   # Auth context + JWT
 │   └── utils.ts                  # Formatação, helpers
 ├── hooks/
@@ -48,69 +47,60 @@ frontend/
 
 ### Componentes
 - Componentes de página em `app/` (Server Components por padrão)
-- Componentes interativos com `"use client"` explícito
+- Componentes interativos com `"use client"`
 - Componentes reutilizáveis em `components/`
 - UI base de `shadcn/ui` em `components/ui/`
 
 ### State Management
-- Server State: React Query (TanStack Query) para cache de dados da API
-- Client State: React Context para auth e tema
-- Formulários: React Hook Form + Zod
+- `useDashboard` hook para buscar dados do dashboard
+- `useConversations` hook para tratar conversas
+- `useAuth` hook para autenticação
 
 ### API Client
-- Usar `lib/api.ts` como wrapper do fetch
-- Nunca chamar a API diretamente nos componentes
-- Pattern:
-```typescript
-// lib/api.ts
-export async function fetchDashboard(params: DashboardParams) {
-  const response = await fetch(`${API_URL}/api/v1/dashboard/summary`, {
-    headers: { Authorization: `Bearer ${getToken()}` }
-  });
-  return response.json();
-}
+- **Uso obrigatório:** Sempre usar `lib/api.ts` para chamar endpoints
+- **Pattern:**
+  ```typescript
+// Exemplo de uso no componente
+const dashboardData = await fetchDashboard({ group: "Suporte", period: "monthly" });
 ```
-
-### Estilização
-- Tailwind CSS para todos os estilos
-- Tema escuro/claro via Next.js ThemeProvider
-- Cores do tema em `tailwind.config.ts`
-- NUNCA usar estilos inline (exceto dynamic values)
-
-### Rotas
-- Layouts agrupam páginas com estrutura comum
-- `(auth)/` — layout sem sidebar/topbar
-- `(dashboard)/` — layout com sidebar/topbar
-- `[id]` — dynamic routes para detalhes
+- **Tratamento de erros:** Mensagens de erro são redirecionadas para `/login` em caso de 401
 
 ### Autenticação
-- JWT armazenado em `localStorage` (via `lib/auth.ts`)
-- Redirect automático para `/login` se não autenticado
-- Token injetado em todas as chamadas à API
+- JWT armazenado em `localStorage` via `lib/auth.ts`
+- Fluxo de login:
+  1. `POST /auth/login` com payload `{ email, password, client_secret }`
+  2. Token armazenado em `localStorage.token`
+  3. Todas as chamadas à API injetam o token automaticamente
 
----
-
-## 🔧 Comandos
+## 🔧 Exemplos de Comandos para Introspecão
 
 ```bash
-# Desenvolvimento
-npm run dev
+# Testar autenticação
+curl -X POST http://localhost:3050/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@empresa.com", "password":"senha", "client_secret":"..."}' \
+  -o token.json && cat token.json
 
-# Build
-npm run build
+# Validar dados do dashboard
+curl -s http://localhost:3050/api/v1/dashboard/summary | jq .'
 
-# Lint
-npm run lint
-
-# Adicionar shadcn/ui component
-npx shadcn-ui@latest add button
+# Verificar estado da auth
+curl -s http://localhost:3050/auth/me | jq .'
 ```
-
----
 
 ## 🚨 Erros Comuns
 
-1. **CORS**: Frontend roda em `:3050`, API em `:8050`. Configurar CORS no backend.
-2. **Hydration mismatch**: Usar `useEffect` para valores que só existem no client
-3. **Loading states**: Sempre mostrar skeleton/spinner durante fetch
-4. **Type errors**: Rodar `npm run build` antes de commitar
+1. **CORS** → Verificar configuração no backend (API em `:8050`)
+2. **401 Unauthorized** → Token expirado ou inválido
+3. **Hydration Mismatch** → Use `useEffect` para acesso ao client-side apenas
+4. **Loading States** → Mostrar skeleton durante fetch via `useQuery` do React Query
+
+---
+
+## 💡 Dicas para Agentes LLM
+
+1. **Nunca** chamar endpoints diretamente no cliente
+2. **Usar sempre** o wrapper `lib/api.ts` para solicitações HTTP
+3. **Validar tokens** via `useAuth` antes de ações sensíveis
+4. **Testar fluxos completos:** login → dashboard → gera relatório
+5. **Evitar** usar `fetch` ou `axios` diretamente em componentes

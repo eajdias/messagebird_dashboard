@@ -27,7 +27,7 @@ def get_database_url():
     return os.getenv("DATABASE_URL", "postgresql://mbird:mbird_dev_2024@localhost:5432/mbird_reports")
 
 
-HTTP_TIMEOUT = float(os.getenv("MESSAGEBIRD_HTTP_TIMEOUT", "30.0"))
+HTTP_TIMEOUT = float(os.getenv("MESSAGEBIRD_HTTP_TIMEOUT", "60.0"))
 
 PHRASE_TRIAGEM_HEADER = os.getenv("MESSAGEBIRD_PHRASE_TRIAGEM_HEADER", "=== Dados da Triagem ===")
 PHRASE_TICKET_HEADER = os.getenv("MESSAGEBIRD_PHRASE_TICKET_HEADER", "=== Informações Ticket ===")

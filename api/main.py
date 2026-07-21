@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -15,45 +16,52 @@ from infrastructure.config.config_loader import load_and_configure_business, loa
 logger = logging.getLogger("m_bird.scheduler")
 
 
-async def _refresh_mv():
-    """Refresh materialized view and invalidate cache after sync."""
-    from api.dependencies import get_pool
-    from infrastructure.cache import repo_cache
-    from infrastructure.database import queries_pg
+def _make_incremental_handler(lookback: int, messages_days: int | None):
+    """Create an incremental sync handler bound to profile parameters."""
 
-    try:
-        pool = await get_pool()
-        await pool.execute(queries_pg.REFRESH_MV)
-        await repo_cache.clear()
-        logger.info("Materialized view refreshed, cache cleared")
-    except Exception:
-        logger.exception("MV refresh failed")
+    async def _run():
+        from application.use_cases.sync_database import SyncDatabaseUseCase
 
+        try:
+            use_case = SyncDatabaseUseCase()
+            await use_case.execute(
+                full_sync=False,
+                sync_messages=messages_days is not None,
+                messages_days=messages_days,
+                lookback_minutes=lookback,
+            )
+            from api.sync_utils import refresh_materialized_view
 
-async def _run_incremental_sync():
-    """Background job: incremental sync (contacts + conversations, last 60 min)."""
-    from application.use_cases.sync_database import SyncDatabaseUseCase
+            await refresh_materialized_view()
+            logger.info("Incremental sync completed (lookback=%d, messages_days=%s)", lookback, messages_days)
+        except Exception:
+            logger.exception("Incremental sync failed")
 
-    try:
-        use_case = SyncDatabaseUseCase()
-        await use_case.execute(full_sync=False, sync_messages=False, lookback_minutes=60)
-        await _refresh_mv()
-        logger.info("Incremental sync completed successfully")
-    except Exception:
-        logger.exception("Incremental sync failed")
+    return _run
 
 
-async def _run_full_sync():
-    """Background job: full sync with messages (daily at 3:00 AM)."""
-    from application.use_cases.sync_database import SyncDatabaseUseCase
+def _make_full_handler(messages_days: int | None, backfill_surveys: bool):
+    """Create a full sync handler bound to profile parameters."""
 
-    try:
-        use_case = SyncDatabaseUseCase()
-        await use_case.execute(full_sync=True, sync_messages=True, backfill_surveys=True)
-        await _refresh_mv()
-        logger.info("Full sync completed successfully")
-    except Exception:
-        logger.exception("Full sync failed")
+    async def _run():
+        from application.use_cases.sync_database import SyncDatabaseUseCase
+
+        try:
+            use_case = SyncDatabaseUseCase()
+            await use_case.execute(
+                full_sync=True,
+                sync_messages=True,
+                messages_days=messages_days,
+                backfill_surveys=backfill_surveys,
+            )
+            from api.sync_utils import refresh_materialized_view
+
+            await refresh_materialized_view()
+            logger.info("Full sync completed (messages_days=%s, surveys=%s)", messages_days, backfill_surveys)
+        except Exception:
+            logger.exception("Full sync failed")
+
+    return _run
 
 
 scheduler = AsyncIOScheduler()
@@ -61,10 +69,6 @@ scheduler = AsyncIOScheduler()
 
 async def _init_schema():
     """Create tables + materialized view if they don't exist (idempotent)."""
-    import os
-
-    from api.dependencies import get_pool
-
     migrations_dir = os.path.join(os.path.dirname(__file__), "..", "infrastructure", "database", "migrations")
     for sql_file in ("001_initial.sql", "002_materialized_view.sql"):
         path = os.path.join(migrations_dir, sql_file)
@@ -72,6 +76,8 @@ async def _init_schema():
             continue
         with open(path) as f:
             sql = f.read()
+        from api.dependencies import get_pool
+
         pool = await get_pool()
         try:
             for statement in sql.split(";"):
@@ -85,7 +91,9 @@ async def _init_schema():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    import os
+    from api.logging_config import setup_logging
+
+    setup_logging()
 
     from dotenv import load_dotenv
 
@@ -98,22 +106,49 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     await _init_schema()
 
-    scheduler.add_job(
-        _run_incremental_sync,
-        trigger=IntervalTrigger(minutes=15),
-        id="incremental_sync",
-        name="Incremental sync (contacts + conversations)",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        _run_full_sync,
-        trigger=CronTrigger(hour=3, minute=0),
-        id="full_sync",
-        name="Full sync with messages (daily 3:00 AM)",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info("APScheduler started: incremental every 15min, full daily 03:00")
+    sync_enabled = os.getenv("SYNC_ENABLED", "true").lower() in ("true", "1", "yes")
+    if sync_enabled:
+        from infrastructure.config.sync_profiles import get_active_profile
+
+        profile = get_active_profile()
+        jobs_registered = []
+
+        if profile.has_incremental:
+            assert profile.incremental_minutes is not None
+            assert profile.incremental_lookback is not None
+            handler = _make_incremental_handler(
+                lookback=profile.incremental_lookback,
+                messages_days=profile.messages_days,
+            )
+            scheduler.add_job(
+                handler,
+                trigger=IntervalTrigger(minutes=profile.incremental_minutes),
+                id="incremental_sync",
+                name=f"Incremental sync ({profile.incremental_minutes}min, lookback={profile.incremental_lookback}min)",
+                replace_existing=True,
+            )
+            jobs_registered.append(f"incremental every {profile.incremental_minutes}min")
+
+        if profile.has_full_sync:
+            assert profile.full_sync_hour is not None
+            handler = _make_full_handler(
+                messages_days=profile.messages_days,
+                backfill_surveys=profile.backfill_surveys,
+            )
+            full_hour = f"{profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}"
+            scheduler.add_job(
+                handler,
+                trigger=CronTrigger(hour=profile.full_sync_hour, minute=profile.full_sync_minute),
+                id="full_sync",
+                name=f"Full sync ({full_hour}, messages_days={profile.messages_days})",
+                replace_existing=True,
+            )
+            jobs_registered.append(f"full at {profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}")
+
+        scheduler.start()
+        logger.info("APScheduler started: profile=%s, %s", profile.name, ", ".join(jobs_registered))
+    else:
+        logger.info("APScheduler disabled (SYNC_ENABLED=false)")
 
     yield
 

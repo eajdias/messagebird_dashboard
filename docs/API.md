@@ -288,9 +288,12 @@ Trigger sincronização manual.
   "sync_messages": false,
   "messages_days": null,
   "year": null, "month": null,
-  "backfill_surveys": false
+  "backfill_surveys": false,
+  "lookback_minutes": 60
 }
 ```
+
+- `lookback_minutes` (int, default 60): janela de lookback para sync incremental. Usa `updatedDatetimeAfter` para buscar conversas atualizadas recentemente, evitando re-sincronizar conversas antigas.
 
 ### GET `/admin/agents`
 

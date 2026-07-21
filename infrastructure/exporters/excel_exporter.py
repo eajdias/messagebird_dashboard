@@ -6,7 +6,7 @@ import xlsxwriter
 
 from application.interfaces.exporter import DashboardDTO, ReportExporter
 
-logger = logging.getLogger("excel_exporter")
+logger = logging.getLogger("m_bird.exporter.excel")
 
 DOW_LABELS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
@@ -35,21 +35,51 @@ def auto_width(ws, header, data, padding=3):
 
 
 class ExcelExporter(ReportExporter):
-    def export_excel(self, filename: str, header: list[str], data: list[list[Any]], sheet_name: str = "Relatório", highlight_frt: bool = False):
+    def export_excel(
+        self,
+        filename: str,
+        header: list[str],
+        data: list[list[Any]],
+        sheet_name: str = "Relatório",
+        highlight_frt: bool = False,
+    ):
         workbook = xlsxwriter.Workbook(filename)
         safe_sheet_name = sheet_name[:31]
         worksheet = workbook.add_worksheet(safe_sheet_name)
 
-        header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1, "font_size": 12, "align": "center", "valign": "vcenter"
-        })
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 12,
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
         cell_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "valign": "top"})
-        alt_fmt = workbook.add_format({"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "left", "valign": "top"})
-        num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "valign": "top", "num_format": "0"})
-        num_alt_fmt = workbook.add_format({"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "left", "valign": "top", "num_format": "0"})
+        alt_fmt = workbook.add_format(
+            {"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "left", "valign": "top"}
+        )
+        num_fmt = workbook.add_format(
+            {"border": 1, "font_size": 11, "align": "left", "valign": "top", "num_format": "0"}
+        )
+        num_alt_fmt = workbook.add_format(
+            {
+                "border": 1,
+                "bg_color": COLOR_SURFACE,
+                "font_size": 11,
+                "align": "left",
+                "valign": "top",
+                "num_format": "0",
+            }
+        )
 
         bad_frt = workbook.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006", "border": 1, "font_size": 11})
-        acceptable_frt = workbook.add_format({"bg_color": "#FFEB9C", "font_color": "#9C6500", "border": 1, "font_size": 11})
+        acceptable_frt = workbook.add_format(
+            {"bg_color": "#FFEB9C", "font_color": "#9C6500", "border": 1, "font_size": 11}
+        )
         good_frt = workbook.add_format({"bg_color": "#C6EFCE", "font_color": "#006100", "border": 1, "font_size": 11})
 
         num_cols = {i for i, h in enumerate(header) if any(k in h for k in ["Documento", "Telefone"])}
@@ -65,23 +95,52 @@ class ExcelExporter(ReportExporter):
                 if col_num in num_cols:
                     try:
                         digits = "".join(filter(str.isdigit, str(cell_value)))
-                        if digits: worksheet.write_number(row_num + 1, col_num, int(digits), n_fmt)
-                        else: worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
-                    except: worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
+                        if digits:
+                            worksheet.write_number(row_num + 1, col_num, int(digits), n_fmt)
+                        else:
+                            worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
+                    except:
+                        worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
                 else:
                     try:
                         if isinstance(cell_value, str) and cell_value.replace(".", "", 1).lstrip("-").isdigit():
                             val = float(cell_value) if "." in cell_value else int(cell_value)
                             worksheet.write(row_num + 1, col_num, val, fmt)
-                        else: worksheet.write(row_num + 1, col_num, cell_value, fmt)
-                    except: worksheet.write(row_num + 1, col_num, cell_value, fmt)
+                        else:
+                            worksheet.write(row_num + 1, col_num, cell_value, fmt)
+                    except:
+                        worksheet.write(row_num + 1, col_num, cell_value, fmt)
 
         if highlight_frt:
             for col_num, col_name in enumerate(header):
                 if any(term in col_name for term in ["Média de Resposta", "Tempo médio", "FRT", "ART"]):
-                    worksheet.conditional_format(1, col_num, len(data), col_num, {"type": "cell", "criteria": ">", "value": 30.0, "format": bad_frt})
-                    worksheet.conditional_format(1, col_num, len(data), col_num, {"type": "cell", "criteria": "between", "minimum": 15.01, "maximum": 30.0, "format": acceptable_frt})
-                    worksheet.conditional_format(1, col_num, len(data), col_num, {"type": "cell", "criteria": "<=", "value": 15.0, "format": good_frt})
+                    worksheet.conditional_format(
+                        1,
+                        col_num,
+                        len(data),
+                        col_num,
+                        {"type": "cell", "criteria": ">", "value": 30.0, "format": bad_frt},
+                    )
+                    worksheet.conditional_format(
+                        1,
+                        col_num,
+                        len(data),
+                        col_num,
+                        {
+                            "type": "cell",
+                            "criteria": "between",
+                            "minimum": 15.01,
+                            "maximum": 30.0,
+                            "format": acceptable_frt,
+                        },
+                    )
+                    worksheet.conditional_format(
+                        1,
+                        col_num,
+                        len(data),
+                        col_num,
+                        {"type": "cell", "criteria": "<=", "value": 15.0, "format": good_frt},
+                    )
 
         auto_width(worksheet, header, data)
         if data:
@@ -113,19 +172,71 @@ class ExcelExporter(ReportExporter):
 
     def _write_bsc_tab(self, workbook: xlsxwriter.Workbook, dto: DashboardDTO):
         from infrastructure.exporters._bsc_writer import write_bsc_kpi_table
+
         bsc_ws = workbook.add_worksheet("BSC")
 
         fmts = {
-            "title":      workbook.add_format({"bold": True, "font_size": 16, "font_color": COLOR_PRIMARY}),
-            "header":     workbook.add_format({"bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1, "font_size": 11, "align": "center", "valign": "vcenter"}),
-            "header_kpi": workbook.add_format({"bold": True, "bg_color": COLOR_SECONDARY, "font_color": "#FFFFFF", "border": 1, "font_size": 11, "align": "center", "valign": "vcenter"}),
-            "label":      workbook.add_format({"bold": True, "bg_color": COLOR_SURFACE, "border": 1, "font_size": 11, "align": "left"}),
-            "cell":       workbook.add_format({"border": 1, "font_size": 11, "align": "left"}),
-            "cell_alt":   workbook.add_format({"border": 1, "font_size": 11, "align": "left", "bg_color": COLOR_SURFACE}),
-            "kpi":        workbook.add_format({"bold": True, "border": 1, "font_size": 11, "align": "center", "font_color": COLOR_SECONDARY}),
-            "kpi_alt":    workbook.add_format({"bold": True, "border": 1, "font_size": 11, "align": "center", "font_color": COLOR_SECONDARY, "bg_color": "#DDEEFF"}),
-            "total":      workbook.add_format({"bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1, "font_size": 11, "align": "left"}),
-            "total_kpi":  workbook.add_format({"bold": True, "bg_color": COLOR_ACCENT, "font_color": "#FFFFFF", "border": 2, "font_size": 12, "align": "center"}),
+            "title": workbook.add_format({"bold": True, "font_size": 16, "font_color": COLOR_PRIMARY}),
+            "header": workbook.add_format(
+                {
+                    "bold": True,
+                    "bg_color": COLOR_PRIMARY,
+                    "font_color": "#FFFFFF",
+                    "border": 1,
+                    "font_size": 11,
+                    "align": "center",
+                    "valign": "vcenter",
+                }
+            ),
+            "header_kpi": workbook.add_format(
+                {
+                    "bold": True,
+                    "bg_color": COLOR_SECONDARY,
+                    "font_color": "#FFFFFF",
+                    "border": 1,
+                    "font_size": 11,
+                    "align": "center",
+                    "valign": "vcenter",
+                }
+            ),
+            "label": workbook.add_format(
+                {"bold": True, "bg_color": COLOR_SURFACE, "border": 1, "font_size": 11, "align": "left"}
+            ),
+            "cell": workbook.add_format({"border": 1, "font_size": 11, "align": "left"}),
+            "cell_alt": workbook.add_format({"border": 1, "font_size": 11, "align": "left", "bg_color": COLOR_SURFACE}),
+            "kpi": workbook.add_format(
+                {"bold": True, "border": 1, "font_size": 11, "align": "center", "font_color": COLOR_SECONDARY}
+            ),
+            "kpi_alt": workbook.add_format(
+                {
+                    "bold": True,
+                    "border": 1,
+                    "font_size": 11,
+                    "align": "center",
+                    "font_color": COLOR_SECONDARY,
+                    "bg_color": "#DDEEFF",
+                }
+            ),
+            "total": workbook.add_format(
+                {
+                    "bold": True,
+                    "bg_color": COLOR_PRIMARY,
+                    "font_color": "#FFFFFF",
+                    "border": 1,
+                    "font_size": 11,
+                    "align": "left",
+                }
+            ),
+            "total_kpi": workbook.add_format(
+                {
+                    "bold": True,
+                    "bg_color": COLOR_ACCENT,
+                    "font_color": "#FFFFFF",
+                    "border": 2,
+                    "font_size": 12,
+                    "align": "center",
+                }
+            ),
         }
 
         bsc_ws.write(0, 0, f"BALANCED SCORECARD — {dto.start_date} a {dto.end_date}", fmts["title"])
@@ -133,22 +244,34 @@ class ExcelExporter(ReportExporter):
         kpi_cfg = next(iter(dto.bsc_kpi_config.values()), {"t1": [], "t2": []})
 
         next_row = write_bsc_kpi_table(
-            bsc_ws, 2, "Desempenho dos Agentes",
-            dto.bsc_header, dto.bsc_data_t1, kpi_cfg.get("t1", []),
-            fmts, add_total_row=True
+            bsc_ws,
+            2,
+            "Desempenho dos Agentes",
+            dto.bsc_header,
+            dto.bsc_data_t1,
+            kpi_cfg.get("t1", []),
+            fmts,
+            add_total_row=True,
         )
 
         next_row = write_bsc_kpi_table(
-            bsc_ws, next_row + 2, "Avaliações Extras",
-            dto.bsc_header, dto.bsc_data_t2, kpi_cfg.get("t2", []),
-            fmts, add_total_row=False
+            bsc_ws,
+            next_row + 2,
+            "Avaliações Extras",
+            dto.bsc_header,
+            dto.bsc_data_t2,
+            kpi_cfg.get("t2", []),
+            fmts,
+            add_total_row=False,
         )
 
         self._write_bsc_legend(bsc_ws, workbook, kpi_cfg, start_row=next_row + 1)
 
     def _write_bsc_legend(self, ws, workbook, kpi_cfg, start_row=36):
         legend_fmt = workbook.add_format({"bold": True, "font_size": 13, "font_color": COLOR_PRIMARY})
-        cat_title_fmt = workbook.add_format({"bold": True, "font_size": 11, "font_color": COLOR_PRIMARY, "bg_color": COLOR_SURFACE, "border": 1})
+        cat_title_fmt = workbook.add_format(
+            {"bold": True, "font_size": 11, "font_color": COLOR_PRIMARY, "bg_color": COLOR_SURFACE, "border": 1}
+        )
         item_fmt = workbook.add_format({"bold": True, "font_size": 11, "font_color": COLOR_PRIMARY})
         desc_fmt = workbook.add_format({"font_size": 11, "text_wrap": True})
 
@@ -185,37 +308,75 @@ class ExcelExporter(ReportExporter):
         gm = dto.general_metrics
 
         def _safe_fmt(val, fmt=".2f"):
-            if val is None: return "N/A"
-            try: return f"{val:{fmt}}"
-            except: return str(val)
+            if val is None:
+                return "N/A"
+            try:
+                return f"{val:{fmt}}"
+            except:
+                return str(val)
 
         # ── Formatos ──────────────────────────────────────────────────────────
         title_fmt = workbook.add_format({"bold": True, "font_size": 22, "align": "center", "font_color": COLOR_PRIMARY})
-        subtitle_fmt = workbook.add_format({"font_size": 11, "align": "center", "italic": True, "font_color": COLOR_TEXT_LIGHT})
+        subtitle_fmt = workbook.add_format(
+            {"font_size": 11, "align": "center", "italic": True, "font_color": COLOR_TEXT_LIGHT}
+        )
         footer_fmt = workbook.add_format({"font_size": 9, "italic": True, "font_color": COLOR_TEXT_LIGHT})
-        card_label_fmt = workbook.add_format({
-            "bold": True, "font_size": 11, "border": 1, "align": "center", "valign": "vcenter",
-            "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "text_wrap": True
-        })
-        card_val_fmt = workbook.add_format({
-            "bold": True, "font_size": 24, "border": 1, "align": "center", "valign": "vcenter",
-            "bg_color": "#F0F4FA", "font_color": COLOR_PRIMARY
-        })
-        workbook.add_format({
-            "font_size": 10, "border": 1, "align": "center", "valign": "vcenter",
-            "font_color": COLOR_ACCENT, "italic": True
-        })
-        section_fmt = workbook.add_format({
-            "bold": True, "font_size": 13, "align": "left", "font_color": COLOR_PRIMARY, "bottom": 2
-        })
-        table_header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center", "valign": "vcenter", "text_wrap": True
-        })
+        card_label_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_size": 11,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "text_wrap": True,
+            }
+        )
+        card_val_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "font_size": 24,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "bg_color": "#F0F4FA",
+                "font_color": COLOR_PRIMARY,
+            }
+        )
+        workbook.add_format(
+            {
+                "font_size": 10,
+                "border": 1,
+                "align": "center",
+                "valign": "vcenter",
+                "font_color": COLOR_ACCENT,
+                "italic": True,
+            }
+        )
+        section_fmt = workbook.add_format(
+            {"bold": True, "font_size": 13, "align": "left", "font_color": COLOR_PRIMARY, "bottom": 2}
+        )
+        table_header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+                "text_wrap": True,
+            }
+        )
         table_cell_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "valign": "vcenter"})
-        table_alt_fmt = workbook.add_format({"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "left", "valign": "vcenter"})
+        table_alt_fmt = workbook.add_format(
+            {"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "left", "valign": "vcenter"}
+        )
         table_num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center", "valign": "vcenter"})
-        table_alt_num_fmt = workbook.add_format({"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "center", "valign": "vcenter"})
+        table_alt_num_fmt = workbook.add_format(
+            {"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "center", "valign": "vcenter"}
+        )
 
         # ── Título + Período ─────────────────────────────────────────────────
         ws.merge_range(0, 0, 0, 14, dto.title, title_fmt)
@@ -230,7 +391,8 @@ class ExcelExporter(ReportExporter):
             try:
                 c = float(current) if current is not None else 0
                 p = float(previous)
-                if p == 0: return "", ""
+                if p == 0:
+                    return "", ""
                 change = ((c - p) / p) * 100
                 arrow = "↑" if change > 0 else ("↓" if change < 0 else "→")
                 if higher_is_better:
@@ -238,15 +400,20 @@ class ExcelExporter(ReportExporter):
                 else:
                     color = COLOR_ALERT if change >= 0 else COLOR_ACCENT
                 return f"{arrow} {abs(change):.1f}%", color
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 return "", ""
 
         kpi_list = [
             ("Total de Chats", f"{gm.get('total_chats', 0)}", "total_chats", True),
-            ("ART Médio (min)", _safe_fmt(gm.get('avg_art')), "avg_art", False),
-            ("Duração Média (min)", _safe_fmt(gm.get('avg_duration')), "avg_duration", False),
-            ("NPS Real", _safe_fmt(gm.get('real_nps'), ".1f"), "real_nps", True),
-            ("SLA Compliance", (_safe_fmt(gm.get('sla_compliance')) + "%") if gm.get('sla_compliance') is not None else "N/A", "sla_compliance", True),
+            ("ART Médio (min)", _safe_fmt(gm.get("avg_art")), "avg_art", False),
+            ("Duração Média (min)", _safe_fmt(gm.get("avg_duration")), "avg_duration", False),
+            ("NPS Real", _safe_fmt(gm.get("real_nps"), ".1f"), "real_nps", True),
+            (
+                "SLA Compliance",
+                (_safe_fmt(gm.get("sla_compliance")) + "%") if gm.get("sla_compliance") is not None else "N/A",
+                "sla_compliance",
+                True,
+            ),
         ]
 
         for i, (label, val, prev_key, higher_better) in enumerate(kpi_list):
@@ -255,10 +422,16 @@ class ExcelExporter(ReportExporter):
             ws.merge_range(4, col_start, 5, col_start + 2, val, card_val_fmt)
             trend_text, trend_color = _trend(gm.get(prev_key), prev.get(prev_key), higher_better)
             if trend_text:
-                trend_fmt = workbook.add_format({
-                    "font_size": 10, "border": 1, "align": "center", "valign": "vcenter",
-                    "font_color": trend_color, "bold": True
-                })
+                trend_fmt = workbook.add_format(
+                    {
+                        "font_size": 10,
+                        "border": 1,
+                        "align": "center",
+                        "valign": "vcenter",
+                        "font_color": trend_color,
+                        "bold": True,
+                    }
+                )
                 ws.merge_range(6, col_start, 6, col_start + 2, f"vs mês anterior: {trend_text}", trend_fmt)
 
         # ── Seção: Distribuição por Departamento ─────────────────────────────
@@ -273,8 +446,19 @@ class ExcelExporter(ReportExporter):
         dept_data = dto.department_data or []
         dept_data.sort(key=lambda r: r[1] if isinstance(r[1], (int, float)) else 0, reverse=True)
 
-        pct_ret_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center", "valign": "vcenter", "num_format": "0.0%"})
-        pct_ret_alt_fmt = workbook.add_format({"border": 1, "bg_color": COLOR_SURFACE, "font_size": 11, "align": "center", "valign": "vcenter", "num_format": "0.0%"})
+        pct_ret_fmt = workbook.add_format(
+            {"border": 1, "font_size": 11, "align": "center", "valign": "vcenter", "num_format": "0.0%"}
+        )
+        pct_ret_alt_fmt = workbook.add_format(
+            {
+                "border": 1,
+                "bg_color": COLOR_SURFACE,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+                "num_format": "0.0%",
+            }
+        )
 
         for idx, row_data in enumerate(dept_data):
             r = dept_start + 1 + idx
@@ -312,21 +496,25 @@ class ExcelExporter(ReportExporter):
             row_idx += 1
 
         chart_nps = workbook.add_chart({"type": "doughnut"})
-        chart_nps.add_series({
-            "name": "NPS",
-            "categories": "='_data_dash'!$A$2:$A$4",
-            "values": "='_data_dash'!$B$2:$B$4",
-            "points": [
-                {"fill": {"color": COLOR_ACCENT}},
-                {"fill": {"color": COLOR_WARNING}},
-                {"fill": {"color": COLOR_ALERT}},
-            ],
-            "data_labels": {
-                "percentage": True, "category": True,
-                "position": "outside_end", "leader_lines": True,
-                "font": {"bold": True, "size": 11, "color": COLOR_TEXT}
+        chart_nps.add_series(
+            {
+                "name": "NPS",
+                "categories": "='_data_dash'!$A$2:$A$4",
+                "values": "='_data_dash'!$B$2:$B$4",
+                "points": [
+                    {"fill": {"color": COLOR_ACCENT}},
+                    {"fill": {"color": COLOR_WARNING}},
+                    {"fill": {"color": COLOR_ALERT}},
+                ],
+                "data_labels": {
+                    "percentage": True,
+                    "category": True,
+                    "position": "outside_end",
+                    "leader_lines": True,
+                    "font": {"bold": True, "size": 11, "color": COLOR_TEXT},
+                },
             }
-        })
+        )
         chart_nps.set_title({"name": "Distribuição NPS", "name_font": chart_title_font})
         chart_nps.set_legend({"font": {"size": 11}})
         chart_nps.set_size({"width": 500, "height": 350})
@@ -341,13 +529,15 @@ class ExcelExporter(ReportExporter):
 
         if dto.topic_data:
             chart_topics = workbook.add_chart({"type": "bar"})
-            chart_topics.add_series({
-                "name": "Motivos",
-                "categories": f"='_data_dash'!$D$2:$D${len(dto.topic_data)+1}",
-                "values": f"='_data_dash'!$E$2:$E${len(dto.topic_data)+1}",
-                "fill": {"color": COLOR_SECONDARY},
-                "data_labels": {"value": True, "font": {"size": 10}}
-            })
+            chart_topics.add_series(
+                {
+                    "name": "Motivos",
+                    "categories": f"='_data_dash'!$D$2:$D${len(dto.topic_data) + 1}",
+                    "values": f"='_data_dash'!$E$2:$E${len(dto.topic_data) + 1}",
+                    "fill": {"color": COLOR_SECONDARY},
+                    "data_labels": {"value": True, "font": {"size": 10}},
+                }
+            )
             chart_topics.set_title({"name": "Top Motivos de Contato", "name_font": chart_title_font})
             chart_topics.set_legend({"none": True})
             chart_topics.set_size({"width": 500, "height": 350})
@@ -361,15 +551,17 @@ class ExcelExporter(ReportExporter):
             data_sheet.write(i + 1, 7, val)
 
         chart_rating = workbook.add_chart({"type": "column"})
-        chart_rating.add_series({
-            "name": "Avaliações",
-            "categories": "='_data_dash'!$G$2:$G$6",
-            "values": "='_data_dash'!$H$2:$H$6",
-            "fill": {"color": COLOR_ACCENT, "none": True},
-            "line": {"color": COLOR_ACCENT, "width": 2},
-            "data_labels": {"value": True, "font": {"size": 11, "bold": True}},
-            "marker": {"type": "square", "size": 8, "fill": {"color": COLOR_ACCENT}},
-        })
+        chart_rating.add_series(
+            {
+                "name": "Avaliações",
+                "categories": "='_data_dash'!$G$2:$G$6",
+                "values": "='_data_dash'!$H$2:$H$6",
+                "fill": {"color": COLOR_ACCENT, "none": True},
+                "line": {"color": COLOR_ACCENT, "width": 2},
+                "data_labels": {"value": True, "font": {"size": 11, "bold": True}},
+                "marker": {"type": "square", "size": 8, "fill": {"color": COLOR_ACCENT}},
+            }
+        )
         chart_rating.set_title({"name": "Distribuição de Notas (CSAT)", "name_font": chart_title_font})
         chart_rating.set_legend({"none": True})
         chart_rating.set_y_axis({"major_gridlines": {"visible": True, "line": {"color": "#E0E0E0"}}})
@@ -385,13 +577,15 @@ class ExcelExporter(ReportExporter):
                 data_sheet.write(i + 1, 10, item["value"])
 
             chart_dow = workbook.add_chart({"type": "column"})
-            chart_dow.add_series({
-                "name": "Chats",
-                "categories": "='_data_dash'!$J$2:$J$8",
-                "values": "='_data_dash'!$K$2:$K$8",
-                "fill": {"color": COLOR_ALERT},
-                "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
-            })
+            chart_dow.add_series(
+                {
+                    "name": "Chats",
+                    "categories": "='_data_dash'!$J$2:$J$8",
+                    "values": "='_data_dash'!$K$2:$K$8",
+                    "fill": {"color": COLOR_ALERT},
+                    "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
+                }
+            )
             chart_dow.set_title({"name": "Chats por Dia da Semana", "name_font": chart_title_font})
             chart_dow.set_legend({"none": True})
             chart_dow.set_y_axis({"major_gridlines": {"visible": True, "line": {"color": "#E0E0E0"}}})
@@ -401,9 +595,14 @@ class ExcelExporter(ReportExporter):
         # ── Rodapé ────────────────────────────────────────────────────────────
         gen_time = datetime.now().strftime("%Y-%m-%d %H:%M")
         footer_row = dept_end + 42
-        ws.merge_range(footer_row, 0, footer_row, 14,
-                       f"Gerado em {gen_time} | Fonte: Omnichannel MCP | Período: {dto.start_date} a {dto.end_date}",
-                       footer_fmt)
+        ws.merge_range(
+            footer_row,
+            0,
+            footer_row,
+            14,
+            f"Gerado em {gen_time} | Fonte: Omnichannel MCP | Período: {dto.start_date} a {dto.end_date}",
+            footer_fmt,
+        )
 
         # Column widths
         ws.set_column(0, 0, 28)
@@ -414,26 +613,52 @@ class ExcelExporter(ReportExporter):
         ws = workbook.add_worksheet("Qualidade")
 
         title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": COLOR_PRIMARY})
-        header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center", "valign": "vcenter"
-        })
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
         cell_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left"})
         alt_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "bg_color": COLOR_SURFACE})
         num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center"})
         alt_num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center", "bg_color": COLOR_SURFACE})
-        total_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "left"
-        })
-        total_num_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center"
-        })
-        section_header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_SECONDARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "left", "valign": "vcenter"
-        })
+        total_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "left",
+            }
+        )
+        total_num_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+            }
+        )
+        section_header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_SECONDARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "left",
+                "valign": "vcenter",
+            }
+        )
 
         # ── Rating Distribution (1-5) ─────────────────────────────────────────
         ws.write(0, 0, "Distribuição de Avaliações Técnicas (1-5)", title_fmt)
@@ -486,11 +711,18 @@ class ExcelExporter(ReportExporter):
         # ── Feedback Summary ──────────────────────────────────────────────────
         gm = dto.general_metrics
         feedback_start = r + 2
-        ws.merge_range(feedback_start, 0, feedback_start, 4, "Feedback de Atendimento (Categoria: Qualidade e Satisfação)", title_fmt)
+        ws.merge_range(
+            feedback_start,
+            0,
+            feedback_start,
+            4,
+            "Feedback de Atendimento (Categoria: Qualidade e Satisfação)",
+            title_fmt,
+        )
         feedback_start += 1
 
-        ws.merge_range(feedback_start, 0, feedback_start+1, 1, "Elogios (nota 4-5)", section_header_fmt)
-        ws.merge_range(feedback_start, 2, feedback_start+1, 4, "Feedback Negativo (nota 1-2)", section_header_fmt)
+        ws.merge_range(feedback_start, 0, feedback_start + 1, 1, "Elogios (nota 4-5)", section_header_fmt)
+        ws.merge_range(feedback_start, 2, feedback_start + 1, 4, "Feedback Negativo (nota 1-2)", section_header_fmt)
         feedback_start += 1
 
         compliments = gm.get("compliments", 0)
@@ -500,7 +732,12 @@ class ExcelExporter(ReportExporter):
 
         feedback_data = [
             ("TOTAL", compliments, "TOTAL", negatives),
-            ("% Avaliados", f"{pct_compl}%" if pct_compl != "N/A" else "N/A", "% Avaliados", f"{pct_neg}%" if pct_neg != "N/A" else "N/A"),
+            (
+                "% Avaliados",
+                f"{pct_compl}%" if pct_compl != "N/A" else "N/A",
+                "% Avaliados",
+                f"{pct_neg}%" if pct_neg != "N/A" else "N/A",
+            ),
         ]
 
         for idx, (l1, v1, l2, v2) in enumerate(feedback_data):
@@ -542,36 +779,154 @@ class ExcelExporter(ReportExporter):
         ]
 
         nps_row = calc_start + 4
-        nps_def_fmt = workbook.add_format({
-            "bold": True, "border": 2, "font_size": 14, "align": "left", "bg_color": COLOR_TEXT_LIGHT, "font_color": "#FFFFFF"
-        })
-        nps_val_fmt = workbook.add_format({
-            "bold": True, "border": 2, "font_size": 14, "align": "center", "bg_color": COLOR_TEXT_LIGHT, "font_color": "#FFFFFF"
-        })
-        ws.conditional_format(nps_row, 0, nps_row, 0, {
-            "type": "cell", "criteria": ">=", "value": 70,
-            "format": workbook.add_format({"bg_color": COLOR_ACCENT, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "left"})
-        })
-        ws.conditional_format(nps_row, 1, nps_row, 1, {
-            "type": "cell", "criteria": ">=", "value": 70,
-            "format": workbook.add_format({"bg_color": COLOR_ACCENT, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "center"})
-        })
-        ws.conditional_format(nps_row, 0, nps_row, 0, {
-            "type": "cell", "criteria": "between", "minimum": 50, "maximum": 69.99,
-            "format": workbook.add_format({"bg_color": COLOR_WARNING, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "left"})
-        })
-        ws.conditional_format(nps_row, 1, nps_row, 1, {
-            "type": "cell", "criteria": "between", "minimum": 50, "maximum": 69.99,
-            "format": workbook.add_format({"bg_color": COLOR_WARNING, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "center"})
-        })
-        ws.conditional_format(nps_row, 0, nps_row, 0, {
-            "type": "cell", "criteria": "<", "value": 50,
-            "format": workbook.add_format({"bg_color": COLOR_ALERT, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "left"})
-        })
-        ws.conditional_format(nps_row, 1, nps_row, 1, {
-            "type": "cell", "criteria": "<", "value": 50,
-            "format": workbook.add_format({"bg_color": COLOR_ALERT, "font_color": "#FFFFFF", "bold": True, "border": 2, "font_size": 14, "align": "center"})
-        })
+        nps_def_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "border": 2,
+                "font_size": 14,
+                "align": "left",
+                "bg_color": COLOR_TEXT_LIGHT,
+                "font_color": "#FFFFFF",
+            }
+        )
+        nps_val_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "border": 2,
+                "font_size": 14,
+                "align": "center",
+                "bg_color": COLOR_TEXT_LIGHT,
+                "font_color": "#FFFFFF",
+            }
+        )
+        ws.conditional_format(
+            nps_row,
+            0,
+            nps_row,
+            0,
+            {
+                "type": "cell",
+                "criteria": ">=",
+                "value": 70,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_ACCENT,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "left",
+                    }
+                ),
+            },
+        )
+        ws.conditional_format(
+            nps_row,
+            1,
+            nps_row,
+            1,
+            {
+                "type": "cell",
+                "criteria": ">=",
+                "value": 70,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_ACCENT,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "center",
+                    }
+                ),
+            },
+        )
+        ws.conditional_format(
+            nps_row,
+            0,
+            nps_row,
+            0,
+            {
+                "type": "cell",
+                "criteria": "between",
+                "minimum": 50,
+                "maximum": 69.99,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_WARNING,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "left",
+                    }
+                ),
+            },
+        )
+        ws.conditional_format(
+            nps_row,
+            1,
+            nps_row,
+            1,
+            {
+                "type": "cell",
+                "criteria": "between",
+                "minimum": 50,
+                "maximum": 69.99,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_WARNING,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "center",
+                    }
+                ),
+            },
+        )
+        ws.conditional_format(
+            nps_row,
+            0,
+            nps_row,
+            0,
+            {
+                "type": "cell",
+                "criteria": "<",
+                "value": 50,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_ALERT,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "left",
+                    }
+                ),
+            },
+        )
+        ws.conditional_format(
+            nps_row,
+            1,
+            nps_row,
+            1,
+            {
+                "type": "cell",
+                "criteria": "<",
+                "value": 50,
+                "format": workbook.add_format(
+                    {
+                        "bg_color": COLOR_ALERT,
+                        "font_color": "#FFFFFF",
+                        "bold": True,
+                        "border": 2,
+                        "font_size": 14,
+                        "align": "center",
+                    }
+                ),
+            },
+        )
 
         for idx, (lbl, val) in enumerate(calc_data):
             ro = calc_start + idx
@@ -607,19 +962,45 @@ class ExcelExporter(ReportExporter):
                     t_fmt = total_fmt
                     t_n_fmt = total_num_fmt
                 for j in range(2, len(row_data)):
-                    fmt = t_fmt if (is_total and j == 2) else (t_n_fmt if is_total else (
-                        n_fmt if isinstance(row_data[j], (int, float)) else c_fmt
-                    ))
+                    fmt = (
+                        t_fmt
+                        if (is_total and j == 2)
+                        else (t_n_fmt if is_total else (n_fmt if isinstance(row_data[j], (int, float)) else c_fmt))
+                    )
                     ws.write(r, j - 2, row_data[j], fmt)
 
             safe_row = agent_start + 1 + len(ag_data)
             for j, h in enumerate(ag_header):
                 if "ART" in h or "FRT" in h:
-                    ws.conditional_format(agent_start + 1, j, safe_row - 1, j,
-                        {"type": "cell", "criteria": ">", "value": 30.0, "format": workbook.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006", "border": 1})})
+                    ws.conditional_format(
+                        agent_start + 1,
+                        j,
+                        safe_row - 1,
+                        j,
+                        {
+                            "type": "cell",
+                            "criteria": ">",
+                            "value": 30.0,
+                            "format": workbook.add_format(
+                                {"bg_color": "#FFC7CE", "font_color": "#9C0006", "border": 1}
+                            ),
+                        },
+                    )
                 if "SLA" in h:
-                    ws.conditional_format(agent_start + 1, j, safe_row - 1, j,
-                        {"type": "cell", "criteria": "<", "value": 90.0, "format": workbook.add_format({"bg_color": "#FFC7CE", "font_color": "#9C0006", "border": 1})})
+                    ws.conditional_format(
+                        agent_start + 1,
+                        j,
+                        safe_row - 1,
+                        j,
+                        {
+                            "type": "cell",
+                            "criteria": "<",
+                            "value": 90.0,
+                            "format": workbook.add_format(
+                                {"bg_color": "#FFC7CE", "font_color": "#9C0006", "border": 1}
+                            ),
+                        },
+                    )
 
         # Column widths
         ws.set_column(0, 0, 36)
@@ -641,21 +1022,25 @@ class ExcelExporter(ReportExporter):
             data_sheet.write(i + 1, 1, dto.nps_distribution.get(key, 0))
 
         chart_nps = workbook.add_chart({"type": "doughnut"})
-        chart_nps.add_series({
-            "name": "NPS",
-            "categories": "='_data_qualidade'!$A$2:$A$4",
-            "values": "='_data_qualidade'!$B$2:$B$4",
-            "points": [
-                {"fill": {"color": COLOR_ACCENT}},
-                {"fill": {"color": COLOR_WARNING}},
-                {"fill": {"color": COLOR_ALERT}},
-            ],
-            "data_labels": {
-                "percentage": True, "category": True,
-                "position": "outside_end", "leader_lines": True,
-                "font": {"bold": True, "size": 11, "color": COLOR_TEXT}
+        chart_nps.add_series(
+            {
+                "name": "NPS",
+                "categories": "='_data_qualidade'!$A$2:$A$4",
+                "values": "='_data_qualidade'!$B$2:$B$4",
+                "points": [
+                    {"fill": {"color": COLOR_ACCENT}},
+                    {"fill": {"color": COLOR_WARNING}},
+                    {"fill": {"color": COLOR_ALERT}},
+                ],
+                "data_labels": {
+                    "percentage": True,
+                    "category": True,
+                    "position": "outside_end",
+                    "leader_lines": True,
+                    "font": {"bold": True, "size": 11, "color": COLOR_TEXT},
+                },
             }
-        })
+        )
         chart_nps.set_title({"name": "Distribuição NPS", "name_font": chart_title_font})
         chart_nps.set_legend({"font": {"size": 11}})
         chart_nps.set_size({"width": 450, "height": 320})
@@ -670,13 +1055,15 @@ class ExcelExporter(ReportExporter):
             data_sheet.write(i + 1, 4, val)
 
         chart_rating = workbook.add_chart({"type": "column"})
-        chart_rating.add_series({
-            "name": "Avaliações",
-            "categories": "='_data_qualidade'!$D$2:$D$6",
-            "values": "='_data_qualidade'!$E$2:$E$6",
-            "fill": {"color": COLOR_SECONDARY},
-            "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
-        })
+        chart_rating.add_series(
+            {
+                "name": "Avaliações",
+                "categories": "='_data_qualidade'!$D$2:$D$6",
+                "values": "='_data_qualidade'!$E$2:$E$6",
+                "fill": {"color": COLOR_SECONDARY},
+                "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
+            }
+        )
         chart_rating.set_title({"name": "Distribuição de Notas Técnicas", "name_font": chart_title_font})
         chart_rating.set_legend({"none": True})
         chart_rating.set_y_axis({"major_gridlines": {"visible": True, "line": {"color": "#E0E0E0"}}})
@@ -689,22 +1076,43 @@ class ExcelExporter(ReportExporter):
 
         title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": COLOR_PRIMARY})
         section_fmt = workbook.add_format({"bold": True, "font_size": 12, "font_color": COLOR_PRIMARY, "bottom": 2})
-        header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center", "valign": "vcenter"
-        })
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
         cell_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left"})
         alt_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "bg_color": COLOR_SURFACE})
         num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center"})
         alt_num_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center", "bg_color": COLOR_SURFACE})
-        total_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "left", "valign": "vcenter"
-        })
-        total_num_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center", "valign": "vcenter"
-        })
+        total_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "left",
+                "valign": "vcenter",
+            }
+        )
+        total_num_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
 
         # ── Section 1: Heatmap ───────────────────────────────────────────────
         ws.merge_range(0, 0, 0, 3, f"Demanda — {dto.start_date} a {dto.end_date}", title_fmt)
@@ -739,11 +1147,7 @@ class ExcelExporter(ReportExporter):
             grand_total += total_by_hour[h]
         ws.write(11, 25, grand_total, total_num_fmt)
 
-        ws.conditional_format(4, 1, 10, 24, {
-            "type": "2_color_scale",
-            "min_color": "#FFFFFF",
-            "max_color": COLOR_ALERT
-        })
+        ws.conditional_format(4, 1, 10, 24, {"type": "2_color_scale", "min_color": "#FFFFFF", "max_color": COLOR_ALERT})
 
         ws.set_column(0, 0, 14)
         for col in range(1, 26):
@@ -836,13 +1240,15 @@ class ExcelExporter(ReportExporter):
                 data_sheet.write(i + 1, 1, item["value"])
 
             chart_motivos = workbook.add_chart({"type": "bar"})
-            chart_motivos.add_series({
-                "name": "Atendimentos",
-                "categories": f"='_data_demanda'!$A$2:$A${len(dto.topic_data)+1}",
-                "values": f"='_data_demanda'!$B$2:$B${len(dto.topic_data)+1}",
-                "fill": {"color": COLOR_SECONDARY},
-                "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
-            })
+            chart_motivos.add_series(
+                {
+                    "name": "Atendimentos",
+                    "categories": f"='_data_demanda'!$A$2:$A${len(dto.topic_data) + 1}",
+                    "values": f"='_data_demanda'!$B$2:$B${len(dto.topic_data) + 1}",
+                    "fill": {"color": COLOR_SECONDARY},
+                    "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
+                }
+            )
             chart_motivos.set_title({"name": "Principais Motivos de Contato", "name_font": chart_title_font})
             chart_motivos.set_legend({"none": True})
             chart_motivos.set_x_axis({"reverse": True})
@@ -858,13 +1264,15 @@ class ExcelExporter(ReportExporter):
                 data_sheet.write(i + 1, 4, item["value"])
 
             chart_ocorr = workbook.add_chart({"type": "bar"})
-            chart_ocorr.add_series({
-                "name": "Atendimentos",
-                "categories": f"='_data_demanda'!$D$2:$D${len(dto.occurrence_data)+1}",
-                "values": f"='_data_demanda'!$E$2:$E${len(dto.occurrence_data)+1}",
-                "fill": {"color": COLOR_WARNING},
-                "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
-            })
+            chart_ocorr.add_series(
+                {
+                    "name": "Atendimentos",
+                    "categories": f"='_data_demanda'!$D$2:$D${len(dto.occurrence_data) + 1}",
+                    "values": f"='_data_demanda'!$E$2:$E${len(dto.occurrence_data) + 1}",
+                    "fill": {"color": COLOR_WARNING},
+                    "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
+                }
+            )
             chart_ocorr.set_title({"name": "Principais Ocorrências", "name_font": chart_title_font})
             chart_ocorr.set_legend({"none": True})
             chart_ocorr.set_x_axis({"reverse": True})
@@ -880,13 +1288,15 @@ class ExcelExporter(ReportExporter):
                 data_sheet.write(i + 1, 7, item["value"])
 
             chart_dow = workbook.add_chart({"type": "column"})
-            chart_dow.add_series({
-                "name": "Chats",
-                "categories": "='_data_demanda'!$G$2:$G$8",
-                "values": "='_data_demanda'!$H$2:$H$8",
-                "fill": {"color": COLOR_ACCENT},
-                "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
-            })
+            chart_dow.add_series(
+                {
+                    "name": "Chats",
+                    "categories": "='_data_demanda'!$G$2:$G$8",
+                    "values": "='_data_demanda'!$H$2:$H$8",
+                    "fill": {"color": COLOR_ACCENT},
+                    "data_labels": {"value": True, "font": {"size": 10, "bold": True}},
+                }
+            )
             chart_dow.set_title({"name": "Chats por Dia da Semana", "name_font": chart_title_font})
             chart_dow.set_legend({"none": True})
             chart_dow.set_y_axis({"major_gridlines": {"visible": True, "line": {"color": "#E0E0E0"}}})
@@ -906,13 +1316,15 @@ class ExcelExporter(ReportExporter):
             data_sheet.write(h + 1, 10, total_by_hour[h])
 
         chart_hourly = workbook.add_chart({"type": "column"})
-        chart_hourly.add_series({
-            "name": "Chats",
-            "categories": "='_data_demanda'!$J$2:$J$25",
-            "values": "='_data_demanda'!$K$2:$K$25",
-            "fill": {"color": COLOR_PRIMARY},
-            "data_labels": {"value": True, "font": {"size": 9}},
-        })
+        chart_hourly.add_series(
+            {
+                "name": "Chats",
+                "categories": "='_data_demanda'!$J$2:$J$25",
+                "values": "='_data_demanda'!$K$2:$K$25",
+                "fill": {"color": COLOR_PRIMARY},
+                "data_labels": {"value": True, "font": {"size": 9}},
+            }
+        )
         chart_hourly.set_title({"name": "Distribuição por Hora do Dia", "name_font": chart_title_font})
         chart_hourly.set_legend({"none": True})
         chart_hourly.set_y_axis({"major_gridlines": {"visible": True, "line": {"color": "#E0E0E0"}}})
@@ -933,10 +1345,17 @@ class ExcelExporter(ReportExporter):
         ws = workbook.add_worksheet("Evolução Mensal")
 
         title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": COLOR_PRIMARY})
-        header_fmt = workbook.add_format({
-            "bold": True, "bg_color": COLOR_PRIMARY, "font_color": "#FFFFFF", "border": 1,
-            "font_size": 11, "align": "center", "valign": "vcenter"
-        })
+        header_fmt = workbook.add_format(
+            {
+                "bold": True,
+                "bg_color": COLOR_PRIMARY,
+                "font_color": "#FFFFFF",
+                "border": 1,
+                "font_size": 11,
+                "align": "center",
+                "valign": "vcenter",
+            }
+        )
         cell_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center"})
         alt_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "center", "bg_color": COLOR_SURFACE})
         label_fmt = workbook.add_format({"border": 1, "font_size": 11, "align": "left", "bold": True})
@@ -978,39 +1397,45 @@ class ExcelExporter(ReportExporter):
         data_end = 3 + len(dto.monthly_evolution)
 
         chart_chats = workbook.add_chart({"type": "line"})
-        chart_chats.add_series({
-            "name": "Total de Chats",
-            "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
-            "values": f"='Evolução Mensal'!$B$4:$B${data_end}",
-            "line": {"color": COLOR_SECONDARY, "width": 2.5},
-            "marker": {"type": "circle", "size": 6, "fill": {"color": COLOR_SECONDARY}},
-        })
+        chart_chats.add_series(
+            {
+                "name": "Total de Chats",
+                "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
+                "values": f"='Evolução Mensal'!$B$4:$B${data_end}",
+                "line": {"color": COLOR_SECONDARY, "width": 2.5},
+                "marker": {"type": "circle", "size": 6, "fill": {"color": COLOR_SECONDARY}},
+            }
+        )
         chart_chats.set_title({"name": "Evolução de Chats por Mês"})
         chart_chats.set_size({"width": 600, "height": 300})
         chart_chats.set_legend({"none": True})
         ws.insert_chart(2, 13, chart_chats)
 
         chart_art = workbook.add_chart({"type": "line"})
-        chart_art.add_series({
-            "name": "ART Médio",
-            "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
-            "values": f"='Evolução Mensal'!$D$4:$D${data_end}",
-            "line": {"color": COLOR_ALERT, "width": 2.5},
-            "marker": {"type": "diamond", "size": 6, "fill": {"color": COLOR_ALERT}},
-        })
+        chart_art.add_series(
+            {
+                "name": "ART Médio",
+                "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
+                "values": f"='Evolução Mensal'!$D$4:$D${data_end}",
+                "line": {"color": COLOR_ALERT, "width": 2.5},
+                "marker": {"type": "diamond", "size": 6, "fill": {"color": COLOR_ALERT}},
+            }
+        )
         chart_art.set_title({"name": "ART Médio por Mês"})
         chart_art.set_size({"width": 600, "height": 300})
         chart_art.set_legend({"none": True})
         ws.insert_chart(19, 13, chart_art)
 
         chart_nps = workbook.add_chart({"type": "line"})
-        chart_nps.add_series({
-            "name": "NPS Real",
-            "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
-            "values": f"='Evolução Mensal'!$G$4:$G${data_end}",
-            "line": {"color": COLOR_ACCENT, "width": 2.5},
-            "marker": {"type": "circle", "size": 6, "fill": {"color": COLOR_ACCENT}},
-        })
+        chart_nps.add_series(
+            {
+                "name": "NPS Real",
+                "categories": f"='Evolução Mensal'!$A$4:$A${data_end}",
+                "values": f"='Evolução Mensal'!$G$4:$G${data_end}",
+                "line": {"color": COLOR_ACCENT, "width": 2.5},
+                "marker": {"type": "circle", "size": 6, "fill": {"color": COLOR_ACCENT}},
+            }
+        )
         chart_nps.set_title({"name": "NPS Real por Mês"})
         chart_nps.set_size({"width": 600, "height": 300})
         chart_nps.set_legend({"none": True})
@@ -1023,7 +1448,16 @@ class ExcelExporter(ReportExporter):
     def export_agent_detailed(self, filename: str, agent_name: str, header: list[str], data: list[list[Any]]):
         self.export_excel(filename, header, data, "Atendimentos", highlight_frt=True)
 
-    def export_summary(self, filename: str, title: str, start_date: str, end_date: str, summary_data: dict[str, Any], report_type: str = "monthly"):
+    def export_summary(
+        self,
+        filename: str,
+        title: str,
+        start_date: str,
+        end_date: str,
+        summary_data: dict[str, Any],
+        report_type: str = "monthly",
+    ):
         from infrastructure.exporters.markdown_exporter import MarkdownExporter
+
         md_exporter = MarkdownExporter()
         md_exporter.export_summary(filename, title, start_date, end_date, summary_data, report_type=report_type)

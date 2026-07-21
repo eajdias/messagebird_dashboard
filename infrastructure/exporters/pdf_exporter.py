@@ -5,22 +5,23 @@ from typing import Any
 from fpdf import FPDF
 from rich.console import Console
 
-logger = logging.getLogger("standalone.pdf_exporter")
+logger = logging.getLogger("m_bird.exporter.pdf")
 console = Console()
 
-_HEADER_COLOR = (26, 58, 92)      # Dark Blue MessageBird style
+_HEADER_COLOR = (26, 58, 92)  # Dark Blue MessageBird style
 _SECTION_COLOR = (235, 240, 245)  # Very light blue for section headers
-_LABEL_COLOR = (245, 245, 245)    # Light gray for labels
-_BRAND_COLOR = (0, 102, 204)      # Primary Brand Blue
-_SUCCESS_COLOR = (34, 139, 34)    # Green for promoters
-_DANGER_COLOR = (220, 53, 69)     # Red for detractors/complaints
-_DANGER_BG = (255, 230, 230)      # Light red background
+_LABEL_COLOR = (245, 245, 245)  # Light gray for labels
+_BRAND_COLOR = (0, 102, 204)  # Primary Brand Blue
+_SUCCESS_COLOR = (34, 139, 34)  # Green for promoters
+_DANGER_COLOR = (220, 53, 69)  # Red for detractors/complaints
+_DANGER_BG = (255, 230, 230)  # Light red background
 
 # Chat history colors
-_CLIENT_BG = (230, 240, 250)      # Light blue for client messages
-_AGENT_BG = (240, 240, 240)       # Light gray for agent messages
-_CLIENT_TEXT = (26, 58, 92)       # Dark blue for client text
-_AGENT_TEXT = (80, 80, 80)        # Dark gray for agent text
+_CLIENT_BG = (230, 240, 250)  # Light blue for client messages
+_AGENT_BG = (240, 240, 240)  # Light gray for agent messages
+_CLIENT_TEXT = (26, 58, 92)  # Dark blue for client text
+_AGENT_TEXT = (80, 80, 80)  # Dark gray for agent text
+
 
 def _sanitize(text: str) -> str:
     if not text:
@@ -36,13 +37,13 @@ def _sanitize(text: str) -> str:
             pass
     return "".join(result)
 
+
 class _OSPDF(FPDF):
     def header(self):
         self.set_fill_color(*_HEADER_COLOR)
         self.set_text_color(255, 255, 255)
         self.set_font("Helvetica", "B", 14)
-        self.cell(0, 12, " ORDEM DE SERVIÇO - ASSISTÊNCIA TÉCNICA",
-                  align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 12, " ORDEM DE SERVIÇO - ASSISTÊNCIA TÉCNICA", align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
         self.set_text_color(0, 0, 0)
         self.ln(4)
 
@@ -67,12 +68,15 @@ class _OSPDF(FPDF):
         self.cell(label_w, 7, f" {_sanitize(label)}", fill=True, border="B")
 
         self.set_font("Helvetica", "", 9)
-        if val_color: self.set_text_color(*val_color)
-        if bg_color: self.set_fill_color(*bg_color)
+        if val_color:
+            self.set_text_color(*val_color)
+        if bg_color:
+            self.set_fill_color(*bg_color)
 
         fill = bool(bg_color)
-        self.multi_cell(self.epw - label_w, 7, f" {_sanitize(value)}", border="B", fill=fill,
-                        new_x="LMARGIN", new_y="NEXT")
+        self.multi_cell(
+            self.epw - label_w, 7, f" {_sanitize(value)}", border="B", fill=fill, new_x="LMARGIN", new_y="NEXT"
+        )
         self.set_text_color(0, 0, 0)
 
     def _two_cols(self, l1: str, v1: str, l2: str, v2: str, label_w: float = 45, v1_color=None, v2_color=None):
@@ -84,7 +88,8 @@ class _OSPDF(FPDF):
         self.cell(label_w, 7, f" {_sanitize(l1)}", fill=True, border="B")
 
         self.set_font("Helvetica", "", 9)
-        if v1_color: self.set_text_color(*v1_color)
+        if v1_color:
+            self.set_text_color(*v1_color)
         self.cell(half - label_w, 7, f" {_sanitize(v1)}", border="B")
         self.set_text_color(0, 0, 0)
 
@@ -94,9 +99,11 @@ class _OSPDF(FPDF):
         self.cell(label_w, 7, f" {_sanitize(l2)}", fill=True, border="B")
 
         self.set_font("Helvetica", "", 9)
-        if v2_color: self.set_text_color(*v2_color)
-        self.cell(self.epw - 2 * label_w - (half - label_w), 7, f" {_sanitize(v2)}",
-                  border="B", new_x="LMARGIN", new_y="NEXT")
+        if v2_color:
+            self.set_text_color(*v2_color)
+        self.cell(
+            self.epw - 2 * label_w - (half - label_w), 7, f" {_sanitize(v2)}", border="B", new_x="LMARGIN", new_y="NEXT"
+        )
         self.set_text_color(0, 0, 0)
 
     def _protocol_header(self, protocolo: str):
@@ -105,7 +112,7 @@ class _OSPDF(FPDF):
         self.set_font("Helvetica", "B", 10)
         self.cell(40, 8, " ID DA OS: ", fill=True)
 
-        self.set_fill_color(240, 248, 255) # Light brand blue
+        self.set_fill_color(240, 248, 255)  # Light brand blue
         self.set_text_color(*_HEADER_COLOR)
         self.set_font("Helvetica", "B", 12)
         self.cell(0, 8, f"  {_sanitize(protocolo)}", fill=True, new_x="LMARGIN", new_y="NEXT")
@@ -177,14 +184,18 @@ class _OSPDF(FPDF):
         # Draw message bubble
         self.get_y()
         self.set_x(margin + 5)
-        self.multi_cell(max_width - 10, 5, _sanitize(content), fill=True, border="B",
-                        new_x="LMARGIN", new_y="NEXT")
+        self.multi_cell(max_width - 10, 5, _sanitize(content), fill=True, border="B", new_x="LMARGIN", new_y="NEXT")
         self.ln(3)
 
 
 class PDFExporter:
-    def export_os_pdfs(self, output_dir: str, header: list[str], data: list[list[Any]],
-                       messages_dict: dict[int, list[dict[str, Any]]] = None):
+    def export_os_pdfs(
+        self,
+        output_dir: str,
+        header: list[str],
+        data: list[list[Any]],
+        messages_dict: dict[int, list[dict[str, Any]]] = None,
+    ):
         os.makedirs(output_dir, exist_ok=True)
         generated = 0
 
@@ -197,7 +208,8 @@ class PDFExporter:
         for row in data:
             try:
                 protocolo = str(row[0])
-                if not protocolo: continue
+                if not protocolo:
+                    continue
 
                 pdf_path = os.path.join(output_dir, f"OS_{protocolo}.pdf")
 
@@ -232,8 +244,10 @@ class PDFExporter:
                 pdf._two_cols("Motivo:", _val(row[8]), "Ocorrência:", _val(row[9]))
 
                 desc = str(row[13])
-                if not desc.strip(): desc = "Sem descrição detalhada."
-                if len(desc) > 800: desc = desc[:797] + "..."
+                if not desc.strip():
+                    desc = "Sem descrição detalhada."
+                if len(desc) > 800:
+                    desc = desc[:797] + "..."
 
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_fill_color(*_LABEL_COLOR)
@@ -300,7 +314,7 @@ class PDFExporter:
                             if not content:
                                 continue
 
-                            is_client = (direction == "received")
+                            is_client = direction == "received"
                             sender = cnts_name if is_client else agnt_name if agnt_name else "Agente"
 
                             pdf._chat_message(sender, str(content), str(timestamp), is_client)

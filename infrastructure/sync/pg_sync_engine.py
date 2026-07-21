@@ -211,60 +211,64 @@ class PgSyncManager:
         min_date=None,
         max_date=None,
     ):
-        """Sync conversation metadata with reopen detection."""
+        """Sync conversation metadata with reopen detection.
+
+        The Bird Conversations API does NOT support date-filter query params
+        (updatedDatetimeAfter is silently ignored).  We use ``reverse=true``
+        to get conversations newest-first and filter client-side, stopping
+        early once we hit a conversation older than the cutoff window.
+        """
         logger.info(f"Starting conversations sync (full={full_sync}, min_date={min_date}, max_date={max_date})...")
         last_sync, resume_cursor, resume_offset = await self.get_last_sync_time(conn, "conversations")
-        if not last_sync:
-            full_sync = True
-        if not full_sync and min_date is None and lookback_minutes:
-            cutoff = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
-            min_date = cutoff.isoformat().replace("+00:00", "Z")
-            logger.info(f"  Syncing conversations updated after {min_date}")
 
-        page_token = resume_cursor
-        offset = resume_offset or 0
+        cutoff_dt: datetime | None = None
+        if not full_sync and min_date is None and lookback_minutes:
+            cutoff_dt = (datetime.now(UTC) - timedelta(minutes=lookback_minutes)).replace(tzinfo=None)
+            min_date = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+            logger.info(f"  Incremental: will stop at conversations older than {min_date}")
+        elif min_date:
+            cutoff_dt = _parse_dt(min_date)
+
+        page_token = resume_cursor if full_sync else None
+        offset = resume_offset or 0 if full_sync else 0
         limit = 20
         count = 0
         start_time = time.time()
-        total_convs = 0
 
         for status in ["active", "archived"]:
-            offset = resume_offset if (full_sync and status == "active") else 0
-            page_token = resume_cursor if (full_sync and status == "active") else None
-            total_convs = 0
+            if full_sync:
+                offset = resume_offset if status == "active" else 0
+                page_token = resume_cursor if status == "active" else None
+            else:
+                offset = 0
+                page_token = None
 
             while True:
-                conv_params: dict[str, Any] = {"limit": limit}
+                conv_params: dict[str, Any] = {"limit": limit, "status": status, "reverse": not full_sync}
                 if page_token:
-                    conv_params["pageToken"] = page_token
+                    conv_params["page_token"] = str(page_token)
                 elif offset:
                     conv_params["offset"] = offset
-                conv_params["status"] = status
-                if min_date:
-                    conv_params["createdDatetimeAfter"] = min_date
                 if max_date:
                     conv_params["createdDatetimeBefore"] = max_date
-                if not full_sync and min_date is None:
-                    conv_params["updatedDatetimeAfter"] = (
-                        (datetime.now(UTC) - timedelta(minutes=lookback_minutes)).isoformat().replace("+00:00", "Z")
-                    )
 
                 response = await self.client.list_conversations(**conv_params)
                 if "error" in response:
                     error_msg = response["error"]
                     await self.log_sync_error(conn, f"conversations_{status}", str(error_msg), context=conv_params)
                     break
-                items: list[Any] = list(response.get("data", response.get("items", [])))  # type: ignore[arg-type]
+
+                items: list[Any] = list(response.get("data", response.get("items", [])))
                 if not items:
                     break
 
-                pagination: dict[str, Any] = response.get("pagination", {})  # type: ignore[assignment]
-                if total_convs == 0:
-                    total_convs = int(pagination.get("totalCount", 0))  # type: ignore[arg-type]
+                pagination: dict[str, Any] = response.get("pagination", {})
                 next_page_token = pagination.get("nextPageToken") or response.get("nextPageToken")
-                page_token = next_page_token if isinstance(next_page_token, str) else None
+                page_token = str(next_page_token) if next_page_token else None
                 offset += len(items)
-                count += len(items)
+
+                should_stop = False
+                batch_data = []
 
                 bird_ids_in_batch = [str(c["id"]) for c in items]
                 existing_rows = await conn.fetch_all(
@@ -310,11 +314,17 @@ class PgSyncManager:
                     for r in rows:
                         self._contact_cache[r["cnts_bird"]] = r["cnts_id"]
 
-                batch_data = []
                 for c in items:
                     updated_at_str = c.get("updatedDatetime")
+                    updated_dt = _parse_dt(updated_at_str) if updated_at_str else None
+
                     if max_date and updated_at_str and updated_at_str >= max_date:
                         continue
+
+                    if not full_sync and cutoff_dt and updated_dt:
+                        if updated_dt < cutoff_dt:
+                            should_stop = True
+                            break
 
                     cnvs_bird = c["id"]
                     cnts_id = self._contact_cache.get(c.get("contactId"))
@@ -322,7 +332,7 @@ class PgSyncManager:
                     cnvs_status = c.get("status")
                     cnvs_channel = c.get("lastUsedChannelId")
                     cnvs_created = _parse_dt(c.get("createdDatetime"))
-                    cnvs_updated = _parse_dt(c.get("updatedDatetime"))
+                    cnvs_updated = updated_dt
                     cnvs_last = _parse_dt(c.get("lastReceivedDatetime"))
 
                     old_data = existing_map.get(cnvs_bird)
@@ -371,9 +381,15 @@ class PgSyncManager:
                             "cnvs_agnt = COALESCE(EXCLUDED.cnvs_agnt, conversations.cnvs_agnt)",
                             batch_data,
                         )
+                    count += len(batch_data)
+
+                if should_stop:
+                    logger.info(f"  Stopped at conversation older than cutoff (status={status}, fetched={count})")
+                    break
 
                 if not next_page_token and len(items) < limit:
                     break
+
                 if full_sync and status == "active":
                     await self.save_sync_progress(conn, "conversations", cursor=page_token, offset=offset)
 

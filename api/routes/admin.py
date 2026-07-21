@@ -2,6 +2,7 @@
 Admin Routes
 """
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -13,11 +14,14 @@ from api.schemas.admin import (
     DepartmentItem,
     DepartmentListResponse,
     HealthResponse,
+    SyncProfileResponse,
     SyncStatusResponse,
     SyncTriggerRequest,
     SyncTriggerResponse,
 )
 from domain.constants import AGENTS, DEPT_MAP
+
+logger = logging.getLogger("m_bird.admin")
 
 router = APIRouter()
 
@@ -37,19 +41,28 @@ async def trigger_sync(
     _current_user: dict[str, Any] = Depends(get_current_user),
 ):
     """Trigger manual sync."""
-    from api.main import _refresh_mv
+    from api.sync_utils import refresh_materialized_view
     from application.use_cases.sync_database import SyncDatabaseUseCase
 
+    logger.info(
+        "Manual sync triggered: full=%s messages=%s days=%s surveys=%s",
+        request.full_sync,
+        request.sync_messages,
+        request.messages_days,
+        request.backfill_surveys,
+    )
     use_case = SyncDatabaseUseCase()
     await use_case.execute(
         full_sync=request.full_sync,
         sync_messages=request.sync_messages,
         messages_days=request.messages_days,
+        lookback_minutes=request.lookback_minutes,
         backfill_surveys=request.backfill_surveys,
         year=request.year,
         month=request.month,
     )
-    await _refresh_mv()
+    await refresh_materialized_view()
+    logger.info("Manual sync completed")
     return SyncTriggerResponse(status="completed", message="Sync and MV refresh completed")
 
 
@@ -77,3 +90,21 @@ async def list_departments(
 async def health_check():
     """Health check endpoint (no auth required)."""
     return HealthResponse(status="healthy", version="2.0.0")
+
+
+@router.get("/sync/profile", response_model=SyncProfileResponse)
+async def get_sync_profile(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Get current sync profile configuration."""
+    import os
+
+    from infrastructure.config.sync_profiles import get_active_profile, list_profiles
+
+    sync_enabled = os.getenv("SYNC_ENABLED", "true").lower() in ("true", "1", "yes")
+    profile = get_active_profile()
+    return SyncProfileResponse(
+        active_profile=profile.name,
+        sync_enabled=sync_enabled,
+        available_profiles=list_profiles(),
+    )

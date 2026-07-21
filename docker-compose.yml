@@ -14,6 +14,7 @@ services:
       - pgdata:/var/lib/postgresql
     ports:
       - "5432:5432"
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mbird -d mbird_reports"]
       interval: 5s
@@ -31,6 +32,10 @@ services:
     environment:
       DATABASE_URL: postgresql://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
       CORS_ORIGINS: https://zsc-sac.eajdias.com,http://localhost:3050
+      SYNC_PROFILE: ${SYNC_PROFILE:-daily}
+      SYNC_ENABLED: ${SYNC_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_ENV: ${APP_ENV:-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,6 +48,11 @@ services:
       - ./infrastructure:/app/infrastructure
       - ./reports:/app/reports
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
@@ -55,6 +65,11 @@ services:
     ports:
       - "3050:3000"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pgdata:

@@ -1,5 +1,6 @@
 """LEGACY — SQLite sync pipeline (used by CLI only).
 Deprecated: use infrastructure.sync.pg_sync_engine for PostgreSQL."""
+
 import asyncio
 import logging
 from datetime import UTC, datetime
@@ -82,9 +83,7 @@ class SyncManager:
         rows = await conn.fetch_all("SELECT cnts_id, cnts_bird FROM contacts")
         self._contact_cache = {r["cnts_bird"]: r["cnts_id"] for r in rows}
 
-        logger.info(
-            f"Caches loaded: {len(self._agent_cache)} agents, {len(self._contact_cache)} contacts"
-        )
+        logger.info(f"Caches loaded: {len(self._agent_cache)} agents, {len(self._contact_cache)} contacts")
 
     async def seed_known_agents(self, conn):
         """Pre-seed known agents from configuration."""
@@ -141,6 +140,7 @@ class SyncManager:
     async def log_sync_error(self, conn, resource, error_msg, code=None, context=None):
         """Log a synchronization error to the database."""
         import json
+
         context_json = json.dumps(context) if context else None
         await conn.execute_query(
             """
@@ -168,9 +168,7 @@ class SyncManager:
         )
 
         # Fetch back ID (SQLite autoincrement)
-        row = await conn.fetch_one(
-            "SELECT cnts_id FROM contacts WHERE cnts_bird = ?", (bird_id,)
-        )
+        row = await conn.fetch_one("SELECT cnts_id FROM contacts WHERE cnts_bird = ?", (bird_id,))
         if row:
             new_id = row["cnts_id"]
             self._contact_cache[bird_id] = new_id
@@ -193,9 +191,7 @@ class SyncManager:
             (bird_id, name),
         )
 
-        row = await conn.fetch_one(
-            "SELECT agnt_id FROM agents WHERE agnt_bird = ?", (bird_id,)
-        )
+        row = await conn.fetch_one("SELECT agnt_id FROM agents WHERE agnt_bird = ?", (bird_id,))
         if row:
             new_id = row["agnt_id"]
             self._agent_cache[bird_id] = new_id
@@ -217,9 +213,7 @@ class SyncManager:
         while True:
             response = await self.client.list_contacts(limit=limit, offset=offset)
             if "error" in response:
-                await self.log_sync_error(
-                    conn, "contacts", response["error"], context={"offset": offset}
-                )
+                await self.log_sync_error(conn, "contacts", response["error"], context={"offset": offset})
                 break
 
             items = response.get("items", [])
@@ -231,9 +225,7 @@ class SyncManager:
                 expected_total = response.get("pagination", {}).get("totalCount", 0)
 
             if expected_total > 0:
-                self._print_progress(
-                    offset + len(items), expected_total, "Syncing Contacts", start_time
-                )
+                self._print_progress(offset + len(items), expected_total, "Syncing Contacts", start_time)
 
             contacts_data = []
             for c in items:
@@ -301,23 +293,28 @@ class SyncManager:
     ):
         """Sync conversation metadata only (no messages).
 
-        `min_date` is inclusive and `max_date` is exclusive when provided.
+        The Bird Conversations API silently ignores date-filter query params.
+        We use ``reverse=true`` for newest-first ordering and filter
+        client-side, stopping early once we hit a conversation older than the
+        cutoff window.
         """
-        logger.info(
-            "Starting conversations sync "
-            f"(full={full_sync}, min_date={min_date}, max_date={max_date})..."
-        )
+        logger.info(f"Starting conversations sync (full={full_sync}, min_date={min_date}, max_date={max_date})...")
 
         last_sync, resume_cursor, resume_offset = await self.get_last_sync_time(conn, "conversations")
-        if not last_sync:
-            full_sync = True
 
+        cutoff_dt = None
         if not full_sync and min_date is None and lookback_minutes:
             from datetime import datetime, timedelta
 
-            cutoff = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
-            min_date = cutoff.isoformat().replace("+00:00", "Z")
-            logger.info(f"  Syncing conversations updated after {min_date}")
+            cutoff_dt = datetime.now(UTC) - timedelta(minutes=lookback_minutes)
+            min_date = cutoff_dt.isoformat().replace("+00:00", "Z")
+            logger.info(f"  Incremental: will stop at conversations older than {min_date}")
+        elif min_date:
+            cutoff_dt = (
+                datetime.fromisoformat(min_date.replace("Z", "+00:00")).replace(tzinfo=None)
+                if "Z" in str(min_date)
+                else datetime.fromisoformat(str(min_date))
+            )
 
         print("🔍 Buscando conversas...", end="", flush=True)
         count = 0
@@ -326,30 +323,27 @@ class SyncManager:
         import time
 
         start_time = time.time()
-        total_convs = 0  # Will be fetched from pagination
-
-        # Use last-seen conversation to know where to stop
-        last_bird_id = None
-        if not full_sync and max_date is None:
-            last_row = await conn.fetch_one(
-                "SELECT cnvs_bird FROM conversations ORDER BY cnvs_id DESC LIMIT 1"
-            )
-            if last_row:
-                last_bird_id = last_row["cnvs_bird"]
-                logger.info(
-                    f"  Will stop sync if existing conversation is found: {last_bird_id}"
-                )
+        total_convs = 0
 
         for status in ["active", "archived"]:
-            # Resume from last saved cursor/offset if doing a full sync restart
-            offset = resume_offset if (full_sync and status == "active") else 0
-            page_token = resume_cursor if (full_sync and status == "active") else None
-            total_convs = 0  # Reset for each status group
+            if full_sync:
+                offset = resume_offset if status == "active" else 0
+                page_token = resume_cursor if status == "active" else None
+            else:
+                offset = 0
+                page_token = None
+            total_convs = 0
 
             while True:
-                response = await self.client.list_conversations(
-                    limit=limit, offset=offset, status=status, page_token=page_token
-                )
+                conv_params: dict[str, Any] = {"limit": limit, "status": status, "reverse": not full_sync}
+                if page_token:
+                    conv_params["page_token"] = str(page_token)
+                elif offset:
+                    conv_params["offset"] = offset
+                if max_date:
+                    conv_params["createdDatetimeBefore"] = max_date
+
+                response = await self.client.list_conversations(**conv_params)
                 if "error" in response:
                     await self.log_sync_error(
                         conn, f"conversations_{status}", response["error"], context={"offset": offset}
@@ -360,56 +354,51 @@ class SyncManager:
                 if not items:
                     break
 
-                # Get total count
                 pagination = response.get("pagination", {})
                 if total_convs == 0:
                     total_convs = pagination.get("totalCount", 0)
 
-                # Support for next page token if API uses it
                 next_page_token = pagination.get("nextPageToken")
 
                 stop_sync = False
                 batch_data = []
                 contacts_to_resolve = {}
 
-                # Pre-fetch existing status to detect changes
                 bird_ids_in_batch = [c["id"] for c in items]
                 placeholders = ",".join("?" * len(bird_ids_in_batch))
                 existing_rows = await conn.fetch_all(
                     f"SELECT cnvs_id, cnvs_bird, cnvs_status, cnvs_agnt, cnvs_reopened_count FROM conversations WHERE cnvs_bird IN ({placeholders})",
-                    tuple(bird_ids_in_batch)
+                    tuple(bird_ids_in_batch),
                 )
-                existing_map = {r["cnvs_bird"]: {"id": r["cnvs_id"], "status": r["cnvs_status"], "agnt": r["cnvs_agnt"], "reopened": r["cnvs_reopened_count"]} for r in existing_rows}
+                existing_map = {
+                    r["cnvs_bird"]: {
+                        "id": r["cnvs_id"],
+                        "status": r["cnvs_status"],
+                        "agnt": r["cnvs_agnt"],
+                        "reopened": r["cnvs_reopened_count"],
+                    }
+                    for r in existing_rows
+                }
 
-                # 1. Prepare data and identify missing contacts
                 for c in items:
                     bird_id = c.get("id")
                     updated_at_str = c.get("updatedDatetime")
 
-                    # USER REQUEST: Optimization - stop if we hit the last synced bird_id
-                    if not full_sync and last_bird_id and bird_id == last_bird_id:
-                        logger.info(
-                            f"Reached last synced conversation {bird_id}. Stopping scan."
-                        )
-                        stop_sync = True
-                        break
-
                     if max_date and updated_at_str and updated_at_str >= max_date:
                         continue
 
-                    if min_date and updated_at_str and updated_at_str < min_date:
-                        logger.info(
-                            f"Stopping sync at {updated_at_str} (min_date={min_date})"
-                        )
-                        stop_sync = True
-                        break
+                    if not full_sync and cutoff_dt and updated_at_str:
+                        from datetime import datetime as _dt
 
-                    # Resolve Contact FK
-                    c_id = c["contactId"]
-                    if c_id not in self._contact_cache:
+                        conv_updated = _dt.fromisoformat(updated_at_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                        if conv_updated < cutoff_dt:
+                            stop_sync = True
+                            break
+
+                    c_id = c.get("contactId")
+                    if c_id and c_id not in self._contact_cache:
                         contact_data = c.get("contact", {})
                         contact_name = contact_data.get("displayName") or None
-                        # Tratar "None" string e nomes vazios
                         if contact_name and str(contact_name).strip().lower() in ("none", "null", ""):
                             contact_name = None
                         contacts_to_resolve[c_id] = (
@@ -417,7 +406,6 @@ class SyncManager:
                             str(contact_data.get("msisdn", "")),
                         )
 
-                # 2. Batch create new contacts
                 if contacts_to_resolve:
                     async with conn.transaction():
                         new_contacts_data = []
@@ -425,7 +413,6 @@ class SyncManager:
                             new_contacts_data.append((bid, name, phone))
 
                         if new_contacts_data:
-                            # Use INSERT OR IGNORE to avoid race conditions if needed, though simple here
                             await conn.execute_many(
                                 """
                                 INSERT OR IGNORE INTO contacts (cnts_bird, cnts_name, cnts_phone)
@@ -434,7 +421,6 @@ class SyncManager:
                                 new_contacts_data,
                             )
 
-                    # Update cache
                     bids = list(contacts_to_resolve.keys())
                     if bids:
                         placeholders = ",".join("?" * len(bids))
@@ -445,29 +431,27 @@ class SyncManager:
                         for r in rows:
                             self._contact_cache[r["cnts_bird"]] = r["cnts_id"]
 
-                # 3. Process conversations
                 for c in items:
                     updated_at_str = c.get("updatedDatetime")
+
                     if max_date and updated_at_str and updated_at_str >= max_date:
                         continue
-                    if stop_sync and updated_at_str and updated_at_str < min_date:
-                        break  # Duplicate check, ensuring we don't add
+                    if stop_sync and updated_at_str:
+                        break
 
-                    cnts_id = self._contact_cache.get(c["contactId"])
+                    cnts_id = self._contact_cache.get(c.get("contactId"))
 
                     cnvs_bird = c["id"]
                     cnvs_msgcount = c.get("messages", {}).get("totalCount", 0)
                     cnvs_status = c.get("status")
                     cnvs_channel = c.get("lastUsedChannelId")
                     cnvs_created = c.get("createdDatetime")
-                    cnvs_updated = c.get("updatedDatetime")
+                    cnvs_updated = updated_at_str
                     cnvs_last = c.get("lastReceivedDatetime")
 
-                    # Detect lifecycle events
                     old_data = existing_map.get(cnvs_bird)
                     reopened_increment = 0
 
-                    # Resolve new agent from API response
                     assigned = c.get("assignedTo") or {}
                     new_agnt_bird = assigned.get("id") if isinstance(assigned, dict) else None
                     new_agnt_id = self._agent_cache.get(new_agnt_bird) if new_agnt_bird else None
@@ -475,24 +459,9 @@ class SyncManager:
                     if old_data:
                         old_status = old_data["status"]
                         if old_status != cnvs_status:
-                            event_type = None
                             if old_status == "archived" and cnvs_status == "active":
-                                event_type = "reopened"
                                 reopened_increment = 1
-                            elif cnvs_status == "archived":
-                                event_type = "archived"
-
-                            if event_type:
-                                # event_type is determined but not stored to keep DB as pure data provider
-                                pass
-
-                        # Detect agent transfer
-                        old_agnt_id = old_data.get("agnt")
-                        if new_agnt_id and old_agnt_id and new_agnt_id != old_agnt_id:
-                            # Transfer detected but not stored to keep DB as pure data provider
-                            pass
                     else:
-                        # New conversation — event inserted after UPSERT below
                         pass
 
                     batch_data.append(
@@ -505,7 +474,7 @@ class SyncManager:
                             cnvs_created,
                             cnvs_updated,
                             cnvs_last,
-                            reopened_increment
+                            reopened_increment,
                         )
                     )
 
@@ -529,20 +498,9 @@ class SyncManager:
                             """,
                             batch_data,
                         )
-
-                        # Handle events for NEW conversations
-                        for c_data in batch_data:
-                            bird_id = c_data[4]
-                            if bird_id not in existing_map:
-                                # New conversation detected but 'opened' event not stored to keep DB as pure data provider
-                                pass
                     count += len(batch_data)
-                    if count % 100 == 0:
-                        pass  # logger.info(f"  ...{count} conversations processed")
 
                     if total_convs > 0:
-                        # Current progress within this status loop
-                        # Not perfect for 'active + archived' combined total but better than nothing
                         current_batch_end = offset + len(items)
                         self._print_progress(
                             current_batch_end,
@@ -551,22 +509,25 @@ class SyncManager:
                             start_time,
                         )
 
-                # Handle pagination: Prefer pageToken if available, else offset
+                if stop_sync:
+                    logger.info(f"  Stopped at conversation older than cutoff (status={status}, fetched={count})")
+                    break
+
                 if next_page_token:
                     page_token = next_page_token
-                    offset += len(items)
                 else:
-                    if len(items) < limit or stop_sync:
+                    if len(items) < limit:
                         break
-                    offset += len(items)
+                offset += len(items)
 
-                # Save resumable cursor after each page
                 if full_sync and status == "active":
                     await self.save_sync_progress(conn, "conversations", cursor=page_token, offset=offset)
 
         duration = time.time() - start_time
-        await self.update_sync_state(conn, "conversations", duration=duration, records_count=count, cursor=None, offset=0)
-        print()  # Newline
+        await self.update_sync_state(
+            conn, "conversations", duration=duration, records_count=count, cursor=None, offset=0
+        )
+        print()
         logger.info(f"Conversations sync completed. Total: {count}")
 
     async def sync_messages_for_month(self, conn, year: int, month: int) -> int:
@@ -589,9 +550,7 @@ class SyncManager:
             (start_iso, end_iso),
         )
         total = len(rows)
-        logger.info(
-            f"Syncing messages for {total} conversations updated in {year:04d}-{month:02d}..."
-        )
+        logger.info(f"Syncing messages for {total} conversations updated in {year:04d}-{month:02d}...")
         print(
             f"🔍 Buscando mensagens de {year:04d}-{month:02d}...",
             end="",
@@ -603,9 +562,7 @@ class SyncManager:
         async def fetch_with_limit(row):
             async with semaphore:
                 try:
-                    return await self.sync_messages(
-                        conn, row["cnvs_bird"], date_from=start_iso
-                    )
+                    return await self.sync_messages(conn, row["cnvs_bird"], date_from=start_iso)
                 except Exception as e:
                     logger.error(f"Error syncing {row['cnvs_bird']}: {e}")
                     return 0
@@ -672,8 +629,7 @@ class SyncManager:
 
             if "error" in response:
                 await self.log_sync_error(
-                    conn, "messages", response["error"],
-                    context={"cnvs_bird": conversation_bird_id, "offset": offset}
+                    conn, "messages", response["error"], context={"cnvs_bird": conversation_bird_id, "offset": offset}
                 )
                 break
 
@@ -691,9 +647,7 @@ class SyncManager:
                 content_text = ""
 
                 if isinstance(content_obj, dict):
-                    content_text = content_obj.get("text", "") or content_obj.get(
-                        "hsm", {}
-                    ).get("elementName", "")
+                    content_text = content_obj.get("text", "") or content_obj.get("hsm", {}).get("elementName", "")
                 else:
                     content_text = str(content_obj)
 
@@ -705,11 +659,7 @@ class SyncManager:
                     if agent and agent.get("id"):
                         agent_bid = agent["id"]
                         if agent_bid not in self._agent_cache:
-                            agents_to_resolve[agent_bid] = (
-                                agent.get("fullName")
-                                or agent.get("firstName")
-                                or "Unknown"
-                            )
+                            agents_to_resolve[agent_bid] = agent.get("fullName") or agent.get("firstName") or "Unknown"
 
                 # Check cache for existing agent
                 # If newly resolved, will be in cache after step 2
@@ -801,9 +751,7 @@ class SyncManager:
 
     async def sync_all_messages(self, conn):
         """Sync messages for ALL conversations ensuring concurrency."""
-        rows = await conn.fetch_all(
-            "SELECT cnvs_bird, cnvs_msgcount FROM conversations ORDER BY cnvs_updated DESC"
-        )
+        rows = await conn.fetch_all("SELECT cnvs_bird, cnvs_msgcount FROM conversations ORDER BY cnvs_updated DESC")
         total = len(rows)
         logger.info(f"Syncing messages for {total} conversations...")
 
@@ -831,16 +779,10 @@ class SyncManager:
                     )
 
                     local_count = local_count_row["count"] if local_count_row else 0
-                    last_msg_date = (
-                        local_count_row["last_msg_date"] if local_count_row else None
-                    )
+                    last_msg_date = local_count_row["last_msg_date"] if local_count_row else None
 
                     # If counts match, skip entirely!
-                    if (
-                        remote_count is not None
-                        and local_count == remote_count
-                        and remote_count > 0
-                    ):
+                    if remote_count is not None and local_count == remote_count and remote_count > 0:
                         return 0
 
                     # Delta Sync: If we have messages, pass dateFrom to only fetch new ones
@@ -874,9 +816,7 @@ class SyncManager:
             # )
 
         print()  # Newline
-        logger.info(
-            f"All messages sync completed. {total} conversations, {msg_count} messages."
-        )
+        logger.info(f"All messages sync completed. {total} conversations, {msg_count} messages.")
 
     async def sync_messages_for_recent(self, conn, days: int = 30):
         """Sync messages only for conversations updated in the last N days."""
@@ -889,9 +829,7 @@ class SyncManager:
             (f"-{days} days",),
         )
         total = len(rows)
-        logger.info(
-            f"Syncing messages for {total} conversations updated in last {days} days..."
-        )
+        logger.info(f"Syncing messages for {total} conversations updated in last {days} days...")
         print(f"🔍 Buscando mensagens dos últimos {days} dias...", end="", flush=True)
 
         semaphore = asyncio.Semaphore(10)
@@ -914,9 +852,7 @@ class SyncManager:
             msg_count += sum(results)
             logger.info(f"  ...processed {min(i + chunk_size, total)}/{total} convs")
 
-        logger.info(
-            f"Recent messages sync completed. {total} conversations, {msg_count} messages."
-        )
+        logger.info(f"Recent messages sync completed. {total} conversations, {msg_count} messages.")
 
     async def update_conversation_surveys(self, conn, conversation_bird_id: str):
         """Extract survey and screening data from conversation messages."""
@@ -930,7 +866,8 @@ class SyncManager:
             "SELECT cnvs_id, cnvs_status, cnvs_rating_agent, cnvs_rating_nps FROM conversations WHERE cnvs_bird = ?",
             (conversation_bird_id,),
         )
-        if not cnvs_row: return
+        if not cnvs_row:
+            return
         cnvs_id = cnvs_row["cnvs_id"]
         cnvs_row["cnvs_status"]
 
@@ -949,7 +886,7 @@ class SyncManager:
 
         messages = await conn.fetch_all(
             "SELECT msgs_id, msgs_content, msgs_direction, msgs_created FROM messages WHERE msgs_cnvs = ? ORDER BY msgs_created ASC",
-            (cnvs_id,)
+            (cnvs_id,),
         )
 
         updates = {}
@@ -961,7 +898,7 @@ class SyncManager:
                 lines = [l.strip() for l in content.split("\n")]
                 try:
                     idx = next(j for j, l in enumerate(lines) if PHRASE_TICKET_HEADER in l)
-                    ticket_lines = [l for l in lines[idx + 1:] if l and not l.startswith("===")]
+                    ticket_lines = [l for l in lines[idx + 1 :] if l and not l.startswith("===")]
                     # ticket_lines format: [system, dept, contact_reason, description...]
                     if len(ticket_lines) >= 4:
                         if "cnvs_contact_reason" not in updates:
@@ -1021,27 +958,30 @@ class SyncManager:
                         num = int(m.group(1)) if m else None
                         if num is not None:
                             if matched_key == "lang" and 1 <= num <= 3:
-                                updates["cnvs_lang"] = num; found = True
+                                updates["cnvs_lang"] = num
+                                found = True
                             elif matched_key == "dept" and 1 <= num <= 5:
-                                updates["cnvs_dept"] = num; found = True
+                                updates["cnvs_dept"] = num
+                                found = True
                             elif matched_key == "contact_reason" and 1 <= num <= 6:
-                                updates["cnvs_contact_reason"] = num; found = True
+                                updates["cnvs_contact_reason"] = num
+                                found = True
                             elif matched_key == "occurrence" and 1 <= num <= 6:
-                                updates["cnvs_occurrence"] = num; found = True
+                                updates["cnvs_occurrence"] = num
+                                found = True
                             elif matched_key == "rating_agent" and 1 <= num <= 5:
-                                updates["cnvs_rating_agent"] = num; found = True
+                                updates["cnvs_rating_agent"] = num
+                                found = True
                             elif matched_key == "rating_nps" and 0 <= num <= 10:
-                                updates["cnvs_rating_nps"] = num; found = True
+                                updates["cnvs_rating_nps"] = num
+                                found = True
                     if found:
                         break
 
         if updates:
             set_clause = ", ".join([f"{k} = ?" for k in updates])
             params = list(updates.values()) + [cnvs_id]
-            await conn.execute_query(
-                f"UPDATE conversations SET {set_clause} WHERE cnvs_id = ?",
-                tuple(params)
-            )
+            await conn.execute_query(f"UPDATE conversations SET {set_clause} WHERE cnvs_id = ?", tuple(params))
 
     async def full_sync(self, conn, db_path: str):
         """Full STRUCTURAL sync: contacts + conversations (no messages)."""
@@ -1131,8 +1071,7 @@ async def trigger_sync_tool(
             )
             synced_messages = await manager.sync_messages_for_month(conn, year, month)
             return (
-                "Monthly synchronization completed for "
-                f"{year:04d}-{month:02d} ({synced_messages} messages processed)."
+                f"Monthly synchronization completed for {year:04d}-{month:02d} ({synced_messages} messages processed)."
             )
 
         if full_sync and sync_messages:
@@ -1165,9 +1104,7 @@ async def trigger_sync_tool(
 
             # Sync contacts only if needed
             if await should_skip("contacts"):
-                logger.info(
-                    "Contacts synced recently, skipping structural contact check."
-                )
+                logger.info("Contacts synced recently, skipping structural contact check.")
             else:
                 await manager.sync_contacts(conn)
 
@@ -1180,13 +1117,9 @@ async def trigger_sync_tool(
 
             # Sync conversations only if needed
             if await should_skip("conversations"):
-                logger.info(
-                    "Conversation list synced recently, skipping structural check."
-                )
+                logger.info("Conversation list synced recently, skipping structural check.")
             else:
-                await manager.sync_conversations(
-                    conn, lookback_minutes=effective_lookback
-                )
+                await manager.sync_conversations(conn, lookback_minutes=effective_lookback)
 
             if messages_days is not None:
                 await manager.sync_messages_for_recent(conn, days=messages_days)

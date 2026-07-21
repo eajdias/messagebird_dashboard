@@ -13,6 +13,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# Ensure Python output is unbuffered (logs appear in docker logs immediately)
+ENV PYTHONUNBUFFERED=1
+
 # Python dependencies
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
@@ -33,4 +36,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"]

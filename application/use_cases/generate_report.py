@@ -24,7 +24,8 @@ from infrastructure.exporters.metrics_cache import (
     save_cache,
 )
 
-logger = logging.getLogger("standalone.generate_report")
+logger = logging.getLogger("m_bird.use_case.generate_report")
+
 
 def _sanitize_path_segment(name: str) -> str:
     """Replace characters invalid on Windows filesystems with underscores."""
@@ -37,16 +38,13 @@ def _sanitize_path_segment(name: str) -> str:
     name = safe.sub("_", name)
     return name.rstrip(".")
 
+
 class GenerateReportUseCase:
     def __init__(self, repository: ReportRepository, exporter: ReportExporter):
         self.repository = repository
         self.exporter = exporter
         # Initialize aggregator with domain strategies
-        self.aggregator = ReportAggregator(strategies=[
-            FRTCalculator(),
-            DurationCalculator(),
-            ARTCalculator()
-        ])
+        self.aggregator = ReportAggregator(strategies=[FRTCalculator(), DurationCalculator(), ARTCalculator()])
         self.auditoria_contatos_service = AuditoriaContatosService(repository)
         self.auditoria_os_service = AuditoriaOSService(repository)
 
@@ -65,7 +63,17 @@ class GenerateReportUseCase:
                     messages_dict[cnvs_id] = []
         return messages_dict
 
-    async def execute(self, year: int, month: int | None, output_dir: str, skip_os: bool = False, sector: str | None = None, report_type: str = "monthly", start_date: str | None = None, end_date: str | None = None):
+    async def execute(
+        self,
+        year: int,
+        month: int | None,
+        output_dir: str,
+        skip_os: bool = False,
+        sector: str | None = None,
+        report_type: str = "monthly",
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ):
         if report_type == "total":
             return await self._generate_system_total(output_dir, skip_os, sector)
         if report_type == "custom_range" and start_date and end_date:
@@ -81,7 +89,9 @@ class GenerateReportUseCase:
         end_date = f"{year}-{month:02d}-{last_day}"
         return await self._generate_custom_range(start_date, end_date, output_dir, skip_os, sector)
 
-    async def _generate_custom_range(self, start_date: str, end_date: str, output_dir: str, skip_os: bool, sector: str | None):
+    async def _generate_custom_range(
+        self, start_date: str, end_date: str, output_dir: str, skip_os: bool, sector: str | None
+    ):
 
         # 0. Validation & Metadata
         unmapped_agents, unmapped_depts = await self.repository.fetch_unmapped_counts()
@@ -121,15 +131,21 @@ class GenerateReportUseCase:
             os.makedirs(group_path, exist_ok=True)
 
             # Filter data for this group
-            [r for r in raw_data if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group]
-            group_processed = [p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
+            [
+                r
+                for r in raw_data
+                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
+            ]
+            group_processed = [
+                p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
+            ]
 
             # Group Dashboard
             g_dash_dto = self.aggregator.aggregate_dashboard(
                 group_processed,
                 title=f"DASHBOARD EXECUTIVO - {group.upper()}",
                 start_date=start_date,
-                end_date=end_date
+                end_date=end_date,
             )
             g_dash_path = os.path.join(group_path, f"Dashboard_Executivo_{safe_group}_{safe_start}_{safe_end}.xlsx")
             self.exporter.export_executive_dashboard(g_dash_path, g_dash_dto)
@@ -138,14 +154,24 @@ class GenerateReportUseCase:
             auditoria_dir = os.path.join(group_path, "auditoria")
             os.makedirs(auditoria_dir, exist_ok=True)
 
-            c_header, c_data = await self.auditoria_contatos_service.build_report(start_date, end_date, agent_group=group)
-            if c_header: self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_contatos.xlsx"), c_header, c_data, "Contatos")
+            c_header, c_data = await self.auditoria_contatos_service.build_report(
+                start_date, end_date, agent_group=group
+            )
+            if c_header:
+                self.exporter.export_excel(
+                    os.path.join(auditoria_dir, "auditoria_contatos.xlsx"), c_header, c_data, "Contatos"
+                )
 
             if not skip_os:
-                os_header, os_data = await self.auditoria_os_service.build_report(start_date, end_date, agent_group=group)
+                os_header, os_data = await self.auditoria_os_service.build_report(
+                    start_date, end_date, agent_group=group
+                )
                 if os_header:
-                    self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_os.xlsx"), os_header, os_data, "Ordens de Serviço")
+                    self.exporter.export_excel(
+                        os.path.join(auditoria_dir, "auditoria_os.xlsx"), os_header, os_data, "Ordens de Serviço"
+                    )
                     from infrastructure.exporters.pdf_exporter import PDFExporter
+
                     messages_dict = await self._fetch_os_messages(os_data)
                     PDFExporter().export_os_pdfs(os.path.join(auditoria_dir, "OS"), os_header, os_data, messages_dict)
 
@@ -165,10 +191,16 @@ class GenerateReportUseCase:
             "end_date": end_date,
             "agent_data": agent_rows,
             "group_data": group_rows,
-            "unmapped": (unmapped_agents, unmapped_depts)
+            "unmapped": (unmapped_agents, unmapped_depts),
         }
 
-        self.exporter.export_summary(os.path.join(report_subdir, "README.md"), "Relatório Período Personalizado Omnichannel", start_date, end_date, summary_data)
+        self.exporter.export_summary(
+            os.path.join(report_subdir, "README.md"),
+            "Relatório Período Personalizado Omnichannel",
+            start_date,
+            end_date,
+            summary_data,
+        )
 
         return summary_data
 
@@ -189,7 +221,7 @@ class GenerateReportUseCase:
 
         cache = load_cache()
         str(year - 1)
-        prev_year_accumulated = get_year_accumulated(cache, year - 1, 12) if cache.get(f"{year-1}-01") else None
+        prev_year_accumulated = get_year_accumulated(cache, year - 1, 12) if cache.get(f"{year - 1}-01") else None
 
         annual_dto = self.aggregator.aggregate_dashboard(
             processed_data,
@@ -239,10 +271,14 @@ class GenerateReportUseCase:
             group_path = os.path.join(report_subdir, safe_group)
             os.makedirs(group_path, exist_ok=True)
 
-            [r for r in raw_data
-                         if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group]
-            group_processed = [p for p in processed_data
-                               if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
+            [
+                r
+                for r in raw_data
+                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
+            ]
+            group_processed = [
+                p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
+            ]
 
             g_dash_dto = self.aggregator.aggregate_dashboard(
                 group_processed,
@@ -261,21 +297,25 @@ class GenerateReportUseCase:
             os.makedirs(auditoria_dir, exist_ok=True)
 
             c_header, c_data = await self.auditoria_contatos_service.build_report(
-                start_date, end_date, agent_group=group)
+                start_date, end_date, agent_group=group
+            )
             if c_header:
-                self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_contatos.xlsx"),
-                                           c_header, c_data, "Contatos")
+                self.exporter.export_excel(
+                    os.path.join(auditoria_dir, "auditoria_contatos.xlsx"), c_header, c_data, "Contatos"
+                )
 
             if not skip_os:
                 os_header, os_data = await self.auditoria_os_service.build_report(
-                    start_date, end_date, agent_group=group)
+                    start_date, end_date, agent_group=group
+                )
                 if os_header:
-                    self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_os.xlsx"),
-                                               os_header, os_data, "Ordens de Serviço")
+                    self.exporter.export_excel(
+                        os.path.join(auditoria_dir, "auditoria_os.xlsx"), os_header, os_data, "Ordens de Serviço"
+                    )
                     from infrastructure.exporters.pdf_exporter import PDFExporter
+
                     messages_dict = await self._fetch_os_messages(os_data)
-                    PDFExporter().export_os_pdfs(os.path.join(auditoria_dir, "OS"),
-                                                  os_header, os_data, messages_dict)
+                    PDFExporter().export_os_pdfs(os.path.join(auditoria_dir, "OS"), os_header, os_data, messages_dict)
 
         await asyncio.gather(*(process_group(g) for g in groups))
 
@@ -293,7 +333,9 @@ class GenerateReportUseCase:
         self.exporter.export_summary(
             os.path.join(report_subdir, "README.md"),
             f"Relatório Anual Omnichannel — {year}",
-            start_date, end_date, summary_data,
+            start_date,
+            end_date,
+            summary_data,
             report_type="annual",
         )
 
@@ -345,10 +387,14 @@ class GenerateReportUseCase:
             group_path = os.path.join(report_subdir, safe_group)
             os.makedirs(group_path, exist_ok=True)
 
-            [r for r in raw_data
-                         if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group]
-            group_processed = [p for p in processed_data
-                               if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
+            [
+                r
+                for r in raw_data
+                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
+            ]
+            group_processed = [
+                p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
+            ]
 
             g_dash_dto = self.aggregator.aggregate_dashboard(
                 group_processed,
@@ -368,18 +414,20 @@ class GenerateReportUseCase:
 
             c_header, c_data = await self.auditoria_contatos_service.build_report_all(agent_group=group)
             if c_header:
-                self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_contatos.xlsx"),
-                                           c_header, c_data, "Contatos")
+                self.exporter.export_excel(
+                    os.path.join(auditoria_dir, "auditoria_contatos.xlsx"), c_header, c_data, "Contatos"
+                )
 
             if not skip_os:
                 os_header, os_data = await self.auditoria_os_service.build_report_all(agent_group=group)
                 if os_header:
-                    self.exporter.export_excel(os.path.join(auditoria_dir, "auditoria_os.xlsx"),
-                                               os_header, os_data, "Ordens de Serviço")
+                    self.exporter.export_excel(
+                        os.path.join(auditoria_dir, "auditoria_os.xlsx"), os_header, os_data, "Ordens de Serviço"
+                    )
                     from infrastructure.exporters.pdf_exporter import PDFExporter
+
                     messages_dict = await self._fetch_os_messages(os_data)
-                    PDFExporter().export_os_pdfs(os.path.join(auditoria_dir, "OS"),
-                                                  os_header, os_data, messages_dict)
+                    PDFExporter().export_os_pdfs(os.path.join(auditoria_dir, "OS"), os_header, os_data, messages_dict)
 
         await asyncio.gather(*(process_group(g) for g in groups))
 
@@ -397,7 +445,9 @@ class GenerateReportUseCase:
         self.exporter.export_summary(
             os.path.join(report_subdir, "README.md"),
             "Relatório Total do Sistema Omnichannel",
-            first_date, last_date, summary_data,
+            first_date,
+            last_date,
+            summary_data,
             report_type="total",
         )
 
