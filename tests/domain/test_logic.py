@@ -23,9 +23,11 @@ class TestLogic(unittest.TestCase):
 
     def test_calculate_business_duration_multi_day(self):
         from datetime import datetime
+
         start = datetime(2024, 1, 1, 23, 50, 0)
         end = datetime(2024, 1, 2, 0, 10, 0)
         self.assertEqual(logic.calculate_business_duration(start, end), 20.0)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

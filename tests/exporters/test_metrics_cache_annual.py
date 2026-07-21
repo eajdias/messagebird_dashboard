@@ -32,7 +32,7 @@ class TestAnnualMetricsCache(unittest.TestCase):
         result = get_annual_monthly_breakdown(self.cache, 2024)
         for i in range(3, 12):
             entry = result[i]
-            self.assertEqual(entry["month"], f"2024-{i+1:02d}")
+            self.assertEqual(entry["month"], f"2024-{i + 1:02d}")
             self.assertNotIn("total_chats", entry)
 
     def test_get_annual_monthly_breakdown_no_data_year(self):
@@ -63,10 +63,17 @@ class TestAnnualMetricsCache(unittest.TestCase):
     def test_breakdown_includes_all_kpis_when_present(self):
         cache = {
             "2024-06": {
-                "total_chats": 150, "total_msgs": 3000, "avg_art": 12.5,
-                "avg_duration": 25.0, "real_nps": 75, "sla_compliance": 92.0,
-                "avg_rating": 4.2, "compliments": 120, "negatives": 10,
-                "unique_clients": 80, "returners": 70,
+                "total_chats": 150,
+                "total_msgs": 3000,
+                "avg_art": 12.5,
+                "avg_duration": 25.0,
+                "real_nps": 75,
+                "sla_compliance": 92.0,
+                "avg_rating": 4.2,
+                "compliments": 120,
+                "negatives": 10,
+                "unique_clients": 80,
+                "returners": 70,
             }
         }
         result = get_annual_monthly_breakdown(cache, 2024)

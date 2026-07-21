@@ -21,7 +21,7 @@ class TestDeptRoutingFlow(unittest.TestCase):
 
         constants.AGENTS = {
             "id_1": {"name": "Alice Suporte", "group": "Suporte Técnico"},
-            "id_2": {"name": "Bruno CS",     "group": "CS | Instalação | Migração | Ouvidoria"},
+            "id_2": {"name": "Bruno CS", "group": "CS | Instalação | Migração | Ouvidoria"},
             "id_3": {"name": "Carlos Vendas", "group": "Comercial"},
         }
 
@@ -32,14 +32,19 @@ class TestDeptRoutingFlow(unittest.TestCase):
 
     def setUp(self):
         constants.DEPT_ROUTING = {}
-        self.aggregator = ReportAggregator(strategies=[
-            FRTCalculator(), DurationCalculator(), ARTCalculator(),
-        ])
+        self.aggregator = ReportAggregator(
+            strategies=[
+                FRTCalculator(),
+                DurationCalculator(),
+                ARTCalculator(),
+            ]
+        )
 
     # ── helpers ───────────────────────────────────────────────────────────
 
-    def _conv(self, cid: str, agent: str, dept_label: str = "Suporte Técnico",
-              rating: int = None) -> RawConversationData:
+    def _conv(
+        self, cid: str, agent: str, dept_label: str = "Suporte Técnico", rating: int = None
+    ) -> RawConversationData:
         return RawConversationData(
             id=cid,
             contact="Cliente Teste",

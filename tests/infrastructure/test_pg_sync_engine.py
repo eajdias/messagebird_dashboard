@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from infrastructure.sync.sync_core import PgSyncManager, parse_dt
 from infrastructure.sync.sync_conversations import sync_conversations
-
+from infrastructure.sync.sync_core import PgSyncManager, parse_dt
 
 # ── Helpers ─────────────────────────────────────────────────────
 
@@ -56,7 +55,6 @@ def mock_conn():
     conn.fetch_one = AsyncMock(return_value=None)
     conn.execute_query = AsyncMock()
     conn.execute_many = AsyncMock()
-    # Proper async context manager for conn.transaction()
     mock_tx = MagicMock()
     mock_tx.__aenter__ = AsyncMock(return_value=None)
     mock_tx.__aexit__ = AsyncMock(return_value=False)
@@ -100,7 +98,6 @@ async def test_incremental_stops_at_cutoff(manager, mock_conn):
     recent = (now - timedelta(minutes=10)).isoformat().replace("+00:00", "Z")
     old = (now - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
 
-    # Page 1: 2 recent conversations
     page1 = _make_page(
         [
             _make_conversation("c1", recent),
@@ -108,7 +105,6 @@ async def test_incremental_stops_at_cutoff(manager, mock_conn):
         ],
         next_page_token="page2",
     )
-    # Page 2: 1 recent + 1 old (should trigger early exit)
     page2 = _make_page(
         [
             _make_conversation("c3", recent),
@@ -116,22 +112,16 @@ async def test_incremental_stops_at_cutoff(manager, mock_conn):
         ]
     )
 
-    mock_conn.fetch_all = AsyncMock(return_value=[])  # existing conversations = none
-
-    # sync loops active + archived → need empty response for archived pass
+    mock_conn.fetch_all = AsyncMock(return_value=[])
     empty_page = _make_page([])
     manager.client = AsyncMock()
     manager.client.list_conversations = AsyncMock(side_effect=[page1, page2, empty_page])
 
     await sync_conversations(manager, mock_conn)
 
-    # Should have processed c1, c2, c3 (3 items) and stopped at c4
-    # API called 3 times: page1(active) + page2(active) + empty_page(archived)
     assert manager.client.list_conversations.call_count == 3
-    # Verify reverse=False (full structural, no cutoff)
     first_call_kwargs = manager.client.list_conversations.call_args_list[0]
     assert first_call_kwargs.kwargs.get("reverse") is False
-    # execute_many called twice: contacts INSERT + conversations UPSERT (2 pages)
     assert mock_conn.execute_many.call_count == 2
 
 
@@ -196,11 +186,10 @@ async def test_api_error_returns_zero(manager, mock_conn):
 
 @pytest.mark.asyncio
 async def test_reopen_detection(manager, mock_conn):
-    """Detects archived→active transition as reopen."""
+    """Detects archived->active transition as reopen."""
     now = datetime.now(UTC)
     recent = (now - timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
 
-    # Existing conversation in DB is archived
     existing = MagicMock()
     existing.__getitem__ = lambda self, key: {
         "cnvs_id": 1,
@@ -218,7 +207,6 @@ async def test_reopen_detection(manager, mock_conn):
 
     await sync_conversations(manager, mock_conn)
 
-    # Verify UPSERT was called with reopened_increment=1
     execute_many_call = mock_conn.execute_many.call_args_list[-1]
-    batch_data = execute_many_call[0][1]  # second positional arg is the data
-    assert batch_data[0][-1] == 1  # last element is reopened_increment
+    batch_data = execute_many_call[0][1]
+    assert batch_data[0][-1] == 1

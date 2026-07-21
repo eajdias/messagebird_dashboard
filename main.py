@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-from application.use_cases.sync_database import SyncDatabaseUseCase
-from infrastructure.config.config_loader import load_and_configure_business, load_bsc_config
+from application.use_cases.sync_database import SyncDatabaseUseCase  # noqa: E402
+from infrastructure.config.config_loader import load_and_configure_business, load_bsc_config  # noqa: E402
 
 try:
     from rich.console import Console

@@ -7,6 +7,7 @@ from domain.services.metrics_calculator import MetricsCalculator
 
 DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
+
 class TemporalAggregator:
     def aggregate_heatmap(self, data: list[ProcessedReportData]) -> list[dict[str, Any]]:
         """Calcula a distribuição horária por dia da semana (Heatmap)."""
@@ -29,6 +30,7 @@ class TemporalAggregator:
                 dow_counts[dt.weekday()] += 1
         return [{"day": DOW_NAMES[day], "value": count} for day, count in sorted(dow_counts.items())]
 
+
 class TopicAggregator:
     def aggregate_reasons(self, data: list[ProcessedReportData]) -> list[dict[str, Any]]:
         """Calcula os motivos de contato mais frequentes."""
@@ -40,6 +42,7 @@ class TopicAggregator:
         occurrences = Counter(p.occurrence for p in data if p.occurrence and p.occurrence != "N/A")
         return [{"label": occ, "value": count} for occ, count in occurrences.most_common(15)]
 
+
 class RatingAggregator:
     def aggregate_distributions(self, data: list[ProcessedReportData]) -> dict[str, Any]:
         """Calcula as distribuições de NPS e Notas."""
@@ -48,7 +51,7 @@ class RatingAggregator:
 
         return {
             "nps_distribution": MetricsCalculator.calculate_nps_distribution(nps_scores),
-            "rating_distribution": MetricsCalculator.calculate_rating_distribution(ratings)
+            "rating_distribution": MetricsCalculator.calculate_rating_distribution(ratings),
         }
 
     def aggregate_agent_ratings(self, data: list[ProcessedReportData]) -> dict[str, Any]:
@@ -110,5 +113,5 @@ class RatingAggregator:
             "rating_header": rating_header,
             "rating_rows": rating_rows,
             "nps_header": nps_header,
-            "nps_rows": nps_rows
+            "nps_rows": nps_rows,
         }

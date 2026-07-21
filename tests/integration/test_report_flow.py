@@ -9,24 +9,25 @@ from domain.metrics.frt import FRTCalculator
 
 class TestReportFlow(unittest.TestCase):
     def setUp(self):
-        self.aggregator = ReportAggregator(strategies=[
-            FRTCalculator(),
-            DurationCalculator(),
-            ARTCalculator()
-        ])
+        self.aggregator = ReportAggregator(strategies=[FRTCalculator(), DurationCalculator(), ARTCalculator()])
 
-    def _make_conversation(self, cid: str, agent: str, rating: int = None, nps: int = None,
-                           phone: str = "5511999999999", msg_count: int = 3,
-                           created: str = "2024-03-01 10:00:00",
-                           updated: str = "2024-03-01 10:30:00",
-                           dept_label: str = "Suporte Técnico",
-                           contact_reason: str = "Problemas técnicos",
-                           occurrence: str = "Pedal") -> RawConversationData:
+    def _make_conversation(
+        self,
+        cid: str,
+        agent: str,
+        rating: int = None,
+        nps: int = None,
+        phone: str = "5511999999999",
+        msg_count: int = 3,
+        created: str = "2024-03-01 10:00:00",
+        updated: str = "2024-03-01 10:30:00",
+        dept_label: str = "Suporte Técnico",
+        contact_reason: str = "Problemas técnicos",
+        occurrence: str = "Pedal",
+    ) -> RawConversationData:
         msgs = [RawMessageData(created, "received", None, agent)]
         for i in range(msg_count):
-            msgs.append(RawMessageData(
-                f"2024-03-01 10:{i+1:02d}:00", "sent", "1", agent
-            ))
+            msgs.append(RawMessageData(f"2024-03-01 10:{i + 1:02d}:00", "sent", "1", agent))
         return RawConversationData(
             id=cid,
             contact="Test Client",
@@ -42,7 +43,7 @@ class TestReportFlow(unittest.TestCase):
             nps=nps,
             dept_label=dept_label,
             contact_reason=contact_reason,
-            occurrence=occurrence
+            occurrence=occurrence,
         )
 
     def test_full_pipeline_single_agent(self):
@@ -124,6 +125,7 @@ class TestReportFlow(unittest.TestCase):
         self.assertEqual(dto.rating_distribution["3"], 1)
         self.assertEqual(len(dto.heatmap_data), 2)
         self.assertGreater(len(dto.topic_data), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

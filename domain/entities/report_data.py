@@ -8,6 +8,7 @@ class RawMessageData:
     agent_id: str | None
     agent_name: str | None
 
+
 @dataclass
 class RawConversationData:
     id: str
@@ -26,6 +27,7 @@ class RawConversationData:
     dept_label: str = "N/A"
     contact_reason: str = "N/A"
     occurrence: str = "N/A"
+
 
 @dataclass
 class ProcessedReportData:

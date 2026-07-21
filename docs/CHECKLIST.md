@@ -197,7 +197,7 @@
 ### Docker
 - [x] Criar `frontend/Dockerfile` (Node 22 Alpine, multi-stage)
 - [x] Completar `docker-compose.yml` com serviço frontend
-- [x] Testar `docker compose up` completo — 3/3 serviços healthy
+- [] Testar `docker compose up` completo — 3/3 serviços healthy
 
 ### Cloudflare Tunnel
 - [x] Portas definidas: API `:8050`, Frontend `:3050`

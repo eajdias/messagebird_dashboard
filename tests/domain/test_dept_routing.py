@@ -25,7 +25,7 @@ class TestResolveConversationGroup(unittest.TestCase):
 
         constants.AGENTS = {
             "id_1": {"name": "Alice Suporte", "group": "Suporte Técnico"},
-            "id_2": {"name": "Bruno CS",     "group": "CS | Instalação | Migração | Ouvidoria"},
+            "id_2": {"name": "Bruno CS", "group": "CS | Instalação | Migração | Ouvidoria"},
             "id_3": {"name": "Carlos Vendas", "group": "Comercial"},
         }
 

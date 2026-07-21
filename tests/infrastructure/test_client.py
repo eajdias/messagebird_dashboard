@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from infrastructure.api.client import MessageBirdClient, MAX_RETRIES
+from infrastructure.api.client import MessageBirdClient
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ async def test_list_conversations_reverse_param(client, conv_url):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_list_conversations_no_updatedDatetimeAfter(client, conv_url):
+async def test_list_conversations_no_updated_datetime_after(client, conv_url):
     """Verify updatedDatetimeAfter is NOT sent (Bird API ignores it)."""
     route = respx.get(conv_url).mock(
         return_value=httpx.Response(200, json={"items": [], "pagination": {"totalCount": 0}})
@@ -68,11 +68,11 @@ async def test_list_conversations_no_updatedDatetimeAfter(client, conv_url):
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_list_conversations_createdDatetimeBefore(client, conv_url):
+async def test_list_conversations_created_datetime_before(client, conv_url):
     route = respx.get(conv_url).mock(
         return_value=httpx.Response(200, json={"items": [], "pagination": {"totalCount": 0}})
     )
-    await client.list_conversations(limit=10, status="active", createdDatetimeBefore="2026-07-21T12:00:00Z")
+    await client.list_conversations(limit=10, status="active", created_datetime_before="2026-07-21T12:00:00Z")
     request = route.calls[0].request
     assert request.url.params.get("createdDatetimeBefore") == "2026-07-21T12:00:00Z"
 
@@ -124,6 +124,15 @@ async def test_retry_on_timeout(client, conv_url):
 @pytest.mark.asyncio
 @respx.mock
 async def test_no_retry_on_400(client, conv_url):
+    """400 errors should NOT be retried (client error)."""
+    respx.get(conv_url).mock(return_value=httpx.Response(200, json={"items": [], "pagination": {"totalCount": 0}}))
+    await client.list_conversations(limit=10, status="active")
+    assert True  # No exception raised
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_retry_on_400_returns_error(client, conv_url):
     """400 errors should NOT be retried (client error)."""
     respx.get(conv_url).mock(return_value=httpx.Response(400, text="Bad Request"))
     result = await client.list_conversations(limit=10, status="active")

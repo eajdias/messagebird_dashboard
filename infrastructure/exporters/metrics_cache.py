@@ -12,7 +12,7 @@ def load_cache() -> dict[str, Any]:
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError):
+    except json.JSONDecodeError, OSError:
         return {}
 
 
@@ -24,8 +24,8 @@ def save_cache(cache: dict[str, Any]):
 
 def get_previous_month_key(year: int, month: int) -> str:
     if month == 1:
-        return f"{year-1}-{12:02d}"
-    return f"{year}-{month-1:02d}"
+        return f"{year - 1}-{12:02d}"
+    return f"{year}-{month - 1:02d}"
 
 
 def get_year_accumulated(cache: dict[str, Any], year: int, upto_month: int) -> dict[str, Any] | None:

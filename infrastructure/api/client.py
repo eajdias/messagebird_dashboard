@@ -97,8 +97,8 @@ class MessageBirdClient:
         status: str = "active",
         page_token: str | None = None,
         reverse: bool = False,
-        createdDatetimeAfter: str | None = None,
-        createdDatetimeBefore: str | None = None,
+        created_datetime_after: str | None = None,
+        created_datetime_before: str | None = None,
     ):
         url = f"{self.base_url_conv}/conversations"
         params: dict[str, Any] = {"limit": limit, "offset": offset, "status": status}
@@ -106,10 +106,10 @@ class MessageBirdClient:
             params["reverse"] = "true"
         if page_token:
             params["pageToken"] = page_token
-        if createdDatetimeAfter:
-            params["createdDatetimeAfter"] = createdDatetimeAfter
-        if createdDatetimeBefore:
-            params["createdDatetimeBefore"] = createdDatetimeBefore
+        if created_datetime_after:
+            params["createdDatetimeAfter"] = created_datetime_after
+        if created_datetime_before:
+            params["createdDatetimeBefore"] = created_datetime_before
         return await self._make_request("GET", url, params)
 
     async def get_messages(self, conversation_id: str, limit: int = 20, offset: int = 0, date_from: str | None = None):

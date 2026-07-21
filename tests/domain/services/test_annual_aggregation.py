@@ -9,30 +9,38 @@ from domain.metrics.frt import FRTCalculator
 
 class TestAnnualAggregation(unittest.TestCase):
     def setUp(self):
-        self.aggregator = ReportAggregator(strategies=[
-            FRTCalculator(),
-            DurationCalculator(),
-            ARTCalculator()
-        ])
+        self.aggregator = ReportAggregator(strategies=[FRTCalculator(), DurationCalculator(), ARTCalculator()])
 
-    def _make_conversation(self, cid: str, agent: str, rating: int = None, nps: int = None,
-                           phone: str = "5511999999999", msg_count: int = 3,
-                           created: str = "2024-03-01 10:00:00",
-                           updated: str = "2024-03-01 10:30:00") -> RawConversationData:
+    def _make_conversation(
+        self,
+        cid: str,
+        agent: str,
+        rating: int = None,
+        nps: int = None,
+        phone: str = "5511999999999",
+        msg_count: int = 3,
+        created: str = "2024-03-01 10:00:00",
+        updated: str = "2024-03-01 10:30:00",
+    ) -> RawConversationData:
         msgs = [RawMessageData(created, "received", None, agent)]
         for i in range(msg_count):
-            msgs.append(RawMessageData(
-                f"2024-03-01 10:{i+1:02d}:00", "sent", "1", agent
-            ))
+            msgs.append(RawMessageData(f"2024-03-01 10:{i + 1:02d}:00", "sent", "1", agent))
         raw = RawConversationData(
-            id=cid, contact="Test", phone=phone,
-            start_time=created, end_time=updated,
-            queue_time=None, raw_created=created, raw_updated=updated,
-            msgs=msgs, metadata={"agent_name": agent},
-            rating=rating, nps=nps,
+            id=cid,
+            contact="Test",
+            phone=phone,
+            start_time=created,
+            end_time=updated,
+            queue_time=None,
+            raw_created=created,
+            raw_updated=updated,
+            msgs=msgs,
+            metadata={"agent_name": agent},
+            rating=rating,
+            nps=nps,
             dept_label="Suporte Técnico",
             contact_reason="Problemas técnicos",
-            occurrence="Pedal"
+            occurrence="Pedal",
         )
         return self.aggregator.process_conversation(raw)
 
@@ -94,9 +102,18 @@ class TestAnnualAggregation(unittest.TestCase):
         result = self.aggregator.aggregate_monthly_breakdown(data)
         entry = result[0]
         expected_keys = {
-            "month", "total_chats", "total_msgs", "avg_art", "avg_duration",
-            "real_nps", "sla_compliance", "avg_rating", "compliments",
-            "negatives", "unique_clients", "returners",
+            "month",
+            "total_chats",
+            "total_msgs",
+            "avg_art",
+            "avg_duration",
+            "real_nps",
+            "sla_compliance",
+            "avg_rating",
+            "compliments",
+            "negatives",
+            "unique_clients",
+            "returners",
         }
         self.assertSetEqual(set(entry.keys()), expected_keys)
 

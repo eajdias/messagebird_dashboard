@@ -278,7 +278,7 @@ class PDFExporter:
                         nps_color = _SUCCESS_COLOR
                     elif nps_int <= 6:
                         nps_color = _DANGER_COLOR
-                except:
+                except Exception:
                     pass
 
                 pdf._two_cols("Nota do Técnico:", _val(row[10]), "Nota NPS:", nps_val, v2_color=nps_color)
@@ -308,7 +308,7 @@ class PDFExporter:
                                 try:
                                     if " " in str(timestamp):
                                         timestamp = str(timestamp).split(" ")[1][:5]
-                                except:
+                                except Exception:
                                     pass
 
                             if not content:

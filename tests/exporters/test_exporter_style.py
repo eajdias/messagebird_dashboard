@@ -47,8 +47,11 @@ class TestExporterStyle(unittest.TestCase):
 
     def test_agent_header_has_correct_columns(self):
         expected_headers = [
-            "Dept maior atendimento", "Grupo", "Nome do Agente",
-            "Total de Chats", "% do Departamento",
+            "Dept maior atendimento",
+            "Grupo",
+            "Nome do Agente",
+            "Total de Chats",
+            "% do Departamento",
         ]
         for h in expected_headers:
             self.assertIn(h, AGENTS_HEADER)
@@ -86,9 +89,13 @@ class TestExporterStyle(unittest.TestCase):
         self.assertEqual(penalidades[0]["name"], "Ligacoes Perdidas (Setor)")
 
     def test_bsc_escalonado_percentual_formula(self):
-        kpi = {"tipo": "escalonado_percentual", "meta": ">40%", "peso": 30,
-               "niveis": [{"min": 40, "pts": 30, "extra_per_unit": 0.75}, {"min": 35, "pts": 15}, {"min": 30, "pts": 10}],
-               "cap": 60}
+        kpi = {
+            "tipo": "escalonado_percentual",
+            "meta": ">40%",
+            "peso": 30,
+            "niveis": [{"min": 40, "pts": 30, "extra_per_unit": 0.75}, {"min": 35, "pts": 15}, {"min": 30, "pts": 10}],
+            "cap": 60,
+        }
         formula = _kpi_excel_formula("A1", kpi)
         self.assertTrue(formula.startswith("=IF"))
         self.assertIn("A1", formula)
@@ -96,8 +103,12 @@ class TestExporterStyle(unittest.TestCase):
         self.assertIn("60", formula)
 
     def test_bsc_escalonado_nps_formula(self):
-        kpi = {"tipo": "escalonado_nps", "meta": ">=70/63/50", "peso": 30,
-               "niveis": [{"min": 70, "pts": 30}, {"min": 63, "pts": 15}, {"min": 50, "pts": 5}]}
+        kpi = {
+            "tipo": "escalonado_nps",
+            "meta": ">=70/63/50",
+            "peso": 30,
+            "niveis": [{"min": 70, "pts": 30}, {"min": 63, "pts": 15}, {"min": 50, "pts": 5}],
+        }
         formula = _kpi_excel_formula("B2", kpi)
         self.assertTrue(formula.startswith("=IF"))
         self.assertIn("B2", formula)
@@ -131,6 +142,7 @@ class TestExporterStyle(unittest.TestCase):
         import tempfile
 
         from xlsxwriter import Workbook
+
         with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
             wb = Workbook(f.name)
             ws = wb.add_worksheet()
@@ -149,6 +161,7 @@ class TestExporterStyle(unittest.TestCase):
 
     def test_metadata_exists_in_dto(self):
         from application.interfaces.exporter import DashboardDTO
+
         self.assertTrue(hasattr(DashboardDTO, "prev_month_metrics"))
         self.assertTrue(hasattr(DashboardDTO, "tabular_header"))
         self.assertTrue(hasattr(DashboardDTO, "bsc_kpi_config"))

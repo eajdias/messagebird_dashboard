@@ -99,7 +99,7 @@ class ExcelExporter(ReportExporter):
                             worksheet.write_number(row_num + 1, col_num, int(digits), n_fmt)
                         else:
                             worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
-                    except:
+                    except Exception:
                         worksheet.write(row_num + 1, col_num, cell_value, n_fmt)
                 else:
                     try:
@@ -108,7 +108,7 @@ class ExcelExporter(ReportExporter):
                             worksheet.write(row_num + 1, col_num, val, fmt)
                         else:
                             worksheet.write(row_num + 1, col_num, cell_value, fmt)
-                    except:
+                    except Exception:
                         worksheet.write(row_num + 1, col_num, cell_value, fmt)
 
         if highlight_frt:
@@ -312,7 +312,7 @@ class ExcelExporter(ReportExporter):
                 return "N/A"
             try:
                 return f"{val:{fmt}}"
-            except:
+            except Exception:
                 return str(val)
 
         # ── Formatos ──────────────────────────────────────────────────────────

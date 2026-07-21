@@ -54,9 +54,8 @@ class AuditoriaContatosService:
                 if row["cnvs_rating_nps"] is not None:
                     d["conv_nps"][cv_id] = row["cnvs_rating_nps"]
             d["msg_count"] += 1
-            if row["agnt_name"] and row["agnt_name"].lower() != "sistema":
-                if d["conv_agents"][cv_id] is None:
-                    d["conv_agents"][cv_id] = row["agnt_name"]
+            if row["agnt_name"] and row["agnt_name"].lower() != "sistema" and d["conv_agents"][cv_id] is None:
+                d["conv_agents"][cv_id] = row["agnt_name"]
         data_list = []
         for d in sorted(contact_data.values(), key=lambda x: len(x["convs"]), reverse=True):
             human_cvs = [cid for cid, ag in d["conv_agents"].items() if ag is not None]
@@ -124,9 +123,8 @@ class AuditoriaContatosService:
                 if row["cnvs_rating_nps"] is not None:
                     d["conv_nps"][cv_id] = row["cnvs_rating_nps"]
             d["msg_count"] += 1
-            if row["agnt_name"] and row["agnt_name"].lower() != "sistema":
-                if d["conv_agents"][cv_id] is None:
-                    d["conv_agents"][cv_id] = row["agnt_name"]
+            if row["agnt_name"] and row["agnt_name"].lower() != "sistema" and d["conv_agents"][cv_id] is None:
+                d["conv_agents"][cv_id] = row["agnt_name"]
         data_list = []
         for d in sorted(contact_data.values(), key=lambda x: len(x["convs"]), reverse=True):
             human_cvs = [cid for cid, ag in d["conv_agents"].items() if ag is not None]

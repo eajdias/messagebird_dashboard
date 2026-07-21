@@ -3,7 +3,15 @@ from typing import Any
 
 
 class MarkdownExporter:
-    def export_summary(self, filename: str, title: str, start_date: str, end_date: str, data: dict[str, Any], report_type: str = "monthly"):
+    def export_summary(
+        self,
+        filename: str,
+        title: str,
+        start_date: str,
+        end_date: str,
+        data: dict[str, Any],
+        report_type: str = "monthly",
+    ):
         with open(filename, "w", encoding="utf-8") as f:
             f.write(f"# {title}\n\n")
             f.write(f"**Período:** {start_date} a {end_date}  \n")
@@ -72,21 +80,25 @@ class MarkdownExporter:
                 sorted_agents = sorted(
                     [r for r in agent_data if r[2] != "TOTAIS"],
                     key=lambda r: r[13] if isinstance(r[13], (int, float)) else 0,
-                    reverse=True
+                    reverse=True,
                 )
                 for idx, row in enumerate(sorted_agents[:10]):
                     name = str(row[2]).replace("|", "\\|")
                     group = str(row[1]).replace("|", "\\|")
-                    f.write(f"| {idx+1} | {name} | {group} | {row[3]} | {row[13]} | {row[14]} min | {row[15]}% |\n")
+                    f.write(f"| {idx + 1} | {name} | {group} | {row[3]} | {row[13]} | {row[14]} min | {row[15]}% |\n")
 
                 f.write("\n")
 
             # ── Arquivos Gerados ──────────────────────────────────────────────
             f.write("## Arquivos Gerados\n\n")
             if report_type == "annual":
-                f.write("- `Dashboard_Executivo_ANUAL_*.xlsx`: Dashboard anual consolidado com abas de evolução mensal.\n")
+                f.write(
+                    "- `Dashboard_Executivo_ANUAL_*.xlsx`: Dashboard anual consolidado com abas de evolução mensal.\n"
+                )
             elif report_type == "total":
-                f.write("- `Dashboard_Executivo_TOTAL_SISTEMA.xlsx`: Dashboard total do sistema com todo o histórico.\n")
+                f.write(
+                    "- `Dashboard_Executivo_TOTAL_SISTEMA.xlsx`: Dashboard total do sistema com todo o histórico.\n"
+                )
             else:
                 f.write("- `Dashboard_Executivo_GLOBAL_*.xlsx`: Dashboard consolidado com todas as abas.\n")
             f.write("- Pastas por grupo: cada uma contém dashboard individual, auditoria de contatos e OS.\n")
@@ -97,4 +109,7 @@ class MarkdownExporter:
                 f.write(f"\n*Período total dos dados: {start_date} a {end_date}*\n")
             f.write("\n")
             f.write("---\n")
-            f.write(f"*Relatório gerado automaticamente pelo sistema Omnichannel MCP em {datetime.now().strftime('%d/%m/%Y %H:%M')}*\n")
+            f.write(
+                f"*Relatório gerado automaticamente pelo sistema Omnichannel MCP em "
+                f"{datetime.now().strftime('%d/%m/%Y %H:%M')}*\n"
+            )

@@ -9,7 +9,6 @@ import os
 import pytest
 
 from infrastructure.api.client import MessageBirdClient
-from infrastructure.sync.pg_sync_engine import PgSyncManager
 
 
 @pytest.mark.integration

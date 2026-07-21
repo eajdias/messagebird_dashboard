@@ -6,6 +6,7 @@ from typing import Any
 # Lido do .env (MESSAGEBIRD_TIMEZONE_OFFSET); default -3 (Brasília) para compatibilidade.
 TIMEZONE_OFFSET = float(os.getenv("MESSAGEBIRD_TIMEZONE_OFFSET", "-3"))
 
+
 def parse_datetime(dt_string: str | None, apply_offset: bool = False) -> datetime | None:
     if not dt_string:
         return None
@@ -34,6 +35,7 @@ def parse_datetime(dt_string: str | None, apply_offset: bool = False) -> datetim
     except Exception:
         return None
 
+
 def local_date_bounds(start_date_str: str, end_date_str: str) -> tuple[datetime, datetime]:
     for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
         try:
@@ -44,17 +46,21 @@ def local_date_bounds(start_date_str: str, end_date_str: str) -> tuple[datetime,
             continue
     raise ValueError(f"Invalid date format: {start_date_str} or {end_date_str}. Use YYYY-MM-DD or DD/MM/YYYY")
 
+
 def to_utc_string(dt: datetime) -> str:
     utc_dt = dt - timedelta(hours=TIMEZONE_OFFSET)
     return utc_dt.strftime("%Y-%m-%d %H:%M:%S")
+
 
 def get_utc_range(start_date: str, end_date: str) -> tuple[str, str]:
     start_dt, end_dt = local_date_bounds(start_date, end_date)
     return to_utc_string(start_dt), to_utc_string(end_dt)
 
+
 def format_local_dt(dt_string: str | None) -> str | None:
     dt = parse_datetime(dt_string, apply_offset=True)
     return dt.strftime("%Y-%m-%d %H:%M:%S") if dt else None
+
 
 def calculate_business_duration(start_dt: datetime, end_dt: datetime) -> float:
     """
@@ -67,18 +73,20 @@ def calculate_business_duration(start_dt: datetime, end_dt: datetime) -> float:
     delta = (end_dt - start_dt).total_seconds() / 60.0
 
     from domain.constants import MAX_ART_MINUTES
+
     # Cap conforme limite de ART externalizado (METRIC_THRESHOLDS.max_art_minutes)
     if delta > MAX_ART_MINUTES:
         return 0.0
 
     return delta
 
+
 def _get_val(obj, keys, default=None):
     if hasattr(obj, "keys"):
         for key in keys:
             try:
                 return obj[key]
-            except (KeyError, IndexError):
+            except KeyError, IndexError:
                 pass
     else:
         for key in keys:
@@ -87,9 +95,11 @@ def _get_val(obj, keys, default=None):
                 return val
     return default
 
+
 def _get_datetime(obj, keys, apply_offset=True):
     val = _get_val(obj, keys)
     return parse_datetime(val, apply_offset=apply_offset)
+
 
 def calculate_ticket_duration(created_at: str, updated_at: str) -> float:
     """Calculates minutes from ticket open to ticket close."""
@@ -100,10 +110,12 @@ def calculate_ticket_duration(created_at: str, updated_at: str) -> float:
             return 0.0
         delta = (u_dt - c_dt).total_seconds() / 60.0
         from domain.constants import MAX_DURATION_MINUTES
+
         if delta > MAX_DURATION_MINUTES:
             return 0.0
         return delta
     return 0.0
+
 
 def get_effective_start_time(messages: list[Any], default_start: str) -> str:
     """
@@ -115,12 +127,13 @@ def get_effective_start_time(messages: list[Any], default_start: str) -> str:
         return default_start
 
     from domain.constants import REOPEN_GAP_HOURS
+
     gap_threshold = REOPEN_GAP_HOURS * 3600
     last_gap_idx = -1
 
     for i in range(1, len(messages)):
-        prev = _get_val(messages[i - 1], ('msgs_created', 'created'))
-        curr = _get_val(messages[i], ('msgs_created', 'created'))
+        prev = _get_val(messages[i - 1], ("msgs_created", "created"))
+        curr = _get_val(messages[i], ("msgs_created", "created"))
         prev_dt = parse_datetime(prev)
         curr_dt = parse_datetime(curr)
         if prev_dt and curr_dt and (curr_dt - prev_dt).total_seconds() >= gap_threshold:
@@ -130,9 +143,9 @@ def get_effective_start_time(messages: list[Any], default_start: str) -> str:
 
     first_agent_msg_time = None
     for m in active_msgs:
-        direction = _get_val(m, ('msgs_direction', 'direction'))
-        agent_id = _get_val(m, ('msgs_agnt', 'agent_id'))
-        created = _get_val(m, ('msgs_created', 'created'))
+        direction = _get_val(m, ("msgs_direction", "direction"))
+        agent_id = _get_val(m, ("msgs_agnt", "agent_id"))
+        created = _get_val(m, ("msgs_created", "created"))
 
         if direction == "sent" and agent_id is not None:
             first_agent_msg_time = created
@@ -143,8 +156,8 @@ def get_effective_start_time(messages: list[Any], default_start: str) -> str:
 
     last_customer_msg_time = None
     for m in active_msgs:
-        direction = _get_val(m, ('msgs_direction', 'direction'))
-        created = _get_val(m, ('msgs_created', 'created'))
+        direction = _get_val(m, ("msgs_direction", "direction"))
+        created = _get_val(m, ("msgs_created", "created"))
 
         if direction == "received" and created <= first_agent_msg_time:
             if not last_customer_msg_time or created > last_customer_msg_time:
@@ -153,4 +166,3 @@ def get_effective_start_time(messages: list[Any], default_start: str) -> str:
             break
 
     return last_customer_msg_time or default_start
-

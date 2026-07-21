@@ -6,25 +6,27 @@ _TIPO_COL = 3
 _FIRST_AGENT_COL = 4
 
 _TIPO_LABELS = {
-    "proporcional":          "Proporcional",
-    "sim_nao_nps":           "SIM ou Não",
-    "sim_nao_assiduidade":   "SIM ou Não",
-    "penalidade":            "Penalidade",
-    "escalonado_nps":        "Escalonado NPS",
+    "proporcional": "Proporcional",
+    "sim_nao_nps": "SIM ou Não",
+    "sim_nao_assiduidade": "SIM ou Não",
+    "penalidade": "Penalidade",
+    "escalonado_nps": "Escalonado NPS",
     "escalonado_percentual": "Escalonado %",
-    "penalidade_taxa":       "Penalidade Taxa",
+    "penalidade_taxa": "Penalidade Taxa",
     "penalidade_percentual": "Penalidade %",
-    "binaria":               "Binária",
+    "binaria": "Binária",
 }
+
 
 def _is_empty(val) -> bool:
     return val in ("", "N/D", "N/A", None)
+
 
 def _kpi_excel_formula(real_cell: str, kpi_def: dict) -> str:
     tipo = kpi_def.get("tipo")
     meta = kpi_def.get("meta")
     peso = kpi_def.get("peso")
-    cap  = kpi_def.get("cap")
+    cap = kpi_def.get("cap")
 
     if tipo in (None, "-") or meta == "-" or peso == "-":
         return "-"
@@ -43,23 +45,25 @@ def _kpi_excel_formula(real_cell: str, kpi_def: dict) -> str:
 
         elif tipo == "escalonado_percentual":
             niveis = kpi_def.get("niveis", [])
-            if not niveis: return f'=IF({guard},"",0)'
+            if not niveis:
+                return f'=IF({guard},"",0)'
             inner = "0"
             for nivel in sorted(niveis, key=lambda n: n["min"]):
                 pts = nivel["pts"]
                 extra = nivel.get("extra_per_unit", 0)
                 calc_pts = f"{pts} + ({real_cell}-{nivel['min']})*{extra}" if extra > 0 else str(pts)
-                inner = f'IF({real_cell}>={nivel["min"]},{calc_pts},{inner})'
+                inner = f"IF({real_cell}>={nivel['min']},{calc_pts},{inner})"
             if cap is not None:
                 inner = f"MIN({cap},{inner})"
             return f'=IF({guard},"",{inner})'
 
         elif tipo == "escalonado_nps":
             niveis = kpi_def.get("niveis", [])
-            if not niveis: return f'=IF({guard},"",0)'
+            if not niveis:
+                return f'=IF({guard},"",0)'
             inner = "0"
             for nivel in sorted(niveis, key=lambda n: n["min"]):
-                inner = f'IF({real_cell}>={nivel["min"]},{nivel["pts"]},{inner})'
+                inner = f"IF({real_cell}>={nivel['min']},{nivel['pts']},{inner})"
             return f'=IF({guard},"",{inner})'
 
         elif tipo == "sim_nao_assiduidade":
@@ -92,9 +96,10 @@ def _kpi_excel_formula(real_cell: str, kpi_def: dict) -> str:
         elif tipo == "binaria":
             return f'=IF({guard},"",IF({real_cell}={meta},{peso},0))'
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "-"
     return "-"
+
 
 def write_bsc_kpi_table(
     ws,
@@ -158,6 +163,7 @@ def write_bsc_kpi_table(
             kpi_col = _FIRST_AGENT_COL + 2 * i + 1
             f_cell = xl_rowcol_to_cell(first_data_row, kpi_col)
             l_cell = xl_rowcol_to_cell(last_data_row, kpi_col)
-            ws.write_formula(t_row, kpi_col, f"=SUMIF({f_cell}:{l_cell},\"<>\"&\"\",{f_cell}:{l_cell})", fmts["total_kpi"])
+            formula = f'=SUMIF({f_cell}:{l_cell},"<>"&"",{f_cell}:{l_cell})'
+            ws.write_formula(t_row, kpi_col, formula, fmts["total_kpi"])
         return t_row + 1
     return last_data_row + 1

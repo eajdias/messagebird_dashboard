@@ -15,7 +15,7 @@ class TestMetricsCalculator(unittest.TestCase):
         self.assertIsNone(MetricsCalculator.calculate_nps([]))
 
     def test_sla_rate(self):
-        arts = [10, 30, 60, 90] # 3 hits (<=60), 1 miss
+        arts = [10, 30, 60, 90]  # 3 hits (<=60), 1 miss
         self.assertEqual(MetricsCalculator.calculate_sla_rate(arts), 75.0)
 
     def test_sla_empty(self):
@@ -46,5 +46,6 @@ class TestMetricsCalculator(unittest.TestCase):
         expected = {"5": 2, "4": 1, "3": 1, "2": 1, "1": 1}
         self.assertEqual(MetricsCalculator.calculate_rating_distribution(values), expected)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

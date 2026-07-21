@@ -13,7 +13,11 @@ class ARTCalculator(MetricStrategy):
                 break
 
         q_time = data.queue_time
-        start_dt_obj = logic.parse_datetime(q_time, apply_offset=True) if q_time else logic.parse_datetime(data.raw_created, apply_offset=True)
+        start_dt_obj = (
+            logic.parse_datetime(q_time, apply_offset=True)
+            if q_time
+            else logic.parse_datetime(data.raw_created, apply_offset=True)
+        )
 
         if not first_resp_dt or not start_dt_obj:
             return None

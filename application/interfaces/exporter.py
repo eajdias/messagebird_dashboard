@@ -30,9 +30,17 @@ class DashboardDTO:
     report_type: str = "monthly"
     period_label: str = ""
 
+
 class ReportExporter(ABC):
     @abstractmethod
-    def export_excel(self, filename: str, header: list[str], data: list[list[Any]], sheet_name: str = "Relatório", highlight_frt: bool = False):
+    def export_excel(
+        self,
+        filename: str,
+        header: list[str],
+        data: list[list[Any]],
+        sheet_name: str = "Relatório",
+        highlight_frt: bool = False,
+    ):
         pass
 
     @abstractmethod
@@ -40,11 +48,25 @@ class ReportExporter(ABC):
         pass
 
     @abstractmethod
-    def export_agent_detailed(self, filename: str, agent_name: str, header: list[str], data: list[list[Any]]):
+    def export_agent_detailed(
+        self,
+        filename: str,
+        agent_name: str,
+        header: list[str],
+        data: list[list[Any]],
+    ):
         pass
 
     @abstractmethod
-    def export_summary(self, filename: str, title: str, start_date: str, end_date: str, summary_data: dict[str, Any], report_type: str = "monthly"):
+    def export_summary(
+        self,
+        filename: str,
+        title: str,
+        start_date: str,
+        end_date: str,
+        summary_data: dict[str, Any],
+        report_type: str = "monthly",
+    ):
         pass
 
     @abstractmethod
