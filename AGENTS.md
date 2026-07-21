@@ -40,7 +40,7 @@ new_bird/
 │   └── use_cases/          # GenerateReport, DataQualityReport, SyncDatabase
 │
 ├── infrastructure/         # Detalhes técnicos
-│   ├── api/                # MessageBirdClient (httpx), config, sync.py (1253 loc)
+│   ├── api/                # MessageBirdClient (httpx), config
 │   ├── config/             # config_loader.py (YAML loaders)
 │   ├── database/           # PostgreSQL (asyncpg), queries, migrations
 │   ├── repositories/       # PostgresReportRepository
@@ -114,7 +114,7 @@ Cada diretório tem seu próprio `AGENTS.md` com regras detalhadas:
 | HTTP Client | httpx | 0.27.0 |
 | Scheduler | APScheduler | 3.10.0 |
 | Frontend | Next.js + React | 16.2.10 / 19.2.7 |
-| TypeScript | TypeScript | 7.0.2 |
+| TypeScript | TypeScript | 5.8.x |
 | Styling | Tailwind CSS + shadcn/ui | 4.3.3 / 4.13.0 |
 | Charts | Recharts | 3.9.2 |
 | Tables | TanStack Table | 8.21.3 |
@@ -129,7 +129,7 @@ Cada diretório tem seu próprio `AGENTS.md` com regras detalhadas:
 ```bash
 cd new_bird
 pip install -e ".[dev]"
-uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8050
 pytest -v
 ruff check . && ruff format .
 ```
@@ -138,9 +138,10 @@ ruff check . && ruff format .
 ```bash
 cd new_bird/frontend
 npm install
-npm run dev        # → localhost:3000
+npm run dev        # → localhost:3050
 npm run build
 npm run lint
+npm run type-check
 ```
 
 ### Docker

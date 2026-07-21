@@ -12,8 +12,8 @@
 |---------|-------|----------|
 | **Interface** | Terminal CLI (`rich`) | Dashboard web (Next.js) |
 | **Acesso** | Manual via SSH | HTTP/HTTPS autenticado |
-| **Sync** | Manual (`python main.py sync`) | Automático a cada 15 min (APScheduler) |
-| **Banco** | SQLite (WAL) | PostgreSQL (via Docker) |
+| **Sync** | Manual (`python main.py sync`) | Automático (APScheduler) |
+| **Banco** | SQLite (WAL) → PostgreSQL | PostgreSQL (via Docker) |
 | **Relatórios** | Excel/PDF no filesystem | Visualização web + download |
 | **Multi-usuário** | Não | Sim (10-30 usuários) |
 | **Deploy** | Local/VPS manual | Docker Compose + Cloudflare Tunnels |
@@ -35,7 +35,7 @@
 │         │           ┌────┴───────┐           │          │
 │         │           │Scheduler   │           │          │
 │         │           │APScheduler │           │          │
-│         │           │(sync 15min)│           │          │
+│         │           │(sync agendado)│           │          │
 │         │           └────┬───────┘           │          │
 │         │                │                   │          │
 │         └────────────────┼───────────────────┘          │
@@ -197,7 +197,7 @@ api/
 #### 2.6 Scheduler de Sync
 
 - APScheduler com trigger `interval` (15 minutos)
-- Modo incremental por padrão
+- Full structural sync (sem lookback/cutoff)
 - Full sync diário às 3:00 AM
 - Logs de sync para tabela `sync_logs`
 - Roda junto com o FastAPI no mesmo container
@@ -314,7 +314,7 @@ frontend/
 ```yaml
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18-alpine
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
@@ -332,12 +332,12 @@ services:
     volumes:
       - ./reports:/app/reports
     ports:
-      - "127.0.0.1:8050:8000"  # Apenas localhost para Cloudflare Tunnel
+      - "127.0.0.1:8050:8050"  # Apenas localhost para Cloudflare Tunnel
 
   frontend:
     build: ./frontend
     ports:
-      - "127.0.0.1:3050:3000"  # Apenas localhost para Cloudflare Tunnel
+      - "127.0.0.1:3050:3050"  # Apenas localhost para Cloudflare Tunnel
     depends_on:
       - api
 
@@ -364,7 +364,6 @@ MESSAGEBIRD_API_KEY_LIVE=...
 MESSAGEBIRD_WORKSPACE_ID_LIVE=...
 MESSAGEBIRD_BASE_URL_CONVERSATIONS=https://conversations.messagebird.com/v1
 MESSAGEBIRD_BASE_URL_CONTACTS=https://contacts.messagebird.com/v2
-MESSAGEBIRD_DB_FILENAME=m_bird.db
 MESSAGEBIRD_HTTP_TIMEOUT=30.0
 MESSAGEBIRD_TIMEZONE_OFFSET=-3
 ```

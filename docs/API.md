@@ -236,7 +236,7 @@ Mensagens de uma conversa.
 
 ## Reports
 
-Todos os endpoints requerem JWT. **Stubs/TODO** — não implementados.
+Todos os endpoints requerem JWT.
 
 ### POST `/reports/generate`
 
@@ -275,7 +275,7 @@ Health check (sem auth).
 
 ### GET `/admin/sync/status`
 
-Status da última sincronização. **Stub/TODO.**
+Status da última sincronização.
 
 ### POST `/admin/sync/trigger`
 
@@ -287,13 +287,18 @@ Trigger sincronização manual.
   "full_sync": false,
   "sync_messages": false,
   "messages_days": null,
-  "year": null, "month": null,
+  "year": null,
+  "month": null,
   "backfill_surveys": false,
-  "lookback_minutes": 60
+  "sync_today": false
 }
 ```
 
-- `lookback_minutes` (int, default 60): janela de lookback para sync incremental. Usa `updatedDatetimeAfter` para buscar conversas atualizadas recentemente, evitando re-sincronizar conversas antigas.
+- `full_sync`: se `true`, sincroniza todas as conversas ativas + arquivadas
+- `sync_messages`: se `true`, baixa mensagens das conversas
+- `messages_days`: dias para trás para buscar mensagens (ex: 7 = últimas 7d)
+- `backfill_surveys`: se `true`, extrai surveys de conversas que ainda não têm
+- `sync_today`: se `true`, sincroniza apenas conversas de hoje (profile rápido)
 
 ### GET `/admin/agents`
 
@@ -303,13 +308,17 @@ Lista todos os agentes (de `business_config.yaml`).
 
 Lista todos os departamentos (de `business_config.yaml`).
 
+### GET `/admin/sync/profile`
+
+Retorna o profile de sync ativo (configurado em `sync_profiles.py`).
+
 ---
 
 ## Background Jobs (APScheduler)
 
 | Job | Frequência | Descrição |
 |-----|-----------|-----------|
-| Incremental sync | A cada 15 min | Contatos + conversas das últimas 60min |
-| Full sync | Diário às 03:00 | Dados completos + mensagens + surveys |
+| Sync automático | Configurável via `SYNC_PROFILE` | Sync full structural contacts+conversations + messages dos últimos `messages_days` dias |
+| Full + messages | Configurável via `SYNC_PROFILE` | Sync full structural + todas as messages + surveys (ex: daily=03:00, weekly=04:00, monthly=05:00) |
 
 Ambos executam `REFRESH MATERIALIZED VIEW CONCURRENTLY vw_survey_data` ao final.

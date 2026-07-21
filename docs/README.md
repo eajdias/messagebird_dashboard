@@ -10,7 +10,7 @@ Dashboard web para relatórios omnichannel da plataforma Bird API.
 | DB | PostgreSQL (asyncpg) | 18.4 / 0.31.0 |
 | Frontend | Next.js + React | 16.2.10 / 19.2.7 |
 | TypeScript | TypeScript | 5.8.x |
-| Styling | Tailwind CSS + shadcn/ui | 4.3.3 |
+| Styling | Tailwind CSS | 4.3.3 |
 | Charts | Recharts | 3.9.2 |
 | Auth | python-jose + passlib | 3.5.0 / 1.7.4 |
 
@@ -19,6 +19,7 @@ Dashboard web para relatórios omnichannel da plataforma Bird API.
 - Python 3.14+
 - Node.js 20+
 - PostgreSQL 18+
+- Docker (opcional, para container PostgreSQL)
 
 ## Setup Rápido
 
@@ -59,11 +60,11 @@ docker compose up -d
 
 **Manual:**
 ```bash
-# PostgreSQL (via Docker ou local)
+# PostgreSQL (via Docker)
 docker compose up -d postgres
 
 # Backend
-uvicorn api.main:app --reload --port 8000
+uvicorn api.main:app --reload --port 8050
 
 # Frontend (em outro terminal)
 cd frontend
@@ -85,17 +86,20 @@ npm run dev
 |-------|-------|------|
 | admin@empresa.com | admin123 | admin |
 
-> **TODO:** Implementar lookup no banco de dados.
+> **Nota:** A autenticação é baseada em JWT com verificação inline (hardcoded). Para produção, implementar lookup em banco de dados.
 
 ## Comandos Úteis
 
 ### Backend
 ```bash
-# Lint
+# Lint e formato
 ruff check . && ruff format .
 
 # Testes
 pytest -v
+
+# Lint específico
+ruff check api/ domain/ application/ infrastructure/
 ```
 
 ### Frontend
@@ -123,9 +127,10 @@ messagebird_dashboard/
 ├── frontend/               # Next.js 16 dashboard
 ├── domain/                 # Lógica de negócio pura
 ├── application/            # Use cases e interfaces
-├── infrastructure/         # PostgreSQL, exporters, API client
-├── tests/                  # Pytest
+├── infrastructure/         # PostgreSQL, sync, exporters, API client
+├── tests/                  # Pytest (112 testes)
 ├── docs/                   # Documentação
+├── main.py                 # CLI legado (ponto de entrada original)
 ├── business_config.yaml    # Mapas de negócio
 ├── business_bsc.yaml       # KPIs e thresholds
 ├── docker-compose.yml      # PostgreSQL + API + Frontend
@@ -136,7 +141,8 @@ messagebird_dashboard/
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| [API.md](API.md) | Todos os 20 endpoints documentados |
+| [API.md](API.md) | Todos os endpoints REST documentados |
 | [FRONTEND.md](FRONTEND.md) | Arquitetura, componentes, páginas |
 | [DATABASE.md](DATABASE.md) | Schema PostgreSQL, migrations, queries |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Clean Architecture, fluxo de dependências |
+| [CHECKLIST.md](CHECKLIST.md) | Status do desenvolvimento por fase |

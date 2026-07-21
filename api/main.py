@@ -69,7 +69,12 @@ scheduler = AsyncIOScheduler()
 async def _init_schema():
     """Create tables + materialized view if they don't exist (idempotent)."""
     migrations_dir = os.path.join(os.path.dirname(__file__), "..", "infrastructure", "database", "migrations")
-    for sql_file in ("001_initial.sql", "002_materialized_view.sql"):
+    for sql_file in (
+        "001_initial.sql",
+        "002_materialized_view.sql",
+        "003_cleanup_unused_columns.sql",
+        "004_add_agnt_grp_to_view.sql",
+    ):
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):
             continue

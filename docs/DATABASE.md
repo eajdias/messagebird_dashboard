@@ -14,7 +14,8 @@ Banco: `mbird_reports` | Engine: PostgreSQL 18 | Driver: asyncpg
 | `cnts_bird` | VARCHAR(255) | **UNIQUE NOT NULL** |
 | `cnts_created` | TIMESTAMP | DEFAULT now() |
 | `cnts_updated` | TIMESTAMP | DEFAULT now() |
-| `cnts_custom1-4` | VARCHAR(255) | nullable |
+
+> Colunas `cnts_custom1` a `cnts_custom4` foram removidas na migration 003 (Julho 2026).
 
 **Índices:** `idx_contacts_bird` (cnts_bird), `idx_contacts_phone` (cnts_phone)
 
@@ -107,9 +108,11 @@ Banco: `mbird_reports` | Engine: PostgreSQL 18 | Driver: asyncpg
 View que faz JOIN de 4 tabelas (messages + conversations + agents + contacts). Reduz query time de ~900ms para ~50ms.
 
 ```sql
+CREATE MATERIALIZED VIEW vw_survey_data AS
 SELECT
   ca.agnt_name AS conversation_agent_name,
   ma.agnt_name AS message_agent_name,
+  ca.agnt_grp  AS agent_group,
   c.cnts_id, c.cnts_name, c.cnts_phone,
   cv.cnvs_id, cv.cnvs_created, cv.cnvs_updated, cv.cnvs_status,
   cv.cnvs_lang, cv.cnvs_software, cv.cnvs_tax_id, cv.cnvs_dept,
@@ -157,13 +160,18 @@ conversations (1) ──< (N) messages (N) >── agents
 | `cnvs_occurrence` | `constants.resolve_occurrence()` | `business_config.yaml` → OCCURRENCE_MAP |
 | `cnvs_lang` | `constants.resolve_lang()` | `business_config.yaml` → LANG_MAP |
 | `cnvs_channel` | `constants.resolve_channel()` | `business_config.yaml` → CHANNEL_MAP |
+| `agent_group` | `a.agnt_grp` (DB) ou `constants.get_agent_group()` | agents.agnt_grp ou Python |
 
 ## Migrations
 
-Aplicadas automaticamente na inicialização da API (`_init_schema()` em `api/main.py`):
+Aplicadas automaticamente na inicialização da API (`_init_schema()` em `api/main.py`) — todas idempotentes (usam `IF EXISTS` / `IF NOT EXISTS`):
 
-1. `infrastructure/database/migrations/001_initial.sql` — schema inicial (tabelas)
-2. `infrastructure/database/migrations/002_materialized_view.sql` — materialized view para dashboard rápido
+| # | Arquivo | Descrição |
+|---|---------|-----------|
+| 1 | `001_initial.sql` | Schema inicial (tabelas + índices) |
+| 2 | `002_materialized_view.sql` | `vw_survey_data` para dashboard rápido |
+| 3 | `003_cleanup_unused_columns.sql` | Remove `cnts_custom1-4` da tabela contacts |
+| 4 | `004_add_agnt_grp_to_view.sql` | Recria `vw_survey_data` com `ca.agnt_grp AS agent_group` |
 
 ## Conexão
 

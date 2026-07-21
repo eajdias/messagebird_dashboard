@@ -11,9 +11,9 @@ Next.js 16 com App Router, React 19, Tailwind CSS 4.
 | `/` (dashboard) | `app/(dashboard)/page.tsx` | KPIs, gráficos, BSC |
 | `/conversations` | `app/(dashboard)/conversations/page.tsx` | Lista paginada |
 | `/conversations/[id]` | `app/(dashboard)/conversations/[id]/page.tsx` | Thread de mensagens |
-| `/agents` | `app/(dashboard)/agents/page.tsx` | Agentes e departamentos |
 | `/reports` | `app/(dashboard)/reports/page.tsx` | Gerar e listar relatórios |
-| `/settings` | `app/(dashboard)/settings/page.tsx` | Placeholder |
+| `/agents` | `app/(dashboard)/agents/page.tsx` | Ranking de agentes |
+| `/settings` | `app/(dashboard)/settings/page.tsx` | Tema e configurações |
 
 ## Layout Hierarchy
 
@@ -68,7 +68,6 @@ Todos usam `class-variance-authority` + `cn()`.
 | `useDashboard` | { summary, bsc, kpis, evolution, agents, channels, loading, error, refetch } | Busca 5 endpoints em paralelo |
 | `useConversations` | { data, loading, error, refetch } | Lista paginada com filtros |
 | `useConversation` | { detail, loading, error } | Detalhe de conversa |
-| `useConversationMessages` | { messages, total, loading, error } | Mensagens de uma conversa |
 
 ## API Client (`lib/api.ts`)
 
@@ -84,25 +83,15 @@ Axios instance com:
 ## Scripts NPM
 
 ```bash
-npm run dev        # Dev server com Turbopack
-npm run build      # Build produção
-npm run start      # Iniciar server produção
-npm run lint       # ESLint
-npm run type-check # TypeScript --noEmit
+npm run dev         # Dev server com Turbopack
+npm run build       # Build produção
+npm run start       # Iniciar server produção
+npm run lint        # ESLint
+npm run type-check  # TypeScript type checking
 ```
 
 ## Configuração
 
 - `next.config.ts` — output standalone, env NEXT_PUBLIC_API_URL
-- `app/globals.css` — Tailwind v4 @theme com variáveis light/dark
-- `.npmrc` — legacy-peer-deps=true
+- `app/globals.css` — Tailwind v4 `@theme` com variáveis light/dark
 - `tsconfig.json` — strict mode, path alias `@/*`
-
-## Dependências Não Usadas (instaladas)
-
-| Pacote | Status |
-|--------|--------|
-| `@tanstack/react-table` | Instalado, não importado |
-| `react-hook-form` | Instalado, não usado nas páginas |
-| `zod` | Instalado, não usado nas páginas |
-| `@hookform/resolvers` | Instalado, não usado |
