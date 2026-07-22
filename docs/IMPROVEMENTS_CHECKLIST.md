@@ -49,6 +49,16 @@
 - [x] Route-level error.tsx para dashboard
 - [x] TypeScript target ES2017 → ES2022 (menor output)
 
+### 21. Error/Empty States
+**Esforço:** Baixo | **Impacto:** Médio
+
+- [x] Instalar sonner para toasts
+- [x] Toaster no root layout com richColors e closeButton
+- [x] EmptyState component reutilizável (ícone, título, descrição, action)
+- [x] Empty table de conversas com ilustração Inbox
+- [x] Toast de sucesso ao exportar CSV
+- [x] Error state do dashboard com ícone AlertCircle + botão retry
+
 ### 23. Responsive Improvements
 **Esforço:** Médio | **Impacto:** Alto
 
@@ -165,7 +175,7 @@
 
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
-| Alta | 5 itens | 3 | 0 | 2 |
+| Alta | 6 itens | 4 | 0 | 2 |
 | Média | 5 itens | 5 | 0 | 0 |
 | Baixa | 4 itens | 2 | 0 | 2 |
-| **Total** | **14 itens** | **10** | **0** | **4** |
+| **Total** | **15 itens** | **11** | **0** | **4** |

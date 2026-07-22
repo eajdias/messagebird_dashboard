@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ChevronLeft, ChevronRight, Download, Columns3, ChevronDown, Eye, Archive, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Search, ChevronLeft, ChevronRight, Download, Columns3, ChevronDown, Eye, Archive, ArrowUpDown, ArrowUp, ArrowDown, Inbox } from "lucide-react";
 import { downloadCsv, cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { ConversationItem } from "@/types";
 
 const PAGE_SIZES = [10, 20, 50, 100];
@@ -149,6 +151,7 @@ export default function ConversationsPage() {
       ],
       `conversas_${new Date().toISOString().slice(0, 10)}.csv`,
     );
+    toast.success(`CSV exportado com ${data.conversations.length} conversas`);
   }
 
   return (
@@ -307,7 +310,11 @@ export default function ConversationsPage() {
                 {data?.conversations.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={visibleColumns.size + 2} className="h-24 text-center text-muted-foreground">
-                      Nenhuma conversa encontrada
+                      <EmptyState
+                        icon={<Inbox className="h-12 w-12" />}
+                        title="Nenhuma conversa encontrada"
+                        description="Tente ajustar os filtros ou buscar por outro termo."
+                      />
                     </TableCell>
                   </TableRow>
                 )}

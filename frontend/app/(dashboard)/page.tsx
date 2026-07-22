@@ -7,6 +7,9 @@ import { useDashboard } from "@/hooks/useDashboard";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const EvolutionChart = dynamic(
   () => import("@/components/dashboard/evolution-chart").then((m) => ({ default: m.EvolutionChart })),
@@ -97,7 +100,17 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <p className="text-destructive">{error}</p>
+        <EmptyState
+          icon={<AlertCircle className="h-12 w-12 text-destructive" />}
+          title="Erro ao carregar dashboard"
+          description={error}
+          action={
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              <RefreshCw className="mr-1 h-4 w-4" />
+              Tentar novamente
+            </Button>
+          }
+        />
       </div>
     );
   }
