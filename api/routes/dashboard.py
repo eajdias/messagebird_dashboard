@@ -481,10 +481,13 @@ def _filter_processed(
     processed: list[Any],
     agent_ids: set[str],
     group: str | None,
+    department: str | None = None,
 ) -> list[Any]:
-    """Filter processed data by agent_ids and/or group (sector)."""
+    """Filter processed data by agent_ids and/or group (sector) and/or department."""
     out = processed
-    if group:
+    if department:
+        out = [p for p in out if p.dept_label == department]
+    elif group:
         out = [p for p in out if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
     if agent_ids:
         out = [p for p in out if p.agent in agent_ids]
@@ -507,10 +510,11 @@ async def _load_executive_processed(
     end_date: str,
     agent_ids: set[str],
     group: str | None,
+    department: str | None = None,
 ) -> list[Any]:
     """Fetch + process + filter for executive endpoints."""
     raw, processed = await _fetch_and_process(repo, start_date, end_date)
-    return _filter_processed(processed, agent_ids, group)
+    return _filter_processed(processed, agent_ids, group, department)
 
 
 @router.get("/executive/quality", response_model=QualityResponse)
@@ -519,13 +523,14 @@ async def get_executive_quality(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None, description="Comma-separated agent names"),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Quality overview: rating distribution (1-5), NPS score distribution (1-10), NPS breakdown."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     from application.services.sub_aggregators import RatingAggregator
 
@@ -534,13 +539,19 @@ async def get_executive_quality(
     # Rating 1-5
     rating_counts = dist.get("rating_distribution", {})
     rating_total = sum(int(rating_counts.get(str(i), 0)) for i in range(1, 6))
-    # NPS 1-10
-    nps_counts = dist.get("nps_distribution", {})
-    nps_total = sum(int(nps_counts.get(str(i), 0)) for i in range(1, 11))
-    # NPS breakdown
-    promoters = sum(int(nps_counts.get(str(i), 0)) for i in (9, 10))
-    neutrals = sum(int(nps_counts.get(str(i), 0)) for i in (7, 8))
-    detractors = sum(int(nps_counts.get(str(i), 0)) for i in range(1, 7))
+
+    # NPS 1-10 (manual — the aggregator returns {promoters, passives, detractors}, not 1-10)
+    nps_raw: dict[str, int] = {str(i): 0 for i in range(1, 11)}
+    for p in processed:
+        if p.nps is not None and 1 <= p.nps <= 10:
+            nps_raw[str(int(p.nps))] += 1
+    nps_total = sum(nps_raw.values())
+
+    # NPS breakdown (from aggregator distribution)
+    nps_dist = dist.get("nps_distribution", {})
+    promoters = int(nps_dist.get("promoters", 0))
+    neutrals = int(nps_dist.get("passives", 0))
+    detractors = int(nps_dist.get("detractors", 0))
 
     from domain.services.metrics_calculator import MetricsCalculator
 
@@ -550,14 +561,14 @@ async def get_executive_quality(
             total=rating_total,
         ),
         nps_score=QualityDistribution(
-            counts={str(i): int(nps_counts.get(str(i), 0)) for i in range(1, 11)},
+            counts=nps_raw,
             total=nps_total,
         ),
         nps_breakdown=NPSBreakdown(
             promoters=promoters,
             neutrals=neutrals,
             detractors=detractors,
-            total=nps_total,
+            total=promoters + neutrals + detractors,
             real_nps=MetricsCalculator.calculate_nps([p.nps for p in processed if p.nps is not None]),
         ),
     )
@@ -569,13 +580,14 @@ async def get_executive_heatmap(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Heatmap of conversations by weekday (0=Mon..6=Sun) × hour (0..23)."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     from application.services.sub_aggregators import TemporalAggregator
 
@@ -594,6 +606,7 @@ async def get_executive_motives(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     limit: int = Query(10, ge=1, le=50),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
@@ -601,7 +614,7 @@ async def get_executive_motives(
     """Top motivos de contato no período."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     from application.services.sub_aggregators import TopicAggregator
 
@@ -624,6 +637,7 @@ async def get_executive_occurrences(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     limit: int = Query(10, ge=1, le=50),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
@@ -631,7 +645,7 @@ async def get_executive_occurrences(
     """Top ocorrências no período."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     from application.services.sub_aggregators import TopicAggregator
 
@@ -654,13 +668,14 @@ async def get_executive_dow(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Distribuição por dia da semana no período."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     from application.services.sub_aggregators import TemporalAggregator
 
@@ -687,13 +702,14 @@ async def get_executive_departments(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Breakdown por departamento no período (sem filtro de grupo, sempre global)."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     dept_map: dict[str, list[Any]] = {}
     for p in processed:
@@ -728,13 +744,14 @@ async def get_executive_agents(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Breakdown por agente no período (rating + NPS por agente)."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, None)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
 
     agent_map: dict[str, list[Any]] = {}
     for p in processed:
@@ -786,6 +803,7 @@ async def get_executive_bsc(
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     group: str = Query("Suporte Tecnico"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
@@ -814,6 +832,7 @@ async def get_executive_meta(
     end_date: str | None = Query(None),
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
     group: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),

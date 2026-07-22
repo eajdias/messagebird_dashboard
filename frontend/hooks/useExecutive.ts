@@ -54,14 +54,15 @@ const INITIAL_STATE: ExecutiveState = {
   error: null,
 };
 
-function buildQuery(params: ExecutiveParams, includeAgent = true): string {
+function buildQuery(params: ExecutiveParams, includeDept = true): string {
   const qs = new URLSearchParams();
   qs.set("start_date", params.startDate);
   qs.set("end_date", params.endDate);
   qs.set("granularity", params.granularity);
-  if (includeAgent && params.selectedDept) {
-    qs.set("group", params.selectedDept);
+  if (includeDept && params.selectedDept) {
+    qs.set("department", params.selectedDept);
   }
+  // BSC still uses group (sector)
   if (params.group) {
     qs.set("group", params.group);
   }
