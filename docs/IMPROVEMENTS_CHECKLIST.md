@@ -67,11 +67,13 @@
 ### 16. Bento Grid Layout
 **Esforço:** Médio | **Impacto:** Alto
 
-- [ ] Redesenhar layout da dashboard como bento grid
-- [ ] Card principal 2x1 para KPI mais importante
-- [ ] Cards médios 1x1 para métricas secundárias
-- [ ] Card largo 2x1 para gráfico de evolução
-- [ ] Responsivo: adaptar grid para tablet/mobile
+- [x] Redesenhar layout da dashboard como bento grid (CSS Grid template-areas)
+- [x] NPS como hero card (2 colunas × 2 linhas, gradiente bg-primary/10)
+- [x] Cards médios 1x1 para métricas secundárias (Conversas, ART, Mensagens)
+- [x] Card full-width para gráfico de evolução (4 colunas)
+- [x] Channel Breakdown + Agent Ranking lado a lado (2 colunas cada)
+- [x] BSC Table full width
+- [x] Responsivo: mobile usa grid simples (sm:grid-cols-2), lg aplica bento grid
 
 ### 17. Sparklines nos KPIs
 **Esforço:** Médio | **Impacto:** Alto
@@ -125,9 +127,10 @@
 ### 23. Page Transitions
 **Esforço:** Baixo | **Impacto:** Baixo
 
-- [ ] Fade in/out entre páginas
-- [ ] Slide lateral para navegação entre seções
-- [ ] AnimatePresence com Motion
+- [x] Instalar framer-motion 12.x
+- [x] PageTransition com AnimatePresence (fade + slide 12px, 0.2s)
+- [x] mode="wait" para evitar conflito entre animações
+- [x] Integrado no dashboard layout
 
 ### 25. Keyboard Shortcuts
 **Esforço:** Baixo | **Impacto:** Médio
@@ -149,6 +152,6 @@
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
 | Alta | 4 itens | 1 | 0 | 3 |
-| Média | 5 itens | 2 | 0 | 3 |
-| Baixa | 4 itens | 1 | 0 | 3 |
-| **Total** | **13 itens** | **4** | **0** | **9** |
+| Média | 5 itens | 3 | 0 | 2 |
+| Baixa | 4 itens | 2 | 0 | 2 |
+| **Total** | **13 itens** | **6** | **0** | **7** |

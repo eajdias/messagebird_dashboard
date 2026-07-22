@@ -105,48 +105,55 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:bento-grid">
+        <KPICard
+          title="NPS"
+          value={summary?.nps_score != null ? summary.nps_score.toFixed(1) : "—"}
+          subtitle={summary?.nps_score != null ? (summary.nps_score >= 50 ? "Excelente" : summary.nps_score >= 0 ? "Neutro" : "Negativo") : undefined}
+          trend={summary?.nps_score != null ? (summary.nps_score >= 50 ? "up" : summary.nps_score >= 0 ? "neutral" : "down") : undefined}
+          className="bento-nps bg-gradient-to-br from-primary/5 to-primary/10 ring-1 ring-primary/20"
+        />
         <KPICard
           title="Conversas"
           value={summary?.total_conversations ?? 0}
           subtitle={`${summary?.unique_contacts ?? 0} clientes únicos`}
-        />
-        <KPICard
-          title="NPS"
-          value={summary?.nps_score != null ? summary.nps_score.toFixed(1) : "—"}
-          subtitle={summary?.nps_score != null ? (summary.nps_score >= 50 ? "Positivo" : summary.nps_score >= 0 ? "Neutro" : "Negativo") : undefined}
-          trend={summary?.nps_score != null ? (summary.nps_score >= 50 ? "up" : summary.nps_score >= 0 ? "neutral" : "down") : undefined}
+          className="bento-conv"
         />
         <KPICard
           title="ART (min)"
           value={summary?.art_avg_minutes != null ? summary.art_avg_minutes.toFixed(1) : "—"}
           subtitle={summary?.sla_compliance_pct != null ? `SLA: ${summary.sla_compliance_pct.toFixed(1)}%` : undefined}
+          className="bento-art"
         />
         <KPICard
           title="Mensagens"
           value={summary?.total_messages ?? 0}
           subtitle={summary?.returning_contacts ? `${summary.returning_contacts} retornantes` : undefined}
+          className="bento-msg"
         />
+        <div className="bento-chart">
+          <Suspense fallback={<ChartSkeleton />}>
+            <EvolutionChart data={evolution?.evolution ?? []} />
+          </Suspense>
+        </div>
+        <div className="bento-chan">
+          <Suspense fallback={<TableSkeleton rows={3} />}>
+            <ChannelBreakdown channels={channels?.channels ?? []} />
+          </Suspense>
+        </div>
+        <div className="bento-agents">
+          <Suspense fallback={<TableSkeleton rows={5} />}>
+            <AgentRanking agents={agents?.agents ?? []} />
+          </Suspense>
+        </div>
+        {bsc && (bsc.data_t1.length > 0 || bsc.data_t2.length > 0) && (
+          <div className="bento-bsc">
+            <Suspense fallback={<TableSkeleton rows={4} />}>
+              <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
+            </Suspense>
+          </div>
+        )}
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton />}>
-          <EvolutionChart data={evolution?.evolution ?? []} />
-        </Suspense>
-        <Suspense fallback={<TableSkeleton rows={3} />}>
-          <ChannelBreakdown channels={channels?.channels ?? []} />
-        </Suspense>
-      </div>
-
-      <Suspense fallback={<TableSkeleton rows={5} />}>
-        <AgentRanking agents={agents?.agents ?? []} />
-      </Suspense>
-
-      {bsc && (bsc.data_t1.length > 0 || bsc.data_t2.length > 0) && (
-        <Suspense fallback={<TableSkeleton rows={4} />}>
-          <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
-        </Suspense>
-      )}
     </div>
   );
 }

@@ -96,3 +96,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@media (width >= 64rem) {
+  .bento-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-areas:
+      "nps    nps    conv   msg"
+      "nps    nps    art    msg"
+      "chart  chart  chart  chart"
+      "chan   chan   agents agents"
+      "bsc    bsc    bsc    bsc";
+  }
+
+  .bento-nps { grid-area: nps; }
+  .bento-conv { grid-area: conv; }
+  .bento-art { grid-area: art; }
+  .bento-msg { grid-area: msg; }
+  .bento-chart { grid-area: chart; }
+  .bento-chan { grid-area: chan; }
+  .bento-agents { grid-area: agents; }
+  .bento-bsc { grid-area: bsc; }
+}
