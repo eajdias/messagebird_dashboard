@@ -47,7 +47,7 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
 
 
 def verify_token(token: str) -> dict[str, Any]:
-    """Verify and decode a JWT token."""
+    """Verify and decode a JWT token (enforces expiration)."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -59,6 +59,24 @@ def verify_token(token: str) -> dict[str, Any]:
         ) from exc
 
 
+def verify_token_allow_expired(token: str) -> dict[str, Any]:
+    """Decode a JWT token without enforcing expiration (for refresh)."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        return payload
+    except JWTError as exc:
+        logger.warning("Token decode failed (allow_expired): %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        ) from exc
+
+
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
     """Get current authenticated user from token."""
     return verify_token(token)
+
+
+async def get_current_user_allow_expired(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
+    """Get current user from token without expiration check (for refresh)."""
+    return verify_token_allow_expired(token)

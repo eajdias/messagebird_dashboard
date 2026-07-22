@@ -1,6 +1,6 @@
 # Checklist de Desenvolvimento — new_bird
 
-> Atualizado em: 2026-07-21
+> Atualizado em: 2026-07-22
 
 ---
 
@@ -12,7 +12,7 @@
 | Fase 1: Backend Core (domain + app + infra) | ✅ Concluída | — |
 | Fase 2: Backend API (endpoints) | ✅ Concluída | — |
 | Fase 3: Frontend Dashboard | ✅ Concluída | — |
-| Fase 4: Integração e Deploy | 🔲 Pendente | Testes com MessageBird API real |
+| Fase 4: Integração e Deploy | 🟡 Parcial | Testes com MessageBird API real pendentes |
 
 > **PostgreSQL é o único banco — SQLite removido (Julho 2026):**
 > - SQLite e todo código legado removidos
@@ -90,7 +90,7 @@
 
 ### Auth
 - [x] Implementar `POST /api/v1/auth/login` — body `LoginRequest`, retorna `TokenResponse` JWT
-- [ ] Implementar `POST /api/v1/auth/refresh` (renovar token) — TODO
+- [x] Implementar `POST /api/v1/auth/refresh` (renovar token) — sliding session
 - [x] Implementar middleware de autenticação JWT (`get_current_user` dependency)
 
 ### Dashboard (6 endpoints)
@@ -168,13 +168,13 @@
 - [x] Criar `Dockerfile` (Python 3.14-slim)
 - [x] Criar `frontend/Dockerfile` (Node 22 Alpine, multi-stage)
 - [x] Completar `docker-compose.yml` com 3 serviços
-- [ ] Testar `docker compose up` completo — 3/3 serviços healthy
+- [x] Testar `docker compose up` completo — 3/3 serviços healthy
 
 ### Cloudflare Tunnel
 - [x] Portas definidas: API `:8050`, Frontend `:3050`
 
 ### Dados
-- [ ] Testar sync automático com MessageBird API real
+- [ ] Testar sync automático com MessageBird API real (requer API key válida)
 
 ### Testes Finais
 - [x] Rodar todos os testes: `pytest -v` (108/112 passando)
@@ -183,8 +183,26 @@
 - [ ] Testar dark/light mode no frontend
 
 ### Documentação
-- [ ] Criar `docs/deploy.md` (guia de deploy na VPS)
+- [x] Criar `docs/deploy.md` (guia de deploy na VPS)
 - [x] Revisar docs existentes (API, DATABASE, ARCHITECTURE, CHECKLIST)
+
+---
+
+## Itens Adicionais Implementados
+
+### Backend (auth)
+- [x] `POST /api/v1/auth/register` — implementado (MVP sem tabela users)
+- [x] `POST /api/v1/auth/refresh` — sliding session (renova JWT expirado)
+
+### Frontend
+- [x] `Settings` page — info da conta, status do sistema, sync manual
+- [x] Exportação CSV nas conversas — botão na página de listagem
+- [x] Página de Agents já existia (não documentada no checklist)
+
+### Infra
+- [x] `bcrypt==4.0.1` pinado no `pyproject.toml` e `Dockerfile` (compatibilidade passlib)
+- [x] `NEXT_PUBLIC_API_URL` adicionado ao frontend no `docker-compose.yml`
+- [x] Doc de deploy criada em `docs/deploy.md`
 
 ---
 

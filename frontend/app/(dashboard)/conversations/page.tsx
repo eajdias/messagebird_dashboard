@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { downloadCsv } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -24,6 +25,33 @@ export default function ConversationsPage() {
   });
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
+
+  function handleExportCsv() {
+    if (!data?.conversations.length) return;
+    downloadCsv(
+      data.conversations.map((c) => ({ ...c })),
+      [
+        { key: "contact", label: "Contato" },
+        { key: "phone", label: "Telefone" },
+        { key: "agent", label: "Agente" },
+        { key: "channel", label: "Canal" },
+        { key: "status", label: "Status" },
+        { key: "msg_count", label: "Mensagens" },
+        {
+          key: "nps",
+          label: "NPS",
+          format: (v) => (v != null ? Number(v).toFixed(0) : ""),
+        },
+        {
+          key: "art_minutes",
+          label: "ART (min)",
+          format: (v) => (v != null ? Number(v).toFixed(1) : ""),
+        },
+        { key: "start_time", label: "Data" },
+      ],
+      `conversas_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+  }
 
   function npsBadge(nps: number | null) {
     if (nps == null) return <span className="text-muted-foreground">—</span>;
@@ -54,6 +82,10 @@ export default function ConversationsPage() {
           <option value="active">Ativo</option>
           <option value="archived">Arquivado</option>
         </select>
+        <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!data?.conversations.length}>
+          <Download className="mr-1 h-4 w-4" />
+          CSV
+        </Button>
       </div>
 
       {loading ? (

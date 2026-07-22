@@ -8,15 +8,15 @@
 
 ## Sumário Executivo
 
-| Aspecto | Atual | Proposto |
-|---------|-------|----------|
-| **Interface** | Terminal CLI (`rich`) | Dashboard web (Next.js) |
-| **Acesso** | Manual via SSH | HTTP/HTTPS autenticado |
-| **Sync** | Manual (`python main.py sync`) | Automático (APScheduler) |
-| **Banco** | SQLite (WAL) → PostgreSQL | PostgreSQL (via Docker) |
-| **Relatórios** | Excel/PDF no filesystem | Visualização web + download |
-| **Multi-usuário** | Não | Sim (10-30 usuários) |
-| **Deploy** | Local/VPS manual | Docker Compose + Cloudflare Tunnels |
+| Aspecto | Atual | Proposto | Status |
+|---------|-------|----------|--------|
+| **Interface** | Terminal CLI (`rich`) | Dashboard web (Next.js) | ✅ |
+| **Acesso** | Manual via SSH | HTTP/HTTPS autenticado | ✅ (JWT + refresh) |
+| **Sync** | Manual (`python main.py sync`) | Automático (APScheduler) | ✅ |
+| **Banco** | SQLite → PostgreSQL | PostgreSQL (via Docker) | ✅ |
+| **Relatórios** | Excel/PDF no filesystem | Visualização web + download | ✅ |
+| **Multi-usuário** | Não | Sim (10-30 usuários) | 🟡 MVP (admin hardcoded) |
+| **Deploy** | Local/VPS manual | Docker Compose + Cloudflare Tunnels | ✅ (doc em docs/deploy.md) |
 
 ---
 
@@ -113,10 +113,11 @@ api/
 
 #### 1.4 Endpoints de Autenticação
 
-- `POST /auth/login` → retorna JWT token
-- `POST /auth/register` → cria usuário (apenas admin)
-- `GET /auth/me` → retorna usuário logado
-- Middleware JWT nas rotas protegidas
+- `POST /auth/login` → retorna JWT token ✅
+- `POST /auth/register` → cria usuário (apenas admin) ✅ (MVP, sem tabela users)
+- `POST /auth/refresh` → renova JWT (sliding session) ✅
+- `GET /auth/me` → retorna usuário logado ✅
+- Middleware JWT nas rotas protegidas ✅
 
 ---
 
@@ -128,7 +129,7 @@ api/
 
 ```python
 # api/schemas/
-├── auth.py          # LoginRequest, TokenResponse, UserResponse
+├── auth.py          # LoginRequest, RegisterRequest, RefreshRequest, TokenResponse, UserResponse
 ├── dashboard.py     # DashboardResponse, KPIResponse, MetricsSummary
 ├── conversations.py # ConversationList, ConversationDetail, MessageList
 ├── reports.py       # ReportRequest, ExportResponse
@@ -420,7 +421,7 @@ MessageBird_API_Reports/
 ├── business_bsc.yaml             # EXISTENTE
 └── docs/                         # EXISTENTE + novos docs
     ├── plano_web_dashboard.md    # ESTE ARQUIVO
-    └── deploy.md                 # NOVO: guia de deploy
+    └── deploy.md                 # NOVO: guia de deploy ✅
 ```
 
 ---

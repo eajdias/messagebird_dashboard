@@ -210,3 +210,223 @@ async def test_reopen_detection(manager, mock_conn):
     execute_many_call = mock_conn.execute_many.call_args_list[-1]
     batch_data = execute_many_call[0][1]
     assert batch_data[0][-1] == 1
+
+
+# ── Tests: PgSyncManager core methods ───────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_load_caches(manager, mock_conn):
+    mock_conn.fetch_all = AsyncMock(
+        side_effect=[
+            [MagicMock(**{"__getitem__": lambda s, k: {"agnt_id": 1, "agnt_bird": "agnt_1"}[k]})],
+            [MagicMock(**{"__getitem__": lambda s, k: {"cnts_id": 1, "cnts_bird": "cnt_1"}[k]})],
+        ]
+    )
+
+    await manager.load_caches(mock_conn)
+
+    assert manager._agent_cache == {"agnt_1": 1}
+    assert manager._contact_cache == {"cnt_1": 1}
+
+
+@pytest.mark.asyncio
+async def test_load_caches_empty(manager, mock_conn):
+    await manager.load_caches(mock_conn)
+    assert manager._agent_cache == {}
+    assert manager._contact_cache == {}
+
+
+@pytest.mark.asyncio
+async def test_seed_known_agents(manager, mock_conn):
+    import infrastructure.api.config as api_config
+
+    known_agents_backup = api_config.get_known_agents
+    try:
+        api_config.get_known_agents = lambda: {
+            "bird_1": {"name": "Agent One", "group": "Suporte"},
+        }
+
+        await manager.seed_known_agents(mock_conn)
+
+        assert mock_conn.execute_many.call_count == 1
+        batch = mock_conn.execute_many.call_args[0][1]
+        assert len(batch) == 1
+        assert batch[0][0] == "Agent One"
+    finally:
+        api_config.get_known_agents = known_agents_backup
+
+
+@pytest.mark.asyncio
+async def test_seed_known_agents_empty(manager, mock_conn):
+    import infrastructure.api.config as api_config
+
+    backup = api_config.get_known_agents
+    try:
+        api_config.get_known_agents = lambda: {}
+        await manager.seed_known_agents(mock_conn)
+        assert mock_conn.execute_many.call_count == 0
+    finally:
+        api_config.get_known_agents = backup
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_contact_cached(manager, mock_conn):
+    manager._contact_cache = {"cnt_existing": 42}
+    result = await manager.get_or_create_contact(mock_conn, "cnt_existing", "Test", "+5511999999999")
+    assert result == 42
+    assert mock_conn.execute_query.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_contact_new(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(return_value=MagicMock(**{"__getitem__": lambda s, k: {"cnts_id": 99}[k]}))
+    result = await manager.get_or_create_contact(mock_conn, "cnt_new", "New Contact", "+5511888888888")
+    assert result == 99
+    assert manager._contact_cache["cnt_new"] == 99
+    assert mock_conn.execute_query.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_contact_not_found(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(return_value=None)
+    result = await manager.get_or_create_contact(mock_conn, "cnt_ghost", "Ghost", "+5511777777777")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_agent_cached(manager, mock_conn):
+    manager._agent_cache = {"agnt_existing": 7}
+    result = await manager.get_or_create_agent(mock_conn, "agnt_existing", "Existing Agent")
+    assert result == 7
+    assert mock_conn.execute_query.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_agent_new(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(return_value=MagicMock(**{"__getitem__": lambda s, k: {"agnt_id": 33}[k]}))
+    result = await manager.get_or_create_agent(mock_conn, "agnt_new", "New Agent")
+    assert result == 33
+    assert manager._agent_cache["agnt_new"] == 33
+
+
+@pytest.mark.asyncio
+async def test_get_last_sync_time_none(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(return_value=None)
+    created, cursor, offset = await manager.get_last_sync_time(mock_conn, "conversations")
+    assert created is None
+    assert cursor is None
+    assert offset == 0
+
+
+@pytest.mark.asyncio
+async def test_get_last_sync_time_exists(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(
+        return_value=MagicMock(
+            **{
+                "__getitem__": lambda s, k: {
+                    "sync_created": datetime(2026, 7, 20, 10, 0, 0),
+                    "sync_cursor": "tok_abc",
+                    "sync_offset": 5,
+                }[k],
+            }
+        )
+    )
+    created, cursor, offset = await manager.get_last_sync_time(mock_conn, "conversations")
+    assert created == datetime(2026, 7, 20, 10, 0, 0)
+    assert cursor == "tok_abc"
+    assert offset == 5
+
+
+@pytest.mark.asyncio
+async def test_should_skip_recently_synced(manager, mock_conn):
+    now = datetime.now(UTC)
+    mock_conn.fetch_one = AsyncMock(
+        return_value=MagicMock(
+            **{
+                "__getitem__": lambda s, k: {
+                    "sync_created": now,
+                    "sync_cursor": None,
+                    "sync_offset": 0,
+                }[k],
+            }
+        )
+    )
+    assert await manager.should_skip(mock_conn, "conversations", minutes=60)
+
+
+@pytest.mark.asyncio
+async def test_should_skip_not_recently_synced(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(
+        return_value=MagicMock(
+            **{
+                "__getitem__": lambda s, k: {
+                    "sync_created": datetime(2020, 1, 1, 0, 0, 0),
+                    "sync_cursor": None,
+                    "sync_offset": 0,
+                }[k],
+            }
+        )
+    )
+    assert not await manager.should_skip(mock_conn, "conversations", minutes=60)
+
+
+@pytest.mark.asyncio
+async def test_should_skip_no_sync(manager, mock_conn):
+    mock_conn.fetch_one = AsyncMock(return_value=None)
+    assert not await manager.should_skip(mock_conn, "conversations", minutes=60)
+
+
+@pytest.mark.asyncio
+async def test_save_sync_progress(manager, mock_conn):
+    await manager.save_sync_progress(mock_conn, "conversations", cursor="tok_xyz", offset=10)
+    assert mock_conn.execute_query.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_update_sync_state(manager, mock_conn):
+    await manager.update_sync_state(mock_conn, "conversations", duration=30.5, records_count=100)
+    assert mock_conn.execute_query.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_log_sync_error(manager, mock_conn):
+    await manager.log_sync_error(mock_conn, "conversations", "Something went wrong", code=500, context={"page": 1})
+    assert mock_conn.execute_query.call_count == 1
+
+
+# ── Tests: month_bounds_utc ─────────────────────────────────────
+
+
+def test_month_bounds_utc():
+    from infrastructure.sync.sync_core import month_bounds_utc
+
+    start, end = month_bounds_utc(2026, 7)
+    assert start.year == 2026
+    assert start.month == 7
+    assert start.day == 1
+    assert end.month == 8
+
+    start, end = month_bounds_utc(2026, 12)
+    assert start.month == 12
+    assert end.month == 1
+    assert end.year == 2027
+
+
+def test_month_bounds_utc_invalid():
+    from infrastructure.sync.sync_core import month_bounds_utc
+
+    with pytest.raises(ValueError):
+        month_bounds_utc(2026, 13)
+
+
+# ── Tests: to_bird_iso ──────────────────────────────────────────
+
+
+def test_to_bird_iso():
+    from infrastructure.sync.sync_core import to_bird_iso
+
+    dt = datetime(2026, 7, 21, 10, 30, 0, tzinfo=UTC)
+    result = to_bird_iso(dt)
+    assert result == "2026-07-21T10:30:00Z"
+    assert result.endswith("Z")

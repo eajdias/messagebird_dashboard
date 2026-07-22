@@ -59,6 +59,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: mbird_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:8000
     depends_on:
       api:
         condition: service_started
