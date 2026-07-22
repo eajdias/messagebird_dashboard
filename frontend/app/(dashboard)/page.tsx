@@ -112,24 +112,32 @@ export default function DashboardPage() {
           subtitle={summary?.nps_score != null ? (summary.nps_score >= 50 ? "Excelente" : summary.nps_score >= 0 ? "Neutro" : "Negativo") : undefined}
           trend={summary?.nps_score != null ? (summary.nps_score >= 50 ? "up" : summary.nps_score >= 0 ? "neutral" : "down") : undefined}
           className="bento-nps bg-gradient-to-br from-primary/5 to-primary/10 ring-1 ring-primary/20"
+          sparklineData={evolution?.evolution?.map((e) => ({ value: e.nps_score ?? 0 }))}
+          sparklineColor="var(--chart-1)"
         />
         <KPICard
           title="Conversas"
           value={summary?.total_conversations ?? 0}
           subtitle={`${summary?.unique_contacts ?? 0} clientes únicos`}
           className="bento-conv"
+          sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
+          sparklineColor="var(--chart-2)"
         />
         <KPICard
           title="ART (min)"
           value={summary?.art_avg_minutes != null ? summary.art_avg_minutes.toFixed(1) : "—"}
           subtitle={summary?.sla_compliance_pct != null ? `SLA: ${summary.sla_compliance_pct.toFixed(1)}%` : undefined}
           className="bento-art"
+          sparklineData={evolution?.evolution?.map((e) => ({ value: e.art_avg_minutes ?? 0 }))}
+          sparklineColor="var(--chart-3)"
         />
         <KPICard
           title="Mensagens"
           value={summary?.total_messages ?? 0}
           subtitle={summary?.returning_contacts ? `${summary.returning_contacts} retornantes` : undefined}
           className="bento-msg"
+          sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
+          sparklineColor="var(--chart-4)"
         />
         <div className="bento-chart">
           <Suspense fallback={<ChartSkeleton />}>

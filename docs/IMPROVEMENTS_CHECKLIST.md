@@ -78,10 +78,12 @@
 ### 17. Sparklines nos KPIs
 **Esforço:** Médio | **Impacto:** Alto
 
-- [ ] Mini AreaChart (64px) em cada KPI Card
-- [ ] Gradiente de cor por tendência (verde/vermelho)
-- [ ] Tooltip no hover com valores
-- [ ] Dados dos últimos 30 dias
+- [x] Mini AreaChart (64px) em cada KPI Card
+- [x] Gradiente de cor por tendência (chart-1 a chart-4)
+- [x] Tooltip no hover com valores
+- [x] Dados dos últimos 12 meses (evolution data)
+- [x] Dynamic import do Sparkline (Recharts lazy)
+- [x] NPS sparkline (azul), Conversas (verde), ART (âmbar), Mensagens (roxo)
 
 ### 20. Design Tokens e Temas Customizados
 **Esforço:** Baixo | **Impacto:** Médio
@@ -152,6 +154,6 @@
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
 | Alta | 4 itens | 2 | 0 | 2 |
-| Média | 5 itens | 3 | 0 | 2 |
+| Média | 5 itens | 4 | 0 | 1 |
 | Baixa | 4 itens | 2 | 0 | 2 |
-| **Total** | **13 itens** | **7** | **0** | **6** |
+| **Total** | **13 itens** | **8** | **0** | **5** |
