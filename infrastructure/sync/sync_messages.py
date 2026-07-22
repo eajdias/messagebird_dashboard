@@ -211,7 +211,7 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
         "SELECT cnvs_bird FROM conversations "
         "WHERE cnvs_updated >= $1::timestamp AND cnvs_updated < $2::timestamp "
         "ORDER BY cnvs_updated DESC",
-        (start_iso, end_iso),
+        (month_start.replace(tzinfo=None), next_month_start.replace(tzinfo=None)),
     )
     total = len(rows)
     logger.info("Syncing messages for %d conversations updated in %04d-%02d...", total, year, month)

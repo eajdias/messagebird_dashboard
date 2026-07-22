@@ -29,11 +29,7 @@ async def sync_conversations(
 
         page = 0
         while True:
-            conv_params: dict[str, Any] = {"limit": limit, "status": status, "reverse": False}
-            if page_token:
-                conv_params["page_token"] = str(page_token)
-            if max_date:
-                conv_params["createdDatetimeBefore"] = max_date
+            conv_params: dict[str, Any] = {"limit": limit, "offset": offset, "status": status}
 
             response = await manager.client.list_conversations(**conv_params)
             if "error" in response:
@@ -99,10 +95,10 @@ async def sync_conversations(
                 updated_at_str = c.get("updatedDatetime")
                 updated_dt = parse_dt(updated_at_str) if updated_at_str else None
 
-                if max_date and updated_at_str and updated_at_str >= max_date:
+                cnvs_created_raw = c.get("createdDatetime")
+                if max_date and cnvs_created_raw and cnvs_created_raw >= max_date:
                     continue
-
-                if min_date and updated_at_str and updated_at_str <= min_date:
+                if min_date and cnvs_created_raw and cnvs_created_raw < min_date:
                     continue
 
                 cnvs_bird = c["id"]
@@ -165,11 +161,15 @@ async def sync_conversations(
             if page % 5 == 0:
                 logger.info("  convs %s: page %d, %d fetched so far...", status, page, count)
 
-            if not next_page_token and len(items) < limit:
+            if len(items) < limit:
+                break
+
+            page_max = max(c.get("createdDatetime", "") or "" for c in items)
+            if min_date and page_max < min_date:
                 break
 
             if status == "active":
-                await manager.save_sync_progress(conn, "conversations", cursor=page_token, offset=offset)
+                await manager.save_sync_progress(conn, "conversations", cursor=None, offset=offset)
 
     duration = time.time() - start_time
     await manager.update_sync_state(

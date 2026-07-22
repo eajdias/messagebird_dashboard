@@ -1,4 +1,5 @@
 import logging
+import os
 from functools import lru_cache
 
 from application.interfaces.repository import ReportRepository
@@ -10,9 +11,12 @@ logger = logging.getLogger("m_bird.db")
 
 @lru_cache
 def get_database_url() -> str:
-    import os
-
     return os.getenv("DATABASE_URL", "postgresql://mbird:mbird_dev_2024@localhost:5432/mbird_reports")
+
+
+@lru_cache
+def get_reports_dir() -> str:
+    return os.getenv("REPORTS_DIR", os.path.join(os.path.dirname(__file__), "..", "reports"))
 
 
 _pool: PostgresPool | None = None

@@ -3,6 +3,10 @@
 -- ============================================================
 -- Pre-computes the heavy 4-table JOIN used by all dashboard
 -- endpoints. Reduces query time from ~900ms to ~50ms.
+-- Columns match the actual schema: conversations stores
+-- bird-level fields (cnvs_status, cnvs_channel, ratings);
+-- non-existent columns silently resolve to NULL (handled
+-- gracefully by resolve_* helpers in domain/constants.py).
 
 DROP MATERIALIZED VIEW IF EXISTS vw_survey_data;
 
@@ -17,15 +21,13 @@ SELECT
     cv.cnvs_created,
     cv.cnvs_updated,
     cv.cnvs_status,
-    cv.cnvs_lang,
-    cv.cnvs_software,
-    cv.cnvs_tax_id,
-    cv.cnvs_dept,
     cv.cnvs_rating_agent,
     cv.cnvs_rating_nps,
+    cv.cnvs_channel,
+    cv.cnvs_dept,
     cv.cnvs_contact_reason,
     cv.cnvs_occurrence,
-    cv.cnvs_channel,
+    cv.cnvs_software,
     cv.cnvs_description,
     m.msgs_id,
     m.msgs_created,

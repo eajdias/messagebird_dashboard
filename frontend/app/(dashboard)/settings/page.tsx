@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import SchedulerControl from "@/components/settings/scheduler-control";
 import { RefreshCw, Activity, User, Palette } from "lucide-react";
 
 interface HealthInfo {
@@ -138,6 +139,8 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <SchedulerControl />
 
       <Card>
         <CardHeader>

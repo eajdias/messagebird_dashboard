@@ -8,12 +8,15 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from api.auth import get_current_user
+from api.schemas._base import StatusResponse
 from api.schemas.admin import (
     AgentItem,
     AgentListResponse,
     DepartmentItem,
     DepartmentListResponse,
     HealthResponse,
+    JobInfo,
+    SchedulerStatusResponse,
     SyncProfileResponse,
     SyncStatusResponse,
     SyncTriggerRequest,
@@ -109,3 +112,39 @@ async def get_sync_profile(
         sync_enabled=sync_enabled,
         available_profiles=list_profiles(),
     )
+
+
+@router.get("/scheduler/status", response_model=SchedulerStatusResponse)
+async def get_scheduler_status(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    from api.main import scheduler_running as _running
+    from api.main import scheduler_jobs as _jobs
+    from api.main import _scheduler_started_by_user
+
+    jobs_raw = _jobs()
+    return SchedulerStatusResponse(
+        running=_running(),
+        jobs=[JobInfo(id=j["id"], name=j["name"], next_run_time=j.get("next_run_time")) for j in jobs_raw],
+        started_by_user=_scheduler_started_by_user,
+    )
+
+
+@router.post("/scheduler/start", response_model=StatusResponse)
+async def start_scheduler_endpoint(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    from api.main import start_scheduler as _start
+
+    msg = _start()
+    return StatusResponse(status="ok", message=msg)
+
+
+@router.post("/scheduler/stop", response_model=StatusResponse)
+async def stop_scheduler_endpoint(
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    from api.main import stop_scheduler as _stop
+
+    msg = _stop()
+    return StatusResponse(status="ok", message=msg)

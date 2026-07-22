@@ -65,6 +65,84 @@ def _make_full_handler(messages_days: int | None, backfill_surveys: bool):
 
 scheduler = AsyncIOScheduler()
 
+# Track whether scheduler was auto-started or user-started
+_scheduler_started_by_user: bool = False
+
+
+def scheduler_running() -> bool:
+    return scheduler.running
+
+
+def scheduler_jobs() -> list[dict[str, object]]:
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run_time": str(job.next_run_time) if job.next_run_time else None,
+        }
+        for job in scheduler.get_jobs()
+    ]
+
+
+def _configure_scheduler_jobs() -> int:
+    from infrastructure.config.sync_profiles import get_active_profile
+
+    profile = get_active_profile()
+    jobs_registered = 0
+
+    if profile.has_incremental:
+        assert profile.incremental_minutes is not None
+        handler = _make_incremental_handler(messages_days=profile.messages_days)
+        scheduler.add_job(
+            handler,
+            trigger=IntervalTrigger(minutes=profile.incremental_minutes),
+            id="incremental_sync",
+            name=f"Sync ({profile.incremental_minutes}min, msgs={profile.messages_days}d)",
+            replace_existing=True,
+        )
+        jobs_registered += 1
+
+    if profile.has_full_sync:
+        assert profile.full_sync_hour is not None
+        handler = _make_full_handler(
+            messages_days=profile.messages_days,
+            backfill_surveys=profile.backfill_surveys,
+        )
+        full_hour = f"{profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}"
+        scheduler.add_job(
+            handler,
+            trigger=CronTrigger(hour=profile.full_sync_hour, minute=profile.full_sync_minute),
+            id="full_sync",
+            name=f"Full sync ({full_hour}, messages_days={profile.messages_days})",
+            replace_existing=True,
+        )
+        jobs_registered += 1
+
+    return jobs_registered
+
+
+def start_scheduler() -> str:
+    global _scheduler_started_by_user
+    if scheduler.running:
+        jobs = scheduler.get_jobs()
+        if jobs:
+            return f"Scheduler already running ({len(jobs)} jobs)"
+        scheduler.remove_all_jobs()
+    _configure_scheduler_jobs()
+    scheduler.start()
+    _scheduler_started_by_user = True
+    jobs = scheduler.get_jobs()
+    return f"Scheduler started ({len(jobs)} jobs)"
+
+
+def stop_scheduler() -> str:
+    global _scheduler_started_by_user
+    if not scheduler.running:
+        return "Scheduler already stopped"
+    scheduler.shutdown(wait=False)
+    _scheduler_started_by_user = False
+    return "Scheduler stopped"
+
 
 async def _init_schema():
     """Create tables + materialized view if they don't exist (idempotent)."""
@@ -112,45 +190,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     sync_enabled = os.getenv("SYNC_ENABLED", "true").lower() in ("true", "1", "yes")
     if sync_enabled:
-        from infrastructure.config.sync_profiles import get_active_profile
-
-        profile = get_active_profile()
-        jobs_registered = []
-
-        if profile.has_incremental:
-            assert profile.incremental_minutes is not None
-            handler = _make_incremental_handler(
-                messages_days=profile.messages_days,
-            )
-            scheduler.add_job(
-                handler,
-                trigger=IntervalTrigger(minutes=profile.incremental_minutes),
-                id="incremental_sync",
-                name=f"Sync ({profile.incremental_minutes}min, msgs={profile.messages_days}d)",
-                replace_existing=True,
-            )
-            jobs_registered.append(f"sync every {profile.incremental_minutes}min")
-
-        if profile.has_full_sync:
-            assert profile.full_sync_hour is not None
-            handler = _make_full_handler(
-                messages_days=profile.messages_days,
-                backfill_surveys=profile.backfill_surveys,
-            )
-            full_hour = f"{profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}"
-            scheduler.add_job(
-                handler,
-                trigger=CronTrigger(hour=profile.full_sync_hour, minute=profile.full_sync_minute),
-                id="full_sync",
-                name=f"Full sync ({full_hour}, messages_days={profile.messages_days})",
-                replace_existing=True,
-            )
-            jobs_registered.append(f"full at {profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}")
-
+        jobs = _configure_scheduler_jobs()
         scheduler.start()
-        logger.info("APScheduler started: profile=%s, %s", profile.name, ", ".join(jobs_registered))
+        logger.info("APScheduler auto-started (%d jobs, SYNC_ENABLED=true)", jobs)
     else:
-        logger.info("APScheduler disabled (SYNC_ENABLED=false)")
+        logger.info("APScheduler paused (SYNC_ENABLED=false) — start via API or set SYNC_ENABLED=true")
 
     yield
 

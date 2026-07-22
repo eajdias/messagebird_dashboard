@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import type {
   ConversationListResponse,
@@ -35,12 +35,17 @@ export function useConversations(filters?: ConversationFilters) {
     error: null,
   });
 
+  const filtersKey = JSON.stringify(filters);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
   const fetchData = useCallback(async () => {
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const qs = new URLSearchParams();
-      if (filters) {
-        Object.entries(filters).forEach(([k, v]) => {
+      const f = filtersRef.current;
+      if (f) {
+        Object.entries(f).forEach(([k, v]) => {
           if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
         });
       }
@@ -56,7 +61,7 @@ export function useConversations(filters?: ConversationFilters) {
         error: err instanceof Error ? err.message : "Erro ao carregar conversas",
       }));
     }
-  }, [filters]);
+  }, [filtersKey]);
 
   useEffect(() => {
     fetchData();

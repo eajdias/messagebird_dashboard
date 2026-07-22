@@ -53,3 +53,15 @@ class SyncProfileResponse(BaseModel):
     active_profile: str
     sync_enabled: bool
     available_profiles: list[dict[str, object]]
+
+
+class JobInfo(BaseModel):
+    id: str
+    name: str
+    next_run_time: str | None = None
+
+
+class SchedulerStatusResponse(BaseModel):
+    running: bool
+    jobs: list[JobInfo]
+    started_by_user: bool = False

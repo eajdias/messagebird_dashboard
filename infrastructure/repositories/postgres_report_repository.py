@@ -76,7 +76,7 @@ def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> l
         conv_agnt_name: str = r["conversation_agent_name"] or "Desconhecido"
 
         if agent_group:
-            conv_dept_label = constants.resolve_dept(r["cnvs_dept"])
+            conv_dept_label = constants.resolve_dept(r.get("cnvs_dept"))
             if constants.resolve_conversation_group(conv_agnt_name, conv_dept_label) != agent_group:
                 continue
 
@@ -99,15 +99,17 @@ def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> l
             msgs=raw_msgs,
             rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
             nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
-            dept_label=constants.resolve_dept(r["cnvs_dept"]),
-            contact_reason=constants.resolve_reason(r["cnvs_dept"], r["cnvs_contact_reason"]),
-            occurrence=constants.resolve_occurrence(r["cnvs_dept"], r["cnvs_contact_reason"], r["cnvs_occurrence"]),
+            dept_label=constants.resolve_dept(r.get("cnvs_dept")),
+            contact_reason=constants.resolve_reason(r.get("cnvs_dept"), r.get("cnvs_contact_reason")),
+            occurrence=constants.resolve_occurrence(
+                r.get("cnvs_dept"), r.get("cnvs_contact_reason"), r.get("cnvs_occurrence")
+            ),
             metadata={
                 "agent_name": conv_agnt_name,
-                "software": r["cnvs_software"],
-                "channel": r["cnvs_channel"],
-                "channel_name": constants.resolve_channel(r["cnvs_channel"]),
-                "description": r["cnvs_description"],
+                "software": r.get("cnvs_software"),
+                "channel": r.get("cnvs_channel"),
+                "channel_name": constants.resolve_channel(r.get("cnvs_channel")),
+                "description": r.get("cnvs_description"),
             },
         )
         result.append(conv)
