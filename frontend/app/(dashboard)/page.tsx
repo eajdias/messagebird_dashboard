@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
+import { motion } from "framer-motion";
 import { useDashboard } from "@/hooks/useDashboard";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -139,27 +140,47 @@ export default function DashboardPage() {
           sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
           sparklineColor="var(--chart-4)"
         />
-        <div className="bento-chart">
+        <motion.div
+          className="bento-chart"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+        >
           <Suspense fallback={<ChartSkeleton />}>
             <EvolutionChart data={evolution?.evolution ?? []} />
           </Suspense>
-        </div>
-        <div className="bento-chan">
+        </motion.div>
+        <motion.div
+          className="bento-chan"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
+        >
           <Suspense fallback={<TableSkeleton rows={3} />}>
             <ChannelBreakdown channels={channels?.channels ?? []} />
           </Suspense>
-        </div>
-        <div className="bento-agents">
+        </motion.div>
+        <motion.div
+          className="bento-agents"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+        >
           <Suspense fallback={<TableSkeleton rows={5} />}>
             <AgentRanking agents={agents?.agents ?? []} />
           </Suspense>
-        </div>
+        </motion.div>
         {bsc && (bsc.data_t1.length > 0 || bsc.data_t2.length > 0) && (
-          <div className="bento-bsc">
+          <motion.div
+            className="bento-bsc"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
+          >
             <Suspense fallback={<TableSkeleton rows={4} />}>
               <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
             </Suspense>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

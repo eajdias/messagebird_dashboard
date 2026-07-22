@@ -10,11 +10,11 @@
 ### 13. Micro-Interactions e Animações
 **Esforço:** Médio | **Impacto:** Alto
 
-- [ ] Animar contadores de KPI (NumberFlow / useSpring)
-- [ ] Animação de entrada nos gráficos Recharts
-- [ ] Hover states com escala sutil nos cards
-- [ ] Loading skeletons com animação pulse
-- [ ] Transições de página (fade/slide)
+- [x] Animar contadores de KPI (framer-motion useSpring + useMotionValue)
+- [x] Animação de entrada nos cards do dashboard (fade + slide up, staggered)
+- [x] Hover states com shadow-md nos cards KPI
+- [x] Loading skeletons com animação pulse (nativo Tailwind)
+- [x] Transições de página (framer-motion AnimatePresence)
 
 ### 14. Data Table Aprimorada (TanStack Table)
 **Esforço:** Médio | **Impacto:** Alto
@@ -154,6 +154,6 @@
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
 | Alta | 4 itens | 2 | 0 | 2 |
-| Média | 5 itens | 4 | 0 | 1 |
+| Média | 5 itens | 5 | 0 | 0 |
 | Baixa | 4 itens | 2 | 0 | 2 |
-| **Total** | **13 itens** | **8** | **0** | **5** |
+| **Total** | **13 itens** | **9** | **0** | **4** |
