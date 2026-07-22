@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -19,14 +20,6 @@ interface HourlyChartProps {
   className?: string;
 }
 
-/**
- * Business hours definition: { validHours: set, label }
- *
- * - Mon–Thu: 7h–19h (covering 7:30–20:00)
- * - Fri: 7h–18h (covering 7:30–19:00)
- * - Sat: 8h–11h (covering 8:00–12:00)
- * - Sun: none (all out of hours)
- */
 const BUSINESS_HOURS: Record<number, Set<number>> = {
   0: new Set([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
   1: new Set([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]),
@@ -39,22 +32,28 @@ const BUSINESS_HOURS: Record<number, Set<number>> = {
 const PEAK_COLOR = "var(--chart-1)";
 const OUT_COLOR = "var(--destructive)";
 
-interface TooltipPayloadEntry {
-  value?: number;
+interface DataPoint {
+  hora: string;
+  chats: number;
+  pct: number;
+  color: string;
 }
 
-function Tooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
+function Tooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DataPoint }> }) {
   if (!active || !payload?.length) return null;
-  const v = payload[0]?.value ?? 0;
+  const d = payload[0]?.payload;
+  if (!d) return null;
   return (
     <div className="glass-tooltip rounded-md px-2.5 py-1.5 text-xs">
-      <p className="font-medium">{v} {v === 1 ? "chat" : "chats"}</p>
+      <p className="font-medium">
+        {d.chats} {d.chats === 1 ? "chat" : "chats"} ({d.pct.toFixed(1)}%)
+      </p>
     </div>
   );
 }
 
 export function HourlyChart({ heatmap, className }: HourlyChartProps) {
-  const { inHours, outCount, total } = useMemo(() => {
+  const data = useMemo(() => {
     const byHour = new Map<number, number>();
     for (let h = 7; h <= 19; h++) byHour.set(h, 0);
     let out = 0;
@@ -67,19 +66,18 @@ export function HourlyChart({ heatmap, className }: HourlyChartProps) {
         out += c.value;
       }
     }
-    return { inHours: byHour, outCount: out, total: tot };
+    const arr: DataPoint[] = [];
+    for (let h = 7; h <= 19; h++) {
+      const v = byHour.get(h) ?? 0;
+      arr.push({ hora: `${h}h`, chats: v, pct: tot > 0 ? (v / tot) * 100 : 0, color: PEAK_COLOR });
+    }
+    if (out > 0) {
+      arr.push({ hora: "Fora do\nexpediente", chats: out, pct: tot > 0 ? (out / tot) * 100 : 0, color: OUT_COLOR });
+    }
+    return { arr, total: tot };
   }, [heatmap]);
 
-  const data = useMemo(() => {
-    const arr: { hora: string; chats: number; color: string }[] = [];
-    for (let h = 7; h <= 19; h++) {
-      arr.push({ hora: `${h}h`, chats: inHours.get(h) ?? 0, color: PEAK_COLOR });
-    }
-    if (outCount > 0) {
-      arr.push({ hora: "Fora do\nexpediente", chats: outCount, color: OUT_COLOR });
-    }
-    return arr;
-  }, [inHours, outCount]);
+  const total = data.total;
 
   return (
     <Card variant="glass" className={className}>
@@ -93,9 +91,9 @@ export function HourlyChart({ heatmap, className }: HourlyChartProps) {
         {total === 0 ? (
           <p className="text-xs text-muted-foreground">Sem dados no período</p>
         ) : (
-          <div className="h-48 w-full">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 12 }}>
+              <BarChart data={data.arr} margin={{ top: 16, right: 4, left: 0, bottom: 12 }}>
                 <CartesianGrid stroke="var(--border)" strokeOpacity={0.15} vertical={false} />
                 <XAxis
                   dataKey="hora"
@@ -103,14 +101,21 @@ export function HourlyChart({ heatmap, className }: HourlyChartProps) {
                   interval={0}
                   axisLine={false}
                   tickLine={false}
-                  height={30}
+                  height={32}
                 />
                 <YAxis hide />
                 <RechartsTooltip content={<Tooltip />} cursor={false} />
-                <Bar dataKey="chats" radius={[3, 3, 0, 0]} isAnimationActive={false}>
-                  {data.map((d, i) => (
+                <Bar dataKey="chats" radius={[3, 3, 0, 0]} isAnimationActive={false} barSize={18}>
+                  {data.arr.map((d, i) => (
                     <Cell key={i} fill={d.color} />
                   ))}
+                  <LabelList
+                    dataKey="pct"
+                    position="top"
+                    formatter={((v: number) => `${v > 0 ? v.toFixed(0) : ""}%`) as unknown as undefined}
+                    fill="var(--muted-foreground)"
+                    fontSize={8}
+                  />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

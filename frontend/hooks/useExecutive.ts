@@ -22,7 +22,7 @@ interface ExecutiveParams {
   startDate: string;
   endDate: string;
   granularity: Granularity;
-  agentIds?: string[];
+  selectedDept?: string;
   group?: string;
 }
 
@@ -59,8 +59,8 @@ function buildQuery(params: ExecutiveParams, includeAgent = true): string {
   qs.set("start_date", params.startDate);
   qs.set("end_date", params.endDate);
   qs.set("granularity", params.granularity);
-  if (includeAgent && params.agentIds && params.agentIds.length > 0) {
-    qs.set("agent_ids", params.agentIds.join(","));
+  if (includeAgent && params.selectedDept) {
+    qs.set("group", params.selectedDept);
   }
   if (params.group) {
     qs.set("group", params.group);
@@ -119,7 +119,7 @@ export function useExecutive(params: ExecutiveParams) {
         error: err instanceof Error ? err.message : "Erro ao carregar dados executivos",
       }));
     }
-  }, [params.startDate, params.endDate, params.granularity, params.agentIds?.join(","), params.group]);
+  }, [params.startDate, params.endDate, params.granularity, params.selectedDept, params.group]);
 
   useEffect(() => {
     fetchData();

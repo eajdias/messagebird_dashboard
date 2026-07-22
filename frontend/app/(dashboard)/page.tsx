@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SegmentedToggle } from "@/components/ui/segmented-toggle";
 import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
 import { AgentMultiSelect } from "@/components/dashboard/agent-multi-select";
+import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,16 @@ const HourlyChart = dynamic(
 
 const QualityOverview = dynamic(
   () => import("@/components/dashboard/quality-overview").then((m) => ({ default: m.QualityOverview })),
+  { loading: () => <ChartSkeleton /> }
+);
+
+const NPSCard = dynamic(
+  () => import("@/components/dashboard/nps-card").then((m) => ({ default: m.NPSCard })),
+  { loading: () => <ChartSkeleton /> }
+);
+
+const NotasCard = dynamic(
+  () => import("@/components/dashboard/notas-card").then((m) => ({ default: m.NotasCard })),
   { loading: () => <ChartSkeleton /> }
 );
 
@@ -164,7 +175,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     () => readTabFromQuery(searchParams, "tab", TAB_OPTIONS, "overview")
   );
   const [granularity, setGranularity] = useState<EvolutionGranularity>("month");
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string>("");
   const [agentList, setAgentList] = useState<AgentItem[]>([]);
 
   const setTab = useCallback(
@@ -195,7 +206,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     startDate: execWindow.startDate,
     endDate: execWindow.endDate,
     granularity,
-    agentIds: selectedAgents.length > 0 ? selectedAgents : undefined,
+    selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
   });
 
@@ -238,11 +249,10 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
         <Tabs value={tab} onChange={setTab} options={TAB_OPTIONS} paramName="tab" />
       </div>
       <div className="flex items-center gap-3">
-        {tab !== "overview" && (
-          <AgentMultiSelect
-            agents={agentList}
-            selected={selectedAgents}
-            onChange={setSelectedAgents}
+        {tab !== "overview" && tab !== "bsc" && (
+          <DepartmentMultiSelect
+            selected={selectedDept ? [selectedDept] : []}
+            onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
           />
         )}
         <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
@@ -394,9 +404,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <UserCircle2 className="h-4 w-4" />
               <span>
-                {selectedAgents.length > 0
-                  ? `${selectedAgents.length} agente(s) selecionado(s)`
-                  : "Todos os agentes"}{" "}
+                {selectedDept
+                  ? selectedDept
+                  : "Todos os departamentos"}{" "}
                 · {executive.meta?.total_chats ?? 0} chats no período
               </span>
               <span className="ml-auto">
@@ -444,13 +454,14 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
                 </CardContent>
               </Card>
             </div>
-            <Suspense fallback={<ChartSkeleton />}>
-              <QualityOverview
-                rating={executive.quality?.rating ?? null}
-                npsScore={executive.quality?.nps_score ?? null}
-                npsBreakdown={executive.quality?.nps_breakdown ?? null}
-              />
-            </Suspense>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Suspense fallback={<ChartSkeleton />}>
+                <NPSCard breakdown={executive.quality?.nps_breakdown ?? null} />
+              </Suspense>
+              <Suspense fallback={<ChartSkeleton />}>
+                <NotasCard rating={executive.quality?.rating ?? null} />
+              </Suspense>
+            </div>
             <Suspense fallback={<ChartSkeleton />}>
               <DemandBars
                 motives={executive.motives}
