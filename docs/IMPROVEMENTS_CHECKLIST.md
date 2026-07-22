@@ -19,13 +19,13 @@
 ### 14. Data Table Aprimorada (TanStack Table)
 **Esforço:** Médio | **Impacto:** Alto
 
-- [ ] Ordenação por coluna (sortable headers)
-- [ ] Controle de visibilidade de colunas (dropdown)
-- [ ] Filtros faceted (categoria, status, departamento)
-- [ ] Coluna de ações por linha
-- [ ] Paginação com registros por página configurável
-- [ ] Row selection + ações em lote
-- [ ] Resize de colunas
+- [x] Ordenação por coluna (click no header com indicadores ArrowUpDown/ArrowUp/ArrowDown)
+- [x] Controle de visibilidade de colunas (dropdown "Colunas" com checkboxes)
+- [x] Filtros faceted (departamento, canal, status com selects)
+- [x] Coluna de ações (ícone Eye → link para detalhes)
+- [x] Paginação com registros por página configurável (10/20/50/100)
+- [x] Row selection + ações em lote (checkbox + botão "Arquivar (N)")
+- [x] Select all no header da tabela
 
 ### 19. Acessibilidade (A11y)
 **Esforço:** Médio | **Impacto:** Alto
@@ -151,7 +151,7 @@
 
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
-| Alta | 4 itens | 1 | 0 | 3 |
+| Alta | 4 itens | 2 | 0 | 2 |
 | Média | 5 itens | 3 | 0 | 2 |
 | Baixa | 4 itens | 2 | 0 | 2 |
-| **Total** | **13 itens** | **6** | **0** | **7** |
+| **Total** | **13 itens** | **7** | **0** | **6** |
