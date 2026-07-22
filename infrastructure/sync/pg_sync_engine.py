@@ -16,7 +16,12 @@ from infrastructure.database.sync_connection_pg import PostgresSyncConnection
 from infrastructure.sync.sync_contacts import sync_contacts
 from infrastructure.sync.sync_conversations import sync_conversations
 from infrastructure.sync.sync_core import PgSyncManager, month_bounds_utc, to_bird_iso
-from infrastructure.sync.sync_messages import sync_all_messages, sync_messages_for_month, sync_messages_for_recent
+from infrastructure.sync.sync_messages import (
+    sync_all_messages,
+    sync_messages_for_month,
+    sync_messages_for_range,
+    sync_messages_for_recent,
+)
 from infrastructure.sync.sync_surveys import backfill_surveys as survey_backfill_fn
 
 logger = logging.getLogger("m_bird.sync_pg")
@@ -31,6 +36,8 @@ async def trigger_sync_pg(
     month: int | None = None,
     backfill_surveys: bool = False,
     sync_today: bool = False,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> str:
     raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
     manager = PgSyncManager()
@@ -42,6 +49,34 @@ async def trigger_sync_pg(
     if backfill_surveys:
         count = await survey_backfill_fn(manager, conn)
         return f"Survey backfill concluído: {count} conversas processadas."
+
+    if start_date is not None or end_date is not None:
+        if not start_date or not end_date:
+            raise ValueError("start_date and end_date must be provided together.")
+
+        try:
+            start_dt = datetime.fromisoformat(start_date)
+            end_dt = datetime.fromisoformat(end_date)
+        except ValueError as e:
+            raise ValueError(f"Invalid date format (use ISO 8601 YYYY-MM-DD): {e}") from e
+        if start_dt.tzinfo is None:
+            start_dt = start_dt.replace(tzinfo=UTC)
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=UTC)
+        if end_dt.date() < start_dt.date():
+            raise ValueError("end_date must be on or after start_date.")
+        delta_days = (end_dt.date() - start_dt.date()).days + 1
+        if delta_days > 30:
+            raise ValueError(f"Range cannot exceed 30 days (got {delta_days} days).")
+        if delta_days < 1:
+            raise ValueError("Range must be at least 1 day.")
+        end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        start_iso = to_bird_iso(start_dt)
+        end_iso = to_bird_iso(end_dt)
+        await sync_conversations(manager, conn, min_date=start_iso, max_date=end_iso)
+        msg_count = await sync_messages_for_range(manager, conn, start_dt, end_dt)
+        return f"Range sync completed for {start_date} → {end_date}: {msg_count} messages."
 
     if (year is None) != (month is None):
         raise ValueError("Use year and month together for monthly sync.")

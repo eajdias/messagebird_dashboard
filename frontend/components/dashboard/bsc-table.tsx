@@ -19,6 +19,7 @@ function npsVariant(value: number): "success" | "warning" | "destructive" | "sec
 function formatCell(value: string | number | null): React.ReactNode {
   if (value == null) return "";
   if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "—";
     return value.toFixed(1);
   }
   return value;
@@ -26,6 +27,7 @@ function formatCell(value: string | number | null): React.ReactNode {
 
 function isNpsCell(value: string | number | null): boolean {
   if (typeof value !== "number") return false;
+  if (!Number.isFinite(value)) return false;
   return value >= -100 && value <= 100;
 }
 

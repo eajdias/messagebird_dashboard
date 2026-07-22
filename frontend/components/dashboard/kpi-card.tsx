@@ -79,14 +79,14 @@ export function KPICard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.05, ease: "easeOut" }}
       whileHover={{ y: -2 }}
+      className={className}
     >
       <Card
         variant="glass"
         style={{ "--glow-color": accent.glow } as React.CSSProperties}
         className={cn(
-          "group relative overflow-hidden bg-gradient-to-br",
-          accent.gradient,
-          className
+          "group relative h-full overflow-hidden bg-gradient-to-br",
+          accent.gradient
         )}
       >
         <span

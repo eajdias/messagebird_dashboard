@@ -34,7 +34,10 @@ export function Sparkline({ data, color, height = 64 }: SparklineProps) {
               WebkitBackdropFilter: "blur(12px) saturate(180%)",
               boxShadow: "0 4px 24px -8px rgba(0,0,0,0.2)",
             }}
-            formatter={(value) => [Number(value).toFixed(1)]}
+            formatter={(value) => {
+              const n = Number(value);
+              return [Number.isFinite(n) ? n.toFixed(1) : "—"];
+            }}
             labelStyle={{ display: "none" }}
             cursor={false}
           />
@@ -46,6 +49,8 @@ export function Sparkline({ data, color, height = 64 }: SparklineProps) {
             fill={`url(#${gradientId})`}
             dot={false}
             activeDot={{ r: 3, strokeWidth: 0, fill: color }}
+            isAnimationActive={false}
+            connectNulls
           />
         </AreaChart>
       </ResponsiveContainer>

@@ -19,8 +19,10 @@ from api.schemas.dashboard import (
     ChannelItem,
     ChannelResponse,
     DashboardSummaryResponse,
+    EvolutionBucket,
     EvolutionMonth,
     EvolutionResponse,
+    GranularEvolutionResponse,
     KPIItem,
     KPIResponse,
 )
@@ -212,6 +214,126 @@ async def get_evolution(
     return EvolutionResponse(evolution=evolution)
 
 
+# ── GET /dashboard/evolution/granular ───────────────────────────────────
+
+
+@router.get("/evolution/granular", response_model=GranularEvolutionResponse)
+async def get_evolution_granular(
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    count: int = Query(12, ge=1, le=90),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Evolution data with selectable granularity (day, week, month).
+
+    - `day`: last `count` days (max 90)
+    - `week`: last `count` ISO weeks (max 90)
+    - `month`: last `count` months (max 24)
+    """
+    import asyncio
+    from datetime import date, timedelta
+
+    now = datetime.now()
+    today = now.date()
+    agg = _make_aggregator()
+
+    if granularity == "month":
+        month_list: list[tuple[str, str, int, int, str]] = []
+        for i in range(count - 1, -1, -1):
+            m = now.month - i
+            y = now.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            start = f"{y}-{m:02d}-01"
+            _, last_day = calendar.monthrange(y, m)
+            end = f"{y}-{m:02d}-{last_day}"
+            label = f"{MONTH_NAMES[m]}/{y}"
+            month_list.append((start, end, y, m, label))
+
+        async def _stats(start: str, end: str):
+            _, processed = await _fetch_and_process(repo, start, end)
+            return agg.aggregate_statistics(processed)
+
+        results = await asyncio.gather(*[_stats(s, e) for s, e, _, _, _ in month_list])
+
+        buckets: list[EvolutionBucket] = []
+        for (start, _, y, m, label), stats in zip(month_list, results, strict=True):
+            buckets.append(
+                EvolutionBucket(
+                    period_start=start,
+                    label=label,
+                    year=y,
+                    month=m,
+                    total_conversations=stats.get("total_chats", 0),
+                    nps_score=stats.get("real_nps"),
+                    art_avg_minutes=stats.get("avg_art"),
+                    sla_compliance_pct=stats.get("sla_compliance"),
+                    rating_avg=stats.get("avg_rating"),
+                )
+            )
+        return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
+
+    if granularity == "day":
+        day_list: list[tuple[str, str, str]] = []
+        for i in range(count - 1, -1, -1):
+            d = today - timedelta(days=i)
+            iso = d.isoformat()
+            day_list.append((iso, iso, d.strftime("%d/%m")))
+
+        async def _day_stats(d_iso: str):
+            _, processed = await _fetch_and_process(repo, d_iso, d_iso)
+            return agg.aggregate_statistics(processed)
+
+        results = await asyncio.gather(*[_day_stats(d) for d, _, _ in day_list])
+
+        buckets = []
+        for (start, _, label), stats in zip(day_list, results, strict=True):
+            buckets.append(
+                EvolutionBucket(
+                    period_start=start,
+                    label=label,
+                    total_conversations=stats.get("total_chats", 0),
+                    nps_score=stats.get("real_nps"),
+                    art_avg_minutes=stats.get("avg_art"),
+                    sla_compliance_pct=stats.get("sla_compliance"),
+                    rating_avg=stats.get("avg_rating"),
+                )
+            )
+        return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
+
+    # week
+    week_list: list[tuple[date, date, str]] = []
+    for i in range(count - 1, -1, -1):
+        week_end = today - timedelta(days=i * 7)
+        week_start = week_end - timedelta(days=6)
+        label = f"{week_start.strftime('%d/%m')}–{week_end.strftime('%d/%m')}"
+        week_list.append((week_start, week_end, label))
+
+    async def _week_stats(start_d: date, end_d: date):
+        start = start_d.isoformat()
+        end = end_d.isoformat()
+        _, processed = await _fetch_and_process(repo, start, end)
+        return agg.aggregate_statistics(processed)
+
+    results = await asyncio.gather(*[_week_stats(s, e) for s, e, _ in week_list])
+
+    buckets = []
+    for (start_d, _, label), stats in zip(week_list, results, strict=True):
+        buckets.append(
+            EvolutionBucket(
+                period_start=start_d.isoformat(),
+                label=label,
+                total_conversations=stats.get("total_chats", 0),
+                nps_score=stats.get("real_nps"),
+                art_avg_minutes=stats.get("avg_art"),
+                sla_compliance_pct=stats.get("sla_compliance"),
+                rating_avg=stats.get("avg_rating"),
+            )
+        )
+    return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
+
+
 # ── GET /dashboard/agents ───────────────────────────────────────────────
 
 
@@ -275,8 +397,8 @@ async def get_channels(
     # Aggregate by channel from raw metadata
     channel_map: dict[str, dict[str, Any]] = {}
     for conv in raw:
-        ch_id = conv.metadata.get("channel", "unknown")
-        ch_name = conv.metadata.get("channel_name", ch_id)
+        ch_id = conv.metadata.get("channel") or "unknown"
+        ch_name = conv.metadata.get("channel_name") or ch_id
         if ch_id not in channel_map:
             channel_map[ch_id] = {
                 "channel_id": ch_id,

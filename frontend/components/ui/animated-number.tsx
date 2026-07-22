@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 interface AnimatedNumberProps {
@@ -9,14 +9,23 @@ interface AnimatedNumberProps {
 }
 
 export function AnimatedNumber({ value, decimals = 0 }: AnimatedNumberProps) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const motionValue = useMotionValue(0);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const motionValue = useMotionValue(mounted ? value : 0);
   const spring = useSpring(motionValue, { damping: 25, stiffness: 120 });
   const rounded = useTransform(spring, (v) => v.toFixed(decimals));
 
   useEffect(() => {
-    motionValue.set(value);
-  }, [value, motionValue]);
+    if (mounted) motionValue.set(value);
+  }, [value, motionValue, mounted]);
 
-  return <motion.span ref={ref}>{rounded}</motion.span>;
+  if (!mounted) {
+    return <span>{value.toFixed(decimals)}</span>;
+  }
+
+  return <motion.span>{rounded}</motion.span>;
 }

@@ -240,6 +240,53 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
     return msg_count
 
 
+async def sync_messages_for_range(
+    manager: PgSyncManager,
+    conn: PostgresSyncConnection,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> int:
+    """Sync messages for conversations updated within [start_dt, end_dt)."""
+    start_naive = start_dt.replace(tzinfo=None)
+    end_naive = end_dt.replace(tzinfo=None)
+    start_iso = to_bird_iso(start_dt)
+    rows = await conn.fetch_all(
+        "SELECT cnvs_bird FROM conversations "
+        "WHERE cnvs_updated >= $1::timestamp AND cnvs_updated < $2::timestamp "
+        "ORDER BY cnvs_updated DESC",
+        (start_naive, end_naive),
+    )
+    total = len(rows)
+    logger.info(
+        "Syncing messages for %d conversations updated between %s and %s...",
+        total,
+        start_naive.isoformat(),
+        end_naive.isoformat(),
+    )
+    semaphore = asyncio.Semaphore(10)
+
+    async def fetch_with_limit(row):
+        async with semaphore:
+            try:
+                return await sync_messages(manager, conn, row["cnvs_bird"], date_from=start_iso)
+            except Exception as e:
+                logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
+                return 0
+
+    tasks = [fetch_with_limit(row) for row in rows]
+    msg_count = 0
+    chunk_size = 1000
+
+    for i in range(0, len(tasks), chunk_size):
+        chunk = tasks[i : i + chunk_size]
+        results = await asyncio.gather(*chunk)
+        msg_count += sum(results)
+        logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
+
+    logger.info("Range messages sync completed: %d conversations, %d messages.", total, msg_count)
+    return msg_count
+
+
 async def sync_messages_for_recent(manager: PgSyncManager, conn: PostgresSyncConnection, days: int = 30):
     rows = await conn.fetch_all(
         "SELECT cnvs_bird FROM conversations "

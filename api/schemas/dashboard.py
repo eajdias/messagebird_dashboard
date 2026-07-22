@@ -53,6 +53,31 @@ class EvolutionMonth(BaseModel):
 EvolutionResponse = list_response(EvolutionMonth, "evolution")
 
 
+class EvolutionBucket(BaseModel):
+    """Generic evolution bucket — supports month, week, or day granularity.
+
+    `period_start` is an ISO date (YYYY-MM-DD) marking the bucket start.
+    `year`/`month` are only populated for monthly buckets (0 otherwise).
+    `label` is human-readable and tailored to the granularity.
+    """
+
+    period_start: str
+    label: str
+    year: int = 0
+    month: int = 0
+    total_conversations: int = 0
+    nps_score: float | None = None
+    art_avg_minutes: float | None = None
+    frt_avg_minutes: float | None = None
+    sla_compliance_pct: float | None = None
+    rating_avg: float | None = None
+
+
+class GranularEvolutionResponse(BaseModel):
+    granularity: str
+    buckets: list[EvolutionBucket] = []
+
+
 class AgentRankingItem(BaseModel):
     rank: int = 0
     agent_name: str

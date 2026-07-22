@@ -53,7 +53,7 @@ export function AgentRanking({ agents }: AgentRankingProps) {
                     <TableCell className="text-right">{a.total_chats}</TableCell>
                     <TableCell className="text-right">{a.total_messages}</TableCell>
                     <TableCell className="text-right">
-                      {a.nps_score != null ? (
+                      {a.nps_score != null && Number.isFinite(a.nps_score) ? (
                         <Badge variant={a.nps_score >= 50 ? "success" : a.nps_score >= 0 ? "warning" : "destructive"}>
                           {a.nps_score.toFixed(1)}
                         </Badge>
@@ -62,7 +62,9 @@ export function AgentRanking({ agents }: AgentRankingProps) {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {a.art_avg_minutes != null ? a.art_avg_minutes.toFixed(1) : "—"}
+                      {a.art_avg_minutes != null && Number.isFinite(a.art_avg_minutes)
+                        ? a.art_avg_minutes.toFixed(1)
+                        : "—"}
                     </TableCell>
                   </TableRow>
                 ))}

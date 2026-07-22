@@ -1,14 +1,16 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { MessageSquare, Users, Clock, MessagesSquare, TrendingUp, Building2 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
+import type { EvolutionGranularity } from "@/types";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SegmentedToggle } from "@/components/ui/segmented-toggle";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -97,10 +99,23 @@ function TableSkeleton({ rows }: { rows: number }) {
   );
 }
 
-export default function DashboardPage() {
-  const { summary, bsc, evolution, agents, channels, loading, error } = useDashboard({ months: 12 });
+const GRANULARITY_OPTIONS: { value: EvolutionGranularity; label: string }[] = [
+  { value: "day", label: "Diário" },
+  { value: "week", label: "Semanal" },
+  { value: "month", label: "Mensal" },
+];
 
-  if (loading) {
+export default function DashboardPage() {
+  const [granularity, setGranularity] = useState<EvolutionGranularity>("month");
+  const { summary, bsc, agents, channels, granularEvolution, loading, error } =
+    useDashboard({ granularity });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -134,9 +149,16 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <SegmentedToggle
+          value={granularity}
+          onChange={setGranularity}
+          options={GRANULARITY_OPTIONS}
+        />
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:bento-grid">
+      <div className="bento-grid sm:grid-cols-2 sm:gap-4 lg:gap-4">
         <motion.div
           className={cn("bento-nps")}
           initial={{ opacity: 0, y: 16 }}
@@ -153,7 +175,7 @@ export default function DashboardPage() {
           value={summary?.total_conversations ?? 0}
           subtitle={`${summary?.unique_contacts ?? 0} clientes únicos`}
           className="bento-conv"
-          sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
+          sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.total_conversations }))}
           sparklineColor="var(--chart-2)"
           icon={MessageSquare}
           accentColor="success"
@@ -164,7 +186,7 @@ export default function DashboardPage() {
           value={summary?.art_avg_minutes != null ? summary.art_avg_minutes.toFixed(1) : "—"}
           subtitle={summary?.sla_compliance_pct != null ? `SLA: ${summary.sla_compliance_pct.toFixed(1)}%` : undefined}
           className="bento-art"
-          sparklineData={evolution?.evolution?.map((e) => ({ value: e.art_avg_minutes ?? 0 }))}
+          sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.art_avg_minutes ?? 0 }))}
           sparklineColor="var(--chart-3)"
           icon={Clock}
           accentColor="warning"
@@ -175,7 +197,7 @@ export default function DashboardPage() {
           value={summary?.total_messages ?? 0}
           subtitle={summary?.returning_contacts ? `${summary.returning_contacts} retornantes` : undefined}
           className="bento-msg"
-          sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
+          sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.total_conversations }))}
           sparklineColor="var(--chart-4)"
           icon={MessagesSquare}
           accentColor="purple"
@@ -189,7 +211,7 @@ export default function DashboardPage() {
           transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
         >
           <Suspense fallback={<ChartSkeleton />}>
-            <EvolutionChart data={evolution?.evolution ?? []} />
+            <EvolutionChart data={granularEvolution?.buckets ?? []} />
           </Suspense>
         </motion.div>
 

@@ -11,10 +11,10 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { EvolutionMonth } from "@/types";
+import type { EvolutionBucket } from "@/types";
 
 interface EvolutionChartProps {
-  data: EvolutionMonth[];
+  data: EvolutionBucket[];
 }
 
 interface TooltipPayloadEntry {
@@ -29,6 +29,16 @@ interface ChartTooltipProps {
   label?: string;
 }
 
+function formatValue(v: unknown): string {
+  if (typeof v === "number" && !Number.isNaN(v)) return v.toFixed(1);
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n.toFixed(1);
+    return v;
+  }
+  return "—";
+}
+
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
   return (
@@ -41,9 +51,7 @@ function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
             style={{ background: p.color }}
           />
           <span className="text-foreground/80">{p.name}:</span>
-          <span className="font-medium tabular-nums">
-            {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
-          </span>
+          <span className="font-medium tabular-nums">{formatValue(p.value)}</span>
         </p>
       ))}
     </div>
@@ -54,7 +62,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
   return (
     <Card variant="glass">
       <CardHeader>
-        <CardTitle className="text-base">Evolução Mensal</CardTitle>
+        <CardTitle className="text-base">Evolução</CardTitle>
       </CardHeader>
       <CardContent>
         {data.length === 0 ? (
@@ -85,7 +93,10 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   axisLine={{ stroke: "var(--border)" }}
                   tickLine={false}
                 />
-                <Tooltip content={<ChartTooltip />} />
+                <Tooltip
+                  content={<ChartTooltip />}
+                  formatter={(value) => [formatValue(value), ""]}
+                />
                 <Legend
                   iconType="circle"
                   wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
@@ -98,6 +109,8 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   strokeWidth={2.5}
                   fill="url(#gradConversations)"
                   activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--background)" }}
+                  isAnimationActive={false}
+                  connectNulls
                 />
                 <Area
                   type="monotone"
@@ -107,6 +120,8 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   strokeWidth={2.5}
                   fill="url(#gradNps)"
                   activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--background)" }}
+                  isAnimationActive={false}
+                  connectNulls
                 />
               </AreaChart>
             </ResponsiveContainer>

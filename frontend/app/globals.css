@@ -211,10 +211,24 @@ body {
   background: rgb(148 163 184 / 0.2);
 }
 
-@media (width >= 64rem) {
+.bento-nps { grid-area: nps; }
+.bento-conv { grid-area: conv; }
+.bento-art { grid-area: art; }
+.bento-msg { grid-area: msg; }
+.bento-chart { grid-area: chart; }
+.bento-chan { grid-area: chan; }
+.bento-agents { grid-area: agents; }
+.bento-bsc { grid-area: bsc; }
+
+@layer components {
   .bento-grid {
     display: grid;
     gap: 1rem;
+  }
+}
+
+@media (width >= 64rem) {
+  .bento-grid {
     grid-template-columns: repeat(4, 1fr);
     grid-template-areas:
       "nps    nps    conv   msg"
@@ -223,15 +237,6 @@ body {
       "chan   chan   agents agents"
       "bsc    bsc    bsc    bsc";
   }
-
-  .bento-nps { grid-area: nps; }
-  .bento-conv { grid-area: conv; }
-  .bento-art { grid-area: art; }
-  .bento-msg { grid-area: msg; }
-  .bento-chart { grid-area: chart; }
-  .bento-chan { grid-area: chan; }
-  .bento-agents { grid-area: agents; }
-  .bento-bsc { grid-area: bsc; }
 }
 
 @media (prefers-reduced-transparency: reduce) {

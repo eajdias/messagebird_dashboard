@@ -5,7 +5,7 @@ Admin Routes
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from api.auth import get_current_user
 from api.schemas._base import StatusResponse
@@ -18,6 +18,7 @@ from api.schemas.admin import (
     JobInfo,
     SchedulerStatusResponse,
     SyncProfileResponse,
+    SyncRangeRequest,
     SyncStatusResponse,
     SyncTriggerRequest,
     SyncTriggerResponse,
@@ -27,6 +28,40 @@ from domain.constants import AGENTS, DEPT_MAP
 logger = logging.getLogger("m_bird.admin")
 
 router = APIRouter()
+
+
+@router.post("/sync/range", response_model=SyncTriggerResponse)
+async def trigger_sync_range(
+    request: SyncRangeRequest | None = Body(default=None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Sync conversations + messages for a date range.
+
+    - Default: today only (1 day)
+    - Maximum range: 30 days
+    - Date format: YYYY-MM-DD
+    """
+    from api.sync_utils import refresh_materialized_view
+    from application.use_cases.sync_database import SyncDatabaseUseCase
+
+    body = request or SyncRangeRequest()
+    logger.info(
+        "Range sync triggered: start=%s end=%s",
+        body.start_date,
+        body.end_date,
+    )
+    try:
+        use_case = SyncDatabaseUseCase()
+        await use_case.execute(start_date=body.start_date, end_date=body.end_date)
+        await refresh_materialized_view()
+    except ValueError as e:
+        logger.warning("Range sync rejected: %s", e)
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    logger.info("Range sync completed for %s → %s", body.start_date, body.end_date)
+    return SyncTriggerResponse(
+        status="completed",
+        message=f"Range sync completed for {body.start_date} → {body.end_date}",
+    )
 
 
 @router.get("/sync/status", response_model=SyncStatusResponse)

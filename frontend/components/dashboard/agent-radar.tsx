@@ -28,19 +28,44 @@ const COLORS = [
 ];
 
 interface TooltipPayloadEntry {
-  payload?: { metric: string; agent: string; value: number };
+  name?: string;
+  value?: number | string;
+  payload?: Record<string, string | number>;
+  color?: string;
 }
 
-function MetricTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
+function safeNum(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  if (typeof v === "string") {
+    const parsed = Number(v);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function formatValue(v: unknown): string {
+  const n = safeNum(v);
+  return n.toFixed(1);
+}
+
+function MetricTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   return (
     <div className="glass-tooltip rounded-lg px-3 py-2 text-xs">
       <p className="font-semibold">{label}</p>
       {payload.map((p, i) => {
-        if (!p.payload) return null;
+        const agentName = String(p.name ?? p.payload?.agent ?? "Agente");
         return (
-          <p key={i} className="mt-1" style={{ color: COLORS[i % COLORS.length] }}>
-            {p.payload.agent}: {p.payload.value.toFixed(1)}
+          <p key={i} className="mt-1" style={{ color: p.color ?? COLORS[i % COLORS.length] }}>
+            {agentName}: {formatValue(p.value)}
           </p>
         );
       })}
@@ -72,9 +97,9 @@ export function AgentRadar({ agents, className }: AgentRadarProps) {
   ] as const;
 
   const data = metrics.map((m) => {
-    const row: Record<string, string | number> = { metric: m.label };
-    top.forEach((a) => {
-      let v = 0;
+    const row: Record<string, number | string> = { metric: m.label };
+    top.forEach((a, idx) => {
+      let v: number | null = 0;
       switch (m.key) {
         case "nps":
           v = a.nps_score ?? 0;
@@ -92,7 +117,8 @@ export function AgentRadar({ agents, className }: AgentRadarProps) {
           v = a.total_chats;
           break;
       }
-      row[a.agent_name] = v;
+      const safeV = typeof v === "number" && !Number.isNaN(v) ? v : 0;
+      row[`agent_${idx}`] = safeV;
     });
     return row;
   });
@@ -122,14 +148,18 @@ export function AgentRadar({ agents, className }: AgentRadarProps) {
                 <Radar
                   key={a.agent_name}
                   name={a.agent_name}
-                  dataKey={a.agent_name}
+                  dataKey={`agent_${i}`}
                   stroke={COLORS[i % COLORS.length]}
                   fill={COLORS[i % COLORS.length]}
                   fillOpacity={0.18}
                   strokeWidth={2}
+                  isAnimationActive={false}
                 />
               ))}
-              <Tooltip content={<MetricTooltip />} />
+              <Tooltip
+                content={<MetricTooltip />}
+                formatter={(value) => [formatValue(value), ""]}
+              />
               <Legend
                 iconType="circle"
                 wrapperStyle={{ fontSize: 11, paddingTop: 8 }}

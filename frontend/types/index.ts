@@ -62,6 +62,26 @@ export interface EvolutionResponse {
   evolution: EvolutionMonth[];
 }
 
+export type EvolutionGranularity = "day" | "week" | "month";
+
+export interface EvolutionBucket {
+  period_start: string;
+  label: string;
+  year: number;
+  month: number;
+  total_conversations: number;
+  nps_score: number | null;
+  art_avg_minutes: number | null;
+  frt_avg_minutes: number | null;
+  sla_compliance_pct: number | null;
+  rating_avg: number | null;
+}
+
+export interface GranularEvolutionResponse {
+  granularity: EvolutionGranularity;
+  buckets: EvolutionBucket[];
+}
+
 export interface AgentRankingItem {
   rank: number;
   agent_name: string;

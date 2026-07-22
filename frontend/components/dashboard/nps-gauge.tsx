@@ -65,11 +65,14 @@ export function NPSGauge({ value, className }: NPSGaugeProps) {
                 cornerRadius={10}
                 fill={color}
                 background={{ fill: "var(--muted)" } as never}
+                isAnimationActive={false}
               />
             </RadialBarChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-bold tabular-nums">{value?.toFixed(1) ?? "—"}</span>
+            <span className="text-3xl font-bold tabular-nums">
+              {value != null && Number.isFinite(value) ? value.toFixed(1) : "—"}
+            </span>
             <span
               className="mt-1 flex items-center gap-1 text-xs font-medium"
               style={{ color }}

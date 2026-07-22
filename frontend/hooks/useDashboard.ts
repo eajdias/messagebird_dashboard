@@ -9,6 +9,8 @@ import type {
   EvolutionResponse,
   AgentRankingResponse,
   ChannelResponse,
+  GranularEvolutionResponse,
+  EvolutionGranularity,
 } from "@/types";
 
 interface DashboardState {
@@ -18,16 +20,27 @@ interface DashboardState {
   evolution: EvolutionResponse | null;
   agents: AgentRankingResponse | null;
   channels: ChannelResponse | null;
+  granularEvolution: GranularEvolutionResponse | null;
   loading: boolean;
   error: string | null;
 }
+
+const GRANULARITY_COUNT: Record<EvolutionGranularity, number> = {
+  day: 30,
+  week: 12,
+  month: 12,
+};
 
 export function useDashboard(params?: {
   start_date?: string;
   end_date?: string;
   department?: string;
   months?: number;
+  granularity?: EvolutionGranularity;
 }) {
+  const granularity: EvolutionGranularity = params?.granularity ?? "month";
+  const granularCount = GRANULARITY_COUNT[granularity];
+
   const [state, setState] = useState<DashboardState>({
     summary: null,
     bsc: null,
@@ -35,6 +48,7 @@ export function useDashboard(params?: {
     evolution: null,
     agents: null,
     channels: null,
+    granularEvolution: null,
     loading: true,
     error: null,
   });
@@ -49,15 +63,15 @@ export function useDashboard(params?: {
       const q = qs.toString();
       const suffix = q ? `?${q}` : "";
 
-      const [summaryRes, bscRes, evoRes, agentsRes, channelsRes] =
+      const [summaryRes, bscRes, agentsRes, channelsRes, granularEvoRes] =
         await Promise.all([
           api.get<DashboardSummary>(`/api/v1/dashboard/summary${suffix}`),
           api.get<BSCData>(`/api/v1/dashboard/bsc${suffix}`),
-          api.get<EvolutionResponse>(
-            `/api/v1/dashboard/evolution?months=${params?.months ?? 12}`
-          ),
           api.get<AgentRankingResponse>("/api/v1/dashboard/agents"),
           api.get<ChannelResponse>("/api/v1/dashboard/channels"),
+          api.get<GranularEvolutionResponse>(
+            `/api/v1/dashboard/evolution/granular?granularity=${granularity}&count=${granularCount}`
+          ),
         ]);
 
       let kpis: KPIResponse | null = null;
@@ -72,9 +86,10 @@ export function useDashboard(params?: {
         summary: summaryRes.data,
         bsc: bscRes.data,
         kpis,
-        evolution: evoRes.data,
+        evolution: null,
         agents: agentsRes.data,
         channels: channelsRes.data,
+        granularEvolution: granularEvoRes.data,
         loading: false,
         error: null,
       });
@@ -85,7 +100,7 @@ export function useDashboard(params?: {
         error: err instanceof Error ? err.message : "Erro ao carregar dados",
       }));
     }
-  }, [params?.start_date, params?.end_date, params?.department, params?.months]);
+  }, [params?.start_date, params?.end_date, params?.department, granularity, granularCount]);
 
   useEffect(() => {
     fetchData();

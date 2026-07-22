@@ -14,6 +14,8 @@ class SyncDatabaseUseCase:
         month: int | None = None,
         backfill_surveys: bool = False,
         sync_today: bool = False,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ):
         pool = self._pool
         if pool is None:
@@ -29,4 +31,6 @@ class SyncDatabaseUseCase:
             month=month,
             backfill_surveys=backfill_surveys,
             sync_today=sync_today,
+            start_date=start_date,
+            end_date=end_date,
         )

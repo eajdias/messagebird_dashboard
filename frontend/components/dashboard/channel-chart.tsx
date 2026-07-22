@@ -25,10 +25,55 @@ const COLORS = [
   "var(--chart-5)",
 ];
 
+interface GroupedChannel {
+  id: string;
+  name: string;
+  conversations: number;
+  messages: number;
+  percent: number;
+}
+
+function classifyChannel(name: string, id: string): "whatsapp" | "templates" | "outros" {
+  const n = (name || id || "").toLowerCase();
+  if (n.includes("whats")) return "whatsapp";
+  if (n.includes("templat") || n.includes("template") || n.includes("site")) return "templates";
+  return "outros";
+}
+
+function groupChannels(channels: ChannelItem[]): GroupedChannel[] {
+  const buckets: Record<"whatsapp" | "templates" | "outros", GroupedChannel> = {
+    whatsapp: { id: "whatsapp", name: "WhatsApp", conversations: 0, messages: 0, percent: 0 },
+    templates: { id: "templates", name: "Templates", conversations: 0, messages: 0, percent: 0 },
+    outros: { id: "outros", name: "Outros", conversations: 0, messages: 0, percent: 0 },
+  };
+  for (const c of channels) {
+    const k = classifyChannel(c.channel_name, c.channel_id);
+    buckets[k].conversations += c.total_conversations;
+    buckets[k].messages += c.total_messages;
+  }
+  const total = Object.values(buckets).reduce((sum, b) => sum + b.conversations, 0);
+  return Object.values(buckets)
+    .map((b) => ({
+      ...b,
+      percent: total > 0 ? (b.conversations / total) * 100 : 0,
+    }))
+    .filter((b) => b.conversations > 0)
+    .sort((a, b) => b.conversations - a.conversations);
+}
+
 interface TooltipPayloadEntry {
   name?: string;
   value?: number;
-  payload?: { name: string; conversations: number; messages: number; percent: number };
+  payload?: GroupedChannel;
+}
+
+function safeNum(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return fallback;
 }
 
 function ChannelTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayloadEntry[] }) {
@@ -40,9 +85,9 @@ function ChannelTooltip({ active, payload }: { active?: boolean; payload?: Toolt
     <div className="glass-tooltip rounded-lg px-3 py-2 text-xs">
       <p className="font-semibold">{data.name}</p>
       <p className="mt-1 text-muted-foreground">
-        {data.conversations} conversas ({data.percent.toFixed(1)}%)
+        {safeNum(data.conversations)} conversas ({safeNum(data.percent).toFixed(1)}%)
       </p>
-      <p className="text-muted-foreground">{data.messages} mensagens</p>
+      <p className="text-muted-foreground">{safeNum(data.messages)} mensagens</p>
     </div>
   );
 }
@@ -61,13 +106,7 @@ export function ChannelChart({ channels, className }: ChannelChartProps) {
     );
   }
 
-  const total = channels.reduce((sum, c) => sum + c.total_conversations, 0);
-  const data = channels.map((c) => ({
-    name: c.channel_name,
-    conversations: c.total_conversations,
-    messages: c.total_messages,
-    percent: total > 0 ? (c.total_conversations / total) * 100 : 0,
-  }));
+  const data = groupChannels(channels);
 
   return (
     <Card variant="glass" className={className}>
@@ -88,12 +127,16 @@ export function ChannelChart({ channels, className }: ChannelChartProps) {
                 dataKey="conversations"
                 stroke="var(--background)"
                 strokeWidth={2}
+                isAnimationActive={false}
               >
                 {data.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip content={<ChannelTooltip />} />
+              <Tooltip
+                content={<ChannelTooltip />}
+                formatter={(value) => [safeNum(value), ""]}
+              />
               <Legend
                 verticalAlign="bottom"
                 iconType="circle"
