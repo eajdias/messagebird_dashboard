@@ -1,9 +1,10 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { Moon, Sun, LogOut, User } from "lucide-react";
+import { Search, Moon, Sun, LogOut, User, Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { CommandPalette } from "@/components/layout/command-palette";
 
 export function TopBar() {
   const { theme, setTheme } = useTheme();
@@ -21,6 +22,38 @@ export function TopBar() {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          className="hidden h-9 w-64 justify-between text-muted-foreground md:flex"
+          onClick={() => {
+            const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
+            document.dispatchEvent(event);
+          }}
+        >
+          <span className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Buscar páginas e ações...
+          </span>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <Command className="h-3 w-3" />
+            K
+          </kbd>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={() => {
+            const event = new KeyboardEvent("keydown", { key: "k", metaKey: true });
+            document.dispatchEvent(event);
+          }}
+          aria-label="Buscar"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
+
         <Button
           variant="ghost"
           size="icon"
@@ -42,6 +75,8 @@ export function TopBar() {
           <LogOut className="h-4 w-4" />
         </Button>
       </div>
+
+      <CommandPalette />
     </header>
   );
 }

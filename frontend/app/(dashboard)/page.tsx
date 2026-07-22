@@ -1,19 +1,94 @@
 "use client";
 
+import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { useDashboard } from "@/hooks/useDashboard";
 import { KPICard } from "@/components/dashboard/kpi-card";
-import { EvolutionChart } from "@/components/dashboard/evolution-chart";
-import { AgentRanking } from "@/components/dashboard/agent-ranking";
-import { ChannelBreakdown } from "@/components/dashboard/channel-breakdown";
-import { BSCTable } from "@/components/dashboard/bsc-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const EvolutionChart = dynamic(
+  () => import("@/components/dashboard/evolution-chart").then((m) => ({ default: m.EvolutionChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const AgentRanking = dynamic(
+  () => import("@/components/dashboard/agent-ranking").then((m) => ({ default: m.AgentRanking })),
+  { loading: () => <TableSkeleton rows={5} /> }
+);
+
+const ChannelBreakdown = dynamic(
+  () => import("@/components/dashboard/channel-breakdown").then((m) => ({ default: m.ChannelBreakdown })),
+  { loading: () => <TableSkeleton rows={3} /> }
+);
+
+const BSCTable = dynamic(
+  () => import("@/components/dashboard/bsc-table").then((m) => ({ default: m.BSCTable })),
+  { loading: () => <TableSkeleton rows={4} /> }
+);
+
+function KPIGridSkeleton() {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="mt-2 h-3 w-32" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ChartSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-32" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-[300px] w-full" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function TableSkeleton({ rows }: { rows: number }) {
+  return (
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-40" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          {Array.from({ length: rows }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-full" />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function DashboardPage() {
   const { summary, bsc, evolution, agents, channels, loading, error } = useDashboard({ months: 12 });
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <KPIGridSkeleton />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <TableSkeleton rows={5} />
       </div>
     );
   }
@@ -55,14 +130,22 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <EvolutionChart data={evolution?.evolution ?? []} />
-        <ChannelBreakdown channels={channels?.channels ?? []} />
+        <Suspense fallback={<ChartSkeleton />}>
+          <EvolutionChart data={evolution?.evolution ?? []} />
+        </Suspense>
+        <Suspense fallback={<TableSkeleton rows={3} />}>
+          <ChannelBreakdown channels={channels?.channels ?? []} />
+        </Suspense>
       </div>
 
-      <AgentRanking agents={agents?.agents ?? []} />
+      <Suspense fallback={<TableSkeleton rows={5} />}>
+        <AgentRanking agents={agents?.agents ?? []} />
+      </Suspense>
 
       {bsc && (bsc.data_t1.length > 0 || bsc.data_t2.length > 0) && (
-        <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
+        <Suspense fallback={<TableSkeleton rows={4} />}>
+          <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
+        </Suspense>
       )}
     </div>
   );

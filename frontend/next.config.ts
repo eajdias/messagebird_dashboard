@@ -1,10 +1,14 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+let nextConfig: NextConfig = {
   output: "standalone",
   compiler: {
-    // Keep console.* in production so Docker logs capture frontend output.
-    removeConsole: false,
+    removeConsole: process.env.NODE_ENV === "production",
+  },
+  modularizeImports: {
+    "lucide-react": {
+      transform: "lucide-react/dist/esm/icons/{{ kebabCase member }}",
+    },
   },
 };
 

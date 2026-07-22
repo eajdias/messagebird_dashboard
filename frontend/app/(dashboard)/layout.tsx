@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopBar } from "@/components/layout/topbar";
 
@@ -19,6 +20,15 @@ export default function DashboardLayout({
       router.replace("/login");
     }
   }, [loading, isAuthenticated, router]);
+
+  useKeyboardShortcuts([
+    { keys: ["g", "d"], handler: useCallback(() => router.push("/"), [router]), description: "Go to Dashboard" },
+    { keys: ["g", "c"], handler: useCallback(() => router.push("/conversations"), [router]), description: "Go to Conversas" },
+    { keys: ["g", "a"], handler: useCallback(() => router.push("/agents"), [router]), description: "Go to Agentes" },
+    { keys: ["g", "r"], handler: useCallback(() => router.push("/reports"), [router]), description: "Go to Relatorios" },
+    { keys: ["g", "s"], handler: useCallback(() => router.push("/settings"), [router]), description: "Go to Settings" },
+    { keys: ["r"], handler: useCallback(() => { window.location.reload(); }, []), description: "Refresh page" },
+  ]);
 
   if (loading) {
     return (

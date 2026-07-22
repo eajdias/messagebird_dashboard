@@ -7,14 +7,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
     "@hookform/resolvers": "5.4.0",
+    "@radix-ui/react-dialog": "^1.1.20",
+    "@radix-ui/react-popover": "^1.1.20",
     "@tanstack/react-table": "8.21.3",
     "axios": "^1.7.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "cmdk": "^1.1.1",
     "lucide-react": "^0.460.0",
     "next": "16.2.10",
     "next-themes": "^0.4.0",
@@ -26,6 +30,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.11",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
