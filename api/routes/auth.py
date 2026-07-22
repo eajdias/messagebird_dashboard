@@ -5,7 +5,7 @@ Auth Routes
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import (
     create_access_token,

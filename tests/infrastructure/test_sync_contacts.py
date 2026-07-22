@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from infrastructure.sync.sync_core import PgSyncManager
 from infrastructure.sync.sync_contacts import sync_contacts
+from infrastructure.sync.sync_core import PgSyncManager
 
 
 @pytest.fixture

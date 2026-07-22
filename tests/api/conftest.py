@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from api.auth import create_access_token
-from api.dependencies import get_pool, get_repository
+from api.dependencies import get_repository
 from api.main import create_app
 from application.interfaces.repository import ReportRepository
 

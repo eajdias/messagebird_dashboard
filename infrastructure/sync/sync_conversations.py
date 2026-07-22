@@ -25,7 +25,6 @@ async def sync_conversations(
 
     for status in ["active", "archived"]:
         offset = 0
-        page_token = None
 
         page = 0
         while True:
@@ -42,9 +41,6 @@ async def sync_conversations(
             if not items:
                 break
 
-            pagination: dict[str, Any] = response.get("pagination", {})
-            next_page_token = pagination.get("nextPageToken") or response.get("nextPageToken")
-            page_token = str(next_page_token) if next_page_token else None
             offset += len(items)
             page += 1
 

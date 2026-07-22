@@ -205,7 +205,6 @@ async def sync_all_messages(manager: PgSyncManager, conn: PostgresSyncConnection
 async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConnection, year: int, month: int) -> int:
     month_start, next_month_start = month_bounds_utc(year, month)
     start_iso = to_bird_iso(month_start)
-    end_iso = to_bird_iso(next_month_start)
 
     rows = await conn.fetch_all(
         "SELECT cnvs_bird FROM conversations "

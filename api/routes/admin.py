@@ -118,9 +118,9 @@ async def get_sync_profile(
 async def get_scheduler_status(
     _current_user: dict[str, Any] = Depends(get_current_user),
 ):
-    from api.main import scheduler_running as _running
-    from api.main import scheduler_jobs as _jobs
     from api.main import _scheduler_started_by_user
+    from api.main import scheduler_jobs as _jobs
+    from api.main import scheduler_running as _running
 
     jobs_raw = _jobs()
     return SchedulerStatusResponse(
