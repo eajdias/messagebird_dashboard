@@ -185,6 +185,121 @@ export interface AvailableReportItem {
   created_at: string;
 }
 
+// ── Executive Dashboard types ──────────────────────────────────────────────
+
+export type Granularity = "day" | "week" | "month";
+
+export interface CountedItem {
+  label: string;
+  value: number;
+  pct: number;
+}
+
+export interface QualityDistribution {
+  counts: Record<string, number>;
+  total: number;
+}
+
+export interface NPSBreakdown {
+  promoters: number;
+  neutrals: number;
+  detractors: number;
+  total: number;
+  real_nps: number | null;
+}
+
+export interface QualityResponse {
+  rating: QualityDistribution;
+  nps_score: QualityDistribution;
+  nps_breakdown: NPSBreakdown;
+}
+
+export interface HeatmapCell {
+  day: number;
+  hour: number;
+  value: number;
+}
+
+export interface HeatmapResponse {
+  cells: HeatmapCell[];
+  max_value: number;
+  total: number;
+}
+
+export interface MotivesResponse {
+  items: CountedItem[];
+  total: number;
+}
+
+export interface OccurrencesResponse {
+  items: CountedItem[];
+  total: number;
+}
+
+export interface DOWResponse {
+  items: CountedItem[];
+  total: number;
+  days: string[];
+}
+
+export interface DepartmentRow {
+  name: string;
+  chats: number;
+  pct_total: number;
+  art_avg: number | null;
+  sla_pct: number | null;
+  returners: number;
+  pct_returning: number;
+  avg_rating: number | null;
+  nps_real: number | null;
+}
+
+export interface DepartmentsResponse {
+  items: DepartmentRow[];
+  total_chats: number;
+}
+
+export interface AgentRow {
+  name: string;
+  department: string;
+  chats: number;
+  total_messages: number;
+  art_avg: number | null;
+  sla_pct: number | null;
+  real_nps: number | null;
+  avg_rating: number | null;
+  compliments: number;
+  negatives: number;
+  returners: number;
+  unique_contacts: number;
+  rating_distribution: Record<string, number>;
+  nps_score_distribution: Record<string, number>;
+}
+
+export interface AgentsResponse {
+  items: AgentRow[];
+  total_chats: number;
+}
+
+export interface ExecutiveBSCResponse {
+  group: string;
+  header: string[];
+  data_t1: (string | number | null)[][];
+  data_t2: (string | number | null)[][];
+  kpi_config: Record<string, unknown> | null;
+  total_chats: number;
+}
+
+export interface ExecutiveMeta {
+  start_date: string;
+  end_date: string;
+  granularity: Granularity;
+  agent_ids: string[];
+  group: string | null;
+  total_chats: number;
+  total_messages: number;
+}
+
 export interface AvailableReportsResponse {
   reports: AvailableReportItem[];
 }

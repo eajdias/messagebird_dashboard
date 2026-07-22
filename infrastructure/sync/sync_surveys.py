@@ -129,17 +129,17 @@ async def update_conversation_surveys(manager: PgSyncManager, conn: PostgresSync
                     break
 
     if updates:
-        set_parts = []
-        params = []
-        for idx, (k, v) in enumerate(updates.items(), 1):
-            set_parts.append(f"{k} = ${idx}")
-            params.append(v)
-        set_clause = ", ".join(set_parts)
-        params.append(cnvs_id)
-        await conn.execute_query(
-            f"UPDATE conversations SET {set_clause} WHERE cnvs_id = ${len(params)}",
-            tuple(params),
-        )
+        values = []
+        for k, v in updates.items():
+            if isinstance(v, int):
+                values.append(f"{k} = {v}")
+            elif isinstance(v, str):
+                safe = v.replace("'", "''")
+                values.append(f"{k} = E'{safe}'")
+            else:
+                values.append(f"{k} = {v!r}")
+        set_clause = ", ".join(values)
+        await conn.execute_raw(f"UPDATE conversations SET {set_clause} WHERE cnvs_id = {cnvs_id}")
 
 
 async def backfill_surveys(manager: PgSyncManager, conn: PostgresSyncConnection) -> int:
@@ -159,8 +159,7 @@ async def backfill_surveys(manager: PgSyncManager, conn: PostgresSyncConnection)
         "  OR cv.cnvs_rating_agent IS NULL "
         "  OR cv.cnvs_contact_reason IS NULL "
         "  OR cv.cnvs_dept IS NULL"
-        ") "
-        "ORDER BY cv.cnvs_id"
+        ")"
     )
     total = len(rows)
     logger.info("Survey backfill: %d conversations to process...", total)

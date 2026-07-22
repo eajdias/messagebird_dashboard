@@ -231,8 +231,8 @@ body {
   .bento-grid {
     grid-template-columns: repeat(4, 1fr);
     grid-template-areas:
+      "nps    nps    conv   art"
       "nps    nps    conv   msg"
-      "nps    nps    art    msg"
       "chart  chart  chart  chart"
       "chan   chan   agents agents"
       "bsc    bsc    bsc    bsc";

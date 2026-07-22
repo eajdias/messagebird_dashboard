@@ -15,16 +15,31 @@ from api.dependencies import get_repository
 from api.schemas.dashboard import (
     AgentRankingItem,
     AgentRankingResponse,
+    AgentRow,
+    AgentsResponse,
     BSCResponse,
     ChannelItem,
     ChannelResponse,
+    CountedItem,
     DashboardSummaryResponse,
+    DepartmentRow,
+    DepartmentsResponse,
+    DOWResponse,
     EvolutionBucket,
     EvolutionMonth,
     EvolutionResponse,
+    ExecutiveBSCResponse,
+    ExecutiveMeta,
     GranularEvolutionResponse,
+    HeatmapCell,
+    HeatmapResponse,
     KPIItem,
     KPIResponse,
+    MotivesResponse,
+    NPSBreakdown,
+    OccurrencesResponse,
+    QualityDistribution,
+    QualityResponse,
 )
 from application.interfaces.repository import ReportRepository
 from application.services.report_aggregator import ReportAggregator
@@ -430,3 +445,389 @@ async def get_channels(
 
     items.sort(key=lambda x: x.total_conversations, reverse=True)
     return ChannelResponse(channels=items)
+
+
+# ── Executive Dashboard (granular endpoints, period-driven) ────────────────
+
+
+def _parse_agent_ids(agent_ids: str | None) -> set[str]:
+    """Parse `?agent_ids=alice&agent_ids=bob` or `?agent_ids=alice,bob`."""
+    if not agent_ids:
+        return set()
+    return {a.strip() for a in agent_ids.split(",") if a.strip()}
+
+
+def _granularity_window(granularity: str, custom_start: str | None, custom_end: str | None) -> tuple[str, str]:
+    """Return (start_date, end_date) ISO strings for the granularity window.
+
+    - `day`:   last 1 day (today)
+    - `week`:  last 7 days
+    - `month`: last 30 days
+    - Custom: use provided range if any
+    """
+    if custom_start and custom_end:
+        return custom_start, custom_end
+    from datetime import date, timedelta
+
+    today = date.today()
+    if granularity == "day":
+        return today.isoformat(), today.isoformat()
+    if granularity == "week":
+        return (today - timedelta(days=6)).isoformat(), today.isoformat()
+    return (today - timedelta(days=29)).isoformat(), today.isoformat()
+
+
+def _filter_processed(
+    processed: list[Any],
+    agent_ids: set[str],
+    group: str | None,
+) -> list[Any]:
+    """Filter processed data by agent_ids and/or group (sector)."""
+    out = processed
+    if group:
+        out = [p for p in out if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
+    if agent_ids:
+        out = [p for p in out if p.agent in agent_ids]
+    return out
+
+
+def _pct(part: int, total: int) -> float:
+    return round(part / total * 100, 2) if total > 0 else 0.0
+
+
+def _safe_div(a: float | None, b: float | None) -> float | None:
+    if a is None or b is None or b == 0:
+        return None
+    return a / b
+
+
+async def _load_executive_processed(
+    repo: ReportRepository,
+    start_date: str,
+    end_date: str,
+    agent_ids: set[str],
+    group: str | None,
+) -> list[Any]:
+    """Fetch + process + filter for executive endpoints."""
+    raw, processed = await _fetch_and_process(repo, start_date, end_date)
+    return _filter_processed(processed, agent_ids, group)
+
+
+@router.get("/executive/quality", response_model=QualityResponse)
+async def get_executive_quality(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None, description="Comma-separated agent names"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Quality overview: rating distribution (1-5), NPS score distribution (1-10), NPS breakdown."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    from application.services.sub_aggregators import RatingAggregator
+
+    dist = RatingAggregator().aggregate_distributions(processed)
+
+    # Rating 1-5
+    rating_counts = dist.get("rating_distribution", {})
+    rating_total = sum(int(rating_counts.get(str(i), 0)) for i in range(1, 6))
+    # NPS 1-10
+    nps_counts = dist.get("nps_distribution", {})
+    nps_total = sum(int(nps_counts.get(str(i), 0)) for i in range(1, 11))
+    # NPS breakdown
+    promoters = sum(int(nps_counts.get(str(i), 0)) for i in (9, 10))
+    neutrals = sum(int(nps_counts.get(str(i), 0)) for i in (7, 8))
+    detractors = sum(int(nps_counts.get(str(i), 0)) for i in range(1, 7))
+
+    from domain.services.metrics_calculator import MetricsCalculator
+
+    return QualityResponse(
+        rating=QualityDistribution(
+            counts={str(i): int(rating_counts.get(str(i), 0)) for i in range(1, 6)},
+            total=rating_total,
+        ),
+        nps_score=QualityDistribution(
+            counts={str(i): int(nps_counts.get(str(i), 0)) for i in range(1, 11)},
+            total=nps_total,
+        ),
+        nps_breakdown=NPSBreakdown(
+            promoters=promoters,
+            neutrals=neutrals,
+            detractors=detractors,
+            total=nps_total,
+            real_nps=MetricsCalculator.calculate_nps([p.nps for p in processed if p.nps is not None]),
+        ),
+    )
+
+
+@router.get("/executive/heatmap", response_model=HeatmapResponse)
+async def get_executive_heatmap(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Heatmap of conversations by weekday (0=Mon..6=Sun) × hour (0..23)."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    from application.services.sub_aggregators import TemporalAggregator
+
+    raw_cells = TemporalAggregator().aggregate_heatmap(processed)
+    cells = [HeatmapCell(day=int(c["day"]), hour=int(c["hour"]), value=int(c["value"])) for c in raw_cells]
+    return HeatmapResponse(
+        cells=cells,
+        max_value=max((c.value for c in cells), default=0),
+        total=sum(c.value for c in cells),
+    )
+
+
+@router.get("/executive/motives", response_model=MotivesResponse)
+async def get_executive_motives(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Top motivos de contato no período."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    from application.services.sub_aggregators import TopicAggregator
+
+    raw = TopicAggregator().aggregate_reasons(processed)
+    total = sum(int(r["value"]) for r in raw)
+    items = [
+        CountedItem(
+            label=str(r["label"]),
+            value=int(r["value"]),
+            pct=_pct(int(r["value"]), total),
+        )
+        for r in raw[:limit]
+    ]
+    return MotivesResponse(items=items, total=total)
+
+
+@router.get("/executive/occurrences", response_model=OccurrencesResponse)
+async def get_executive_occurrences(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Top ocorrências no período."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    from application.services.sub_aggregators import TopicAggregator
+
+    raw = TopicAggregator().aggregate_occurrences(processed)
+    total = sum(int(r["value"]) for r in raw)
+    items = [
+        CountedItem(
+            label=str(r["label"]),
+            value=int(r["value"]),
+            pct=_pct(int(r["value"]), total),
+        )
+        for r in raw[:limit]
+    ]
+    return OccurrencesResponse(items=items, total=total)
+
+
+@router.get("/executive/dow", response_model=DOWResponse)
+async def get_executive_dow(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Distribuição por dia da semana no período."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    from application.services.sub_aggregators import TemporalAggregator
+
+    raw = TemporalAggregator().aggregate_dow(processed)
+    total = sum(int(r["value"]) for r in raw)
+    items = [
+        CountedItem(
+            label=str(r["day"]),
+            value=int(r["value"]),
+            pct=_pct(int(r["value"]), total),
+        )
+        for r in raw
+    ]
+    return DOWResponse(items=items, total=total, days=_dow_labels())
+
+
+def _dow_labels() -> list[str]:
+    return ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+
+
+@router.get("/executive/departments", response_model=DepartmentsResponse)
+async def get_executive_departments(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Breakdown por departamento no período (sem filtro de grupo, sempre global)."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    dept_map: dict[str, list[Any]] = {}
+    for p in processed:
+        dept_map.setdefault(p.dept_label or "N/A", []).append(p)
+
+    total_chats = len(processed)
+    from application.services.report_aggregator import ReportAggregator
+
+    agg = ReportAggregator()
+    items: list[DepartmentRow] = []
+    for dept, plist in sorted(dept_map.items(), key=lambda kv: -len(kv[1])):
+        stats = agg.aggregate_statistics(plist)
+        items.append(
+            DepartmentRow(
+                name=dept,
+                chats=stats.get("total_chats", 0),
+                pct_total=_pct(stats.get("total_chats", 0), total_chats),
+                art_avg=stats.get("avg_art"),
+                sla_pct=stats.get("sla_compliance"),
+                returners=stats.get("returners", 0),
+                pct_returning=_pct(stats.get("returners", 0), stats.get("unique_clients", 0)),
+                avg_rating=stats.get("avg_rating"),
+                nps_real=stats.get("real_nps"),
+            )
+        )
+    return DepartmentsResponse(items=items, total_chats=total_chats)
+
+
+@router.get("/executive/agents", response_model=AgentsResponse)
+async def get_executive_agents(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Breakdown por agente no período (rating + NPS por agente)."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None)
+
+    agent_map: dict[str, list[Any]] = {}
+    for p in processed:
+        agent_map.setdefault(p.agent, []).append(p)
+
+    from application.services.report_aggregator import ReportAggregator
+    from application.services.sub_aggregators import RatingAggregator
+
+    agg = ReportAggregator()
+    rating_agg = RatingAggregator()
+    items: list[AgentRow] = []
+    for agent, plist in sorted(agent_map.items(), key=lambda kv: -len(kv[1])):
+        stats = agg.aggregate_statistics(plist)
+        depts = Counter(p.dept_label for p in plist)
+        main_dept = depts.most_common(1)[0][0] if depts else "N/A"
+        dist = rating_agg.aggregate_distributions(plist)
+        items.append(
+            AgentRow(
+                name=agent,
+                department=main_dept,
+                chats=stats.get("total_chats", 0),
+                total_messages=stats.get("total_msgs", 0),
+                art_avg=stats.get("avg_art"),
+                sla_pct=stats.get("sla_compliance"),
+                real_nps=stats.get("real_nps"),
+                avg_rating=stats.get("avg_rating"),
+                compliments=stats.get("compliments", 0),
+                negatives=stats.get("negatives", 0),
+                returners=stats.get("returners", 0),
+                unique_contacts=stats.get("unique_clients", 0),
+                rating_distribution={
+                    str(i): int(dist.get("rating_distribution", {}).get(str(i), 0)) for i in range(1, 6)
+                },
+                nps_score_distribution={
+                    str(i): int(dist.get("nps_distribution", {}).get(str(i), 0)) for i in range(1, 11)
+                },
+            )
+        )
+    return AgentsResponse(
+        items=items,
+        total_chats=sum(c.chats for c in items),
+    )
+
+
+@router.get("/executive/bsc", response_model=ExecutiveBSCResponse)
+async def get_executive_bsc(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    group: str = Query("Suporte Tecnico"),
+    agent_ids: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """BSC scorecard (T1/T2) para o grupo (sector) — apenas 'Suporte Tecnico' tem config."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, group)
+
+    from application.services.report_aggregator import ReportAggregator
+
+    agg = ReportAggregator()
+    dto = agg.aggregate_dashboard(processed, title=f"BSC {group}", start_date=s, end_date=e)
+    return ExecutiveBSCResponse(
+        group=group,
+        header=dto.bsc_header or [],
+        data_t1=dto.bsc_data_t1 or [],
+        data_t2=dto.bsc_data_t2 or [],
+        kpi_config=dto.bsc_kpi_config,
+        total_chats=len(processed),
+    )
+
+
+@router.get("/executive/meta", response_model=ExecutiveMeta)
+async def get_executive_meta(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    group: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Metadata for current executive view: period, total counts, filters."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, group)
+    return ExecutiveMeta(
+        start_date=s,
+        end_date=e,
+        granularity=granularity,
+        agent_ids=sorted(aid),
+        group=group,
+        total_chats=len(processed),
+        total_messages=sum(p.msg_count for p in processed),
+    )

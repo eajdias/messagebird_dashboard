@@ -25,6 +25,11 @@ class PostgresSyncConnection:
         async with self._pool.acquire() as conn:
             return await conn.fetch(query, *params)
 
+    async def execute_raw(self, query: str):
+        """Execute raw SQL — no prepared statements, no parameter type issues."""
+        async with self._pool.acquire() as conn:
+            return await conn.execute(query)
+
     async def execute_many(self, query: str, params_list: list[tuple]):
         if not params_list:
             return
