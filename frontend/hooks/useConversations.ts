@@ -56,19 +56,7 @@ export function useConversations(filters?: ConversationFilters) {
         error: err instanceof Error ? err.message : "Erro ao carregar conversas",
       }));
     }
-  }, [
-    filters?.start_date,
-    filters?.end_date,
-    filters?.department,
-    filters?.agent,
-    filters?.channel,
-    filters?.status,
-    filters?.search,
-    filters?.page,
-    filters?.per_page,
-    filters?.sort_by,
-    filters?.sort_order,
-  ]);
+  }, [filters]);
 
   useEffect(() => {
     fetchData();
@@ -79,12 +67,11 @@ export function useConversations(filters?: ConversationFilters) {
 
 export function useConversation(id: string | null) {
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
     api
       .get<ConversationDetail>(`/api/v1/conversations/${id}`)
       .then((res) => {
@@ -102,12 +89,11 @@ export function useConversation(id: string | null) {
 
 export function useConversationMessages(id: string | null) {
   const [state, setState] = useState<ConversationMessagesResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
     api
       .get<ConversationMessagesResponse>(
         `/api/v1/conversations/${id}/messages`

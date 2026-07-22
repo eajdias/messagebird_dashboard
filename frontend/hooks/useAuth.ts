@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import api from "@/lib/api";
 import type { TokenResponse, UserResponse } from "@/types";
 
@@ -10,24 +10,21 @@ interface AuthState {
   loading: boolean;
 }
 
+function getInitialAuthState(): AuthState {
+  if (typeof window === "undefined") {
+    return { user: null, token: null, loading: false };
+  }
+  const token = localStorage.getItem("token");
+  const email = localStorage.getItem("user_email");
+  const role = localStorage.getItem("user_role");
+  if (token && email && role) {
+    return { user: { email, role }, token, loading: false };
+  }
+  return { user: null, token: null, loading: false };
+}
+
 export function useAuth() {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    token: null,
-    loading: true,
-  });
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const email = localStorage.getItem("user_email");
-    const role = localStorage.getItem("user_role");
-
-    if (token && email && role) {
-      setState({ user: { email, role }, token, loading: false });
-    } else {
-      setState((prev) => ({ ...prev, loading: false }));
-    }
-  }, []);
+  const [state, setState] = useState<AuthState>(getInitialAuthState);
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.post<TokenResponse>("/api/v1/auth/login", {
