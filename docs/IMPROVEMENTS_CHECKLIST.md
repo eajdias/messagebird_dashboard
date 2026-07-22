@@ -49,6 +49,18 @@
 - [x] Route-level error.tsx para dashboard
 - [x] TypeScript target ES2017 → ES2022 (menor output)
 
+### 23. Responsive Improvements
+**Esforço:** Médio | **Impacto:** Alto
+
+- [x] Mobile sidebar drawer com animação slide-in (framer-motion spring)
+- [x] Backdrop overlay ao abrir menu mobile
+- [x] Hamburger button no topbar (visível apenas em lg:hidden)
+- [x] Fechar menu ao navegar
+- [x] Tabela de conversas com overflow-x-auto (scroll horizontal)
+- [x] Search bar responsiva (texto menor em md, full em lg)
+- [x] Padding responsivo no header (px-4 md:px-6)
+- [x] Touch targets 44px+ nos itens de navegação mobile
+
 ---
 
 ## Média Prioridade
@@ -153,7 +165,7 @@
 
 | Prioridade | Total | ✅ Concluído | 🔄 Em andamento | ⏳ Pendente |
 |------------|-------|--------------|------------------|-------------|
-| Alta | 4 itens | 2 | 0 | 2 |
+| Alta | 5 itens | 3 | 0 | 2 |
 | Média | 5 itens | 5 | 0 | 0 |
 | Baixa | 4 itens | 2 | 0 | 2 |
-| **Total** | **13 itens** | **9** | **0** | **4** |
+| **Total** | **14 itens** | **10** | **0** | **4** |

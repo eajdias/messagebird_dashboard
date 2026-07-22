@@ -263,7 +263,7 @@ export default function ConversationsPage() {
         <p className="text-destructive">{error}</p>
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
