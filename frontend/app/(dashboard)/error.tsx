@@ -11,7 +11,7 @@ interface ErrorPageProps {
 export default function DashboardError({ error, reset }: ErrorPageProps) {
   return (
     <div className="flex min-h-[50vh] items-center justify-center p-6">
-      <Card className="w-full max-w-md">
+      <Card variant="glass" className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-destructive">Erro inesperado</CardTitle>
         </CardHeader>

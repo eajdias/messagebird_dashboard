@@ -37,7 +37,7 @@ export default function AgentsPage() {
       <h1 className="text-2xl font-bold">Agentes & Departamentos</h1>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
+        <Card variant="glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Users className="h-4 w-4" />
@@ -68,7 +68,7 @@ export default function AgentsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card variant="glass">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Building2 className="h-4 w-4" />

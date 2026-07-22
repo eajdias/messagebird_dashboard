@@ -29,7 +29,7 @@ export function ConversationDetailClient({
       ) : error ? (
         <p className="text-destructive">{error}</p>
       ) : (
-        <Card>
+        <Card variant="glass">
           <CardHeader>
             <CardTitle className="text-base">
               Mensagens ({total ?? 0})
@@ -43,10 +43,10 @@ export function ConversationDetailClient({
                   className={`flex ${m.direction === "outbound" ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                    className={`max-w-[70%] rounded-lg border border-white/10 px-4 py-2 backdrop-blur-sm ${
                       m.direction === "outbound"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
+                        ? "bg-primary/80 text-primary-foreground shadow-lg"
+                        : "bg-white/10 text-foreground"
                     }`}
                   >
                     <p className="text-sm">{m.content || "(sem conteúdo)"}</p>

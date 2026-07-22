@@ -50,7 +50,7 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Relatórios</h1>
 
-      <Card>
+      <Card variant="glass">
         <CardHeader>
           <CardTitle className="text-base">Gerar Relatório</CardTitle>
         </CardHeader>
@@ -61,7 +61,7 @@ export default function ReportsPage() {
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as "monthly" | "annual")}
-                className="h-9 rounded-md border bg-transparent px-3 text-sm"
+                className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
               >
                 <option value="monthly">Mensal</option>
                 <option value="annual">Anual</option>
@@ -102,7 +102,7 @@ export default function ReportsPage() {
       </Card>
 
       {reports.length > 0 && (
-        <Card>
+        <Card variant="glass">
           <CardHeader>
             <CardTitle className="text-base">Relatórios Disponíveis</CardTitle>
           </CardHeader>

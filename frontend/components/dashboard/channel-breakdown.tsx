@@ -1,14 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import type { ChannelItem } from "@/types";
 
 interface ChannelBreakdownProps {
@@ -16,38 +9,46 @@ interface ChannelBreakdownProps {
 }
 
 export function ChannelBreakdown({ channels }: ChannelBreakdownProps) {
+  if (channels.length === 0) {
+    return (
+      <Card variant="glass">
+        <CardHeader>
+          <CardTitle className="text-base">Por Canal</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Sem dados disponíveis</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <CardTitle className="text-base">Por Canal</CardTitle>
       </CardHeader>
       <CardContent>
-        {channels.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem dados disponíveis</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Canal</TableHead>
-                <TableHead className="text-right">Conversas</TableHead>
-                <TableHead className="text-right">Msgs</TableHead>
-                <TableHead className="text-right">NPS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {channels.map((c) => (
-                <TableRow key={c.channel_id}>
-                  <TableCell className="font-medium">{c.channel_name}</TableCell>
-                  <TableCell className="text-right">{c.total_conversations}</TableCell>
-                  <TableCell className="text-right">{c.total_messages}</TableCell>
-                  <TableCell className="text-right">
-                    {c.nps_score != null ? c.nps_score.toFixed(1) : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        <div className="space-y-3">
+          {channels.map((c) => (
+            <div
+              key={c.channel_id}
+              className="flex items-center justify-between rounded-lg border border-white/5 bg-white/5 p-3"
+            >
+              <div>
+                <div className="text-sm font-medium">{c.channel_name}</div>
+                <div className="text-xs text-muted-foreground">{c.total_messages} mensagens</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{c.total_conversations}</Badge>
+                {c.nps_score != null && (
+                  <Badge variant={c.nps_score >= 50 ? "success" : c.nps_score >= 0 ? "warning" : "destructive"}>
+                    {c.nps_score.toFixed(0)}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </CardContent>
     </Card>
   );

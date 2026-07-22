@@ -42,7 +42,8 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="relative flex h-screen overflow-hidden">
+      <div className="animated-bg pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar />

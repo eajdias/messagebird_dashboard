@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 function ChartSkeleton() {
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <Skeleton className="h-5 w-32" />
       </CardHeader>
@@ -16,7 +16,7 @@ function ChartSkeleton() {
 
 function TableSkeleton({ rows }: { rows: number }) {
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <Skeleton className="h-5 w-40" />
       </CardHeader>
@@ -38,7 +38,7 @@ export default function DashboardLoading() {
       <Skeleton className="h-8 w-36" />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
+          <Card key={i} variant="glass">
             <CardHeader className="pb-2">
               <Skeleton className="h-4 w-24" />
             </CardHeader>

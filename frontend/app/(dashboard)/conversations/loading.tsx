@@ -5,7 +5,7 @@ export default function ConversationsLoading() {
   return (
     <div className="space-y-6 p-6">
       <Skeleton className="h-8 w-48" />
-      <Card>
+      <Card variant="glass">
         <CardHeader>
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-32" />

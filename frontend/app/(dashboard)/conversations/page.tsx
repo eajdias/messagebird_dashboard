@@ -175,7 +175,7 @@ export default function ConversationsPage() {
         <select
           value={department}
           onChange={(e) => { setDepartment(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
         >
           <option value="">Dept: Todos</option>
           <option value="Suporte">Suporte</option>
@@ -186,7 +186,7 @@ export default function ConversationsPage() {
         <select
           value={channel}
           onChange={(e) => { setChannel(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
         >
           <option value="">Canal: Todos</option>
           <option value="WhatsApp">WhatsApp</option>
@@ -199,7 +199,7 @@ export default function ConversationsPage() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border bg-transparent px-3 text-sm"
+          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
         >
           <option value="">Status: Todos</option>
           <option value="active">Ativo</option>
@@ -215,7 +215,7 @@ export default function ConversationsPage() {
           {columnMenuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setColumnMenuOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-md border bg-popover p-2 shadow-md">
+              <div className="glass-card absolute right-0 top-full z-20 mt-1 w-44 rounded-md p-2 shadow-2xl">
                 <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">Colunas visíveis</p>
                 {columns.map((col) => (
                   <label key={col.key} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent cursor-pointer">
@@ -237,7 +237,7 @@ export default function ConversationsPage() {
           <select
             value={pageSize}
             onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-            className="h-9 rounded-md border bg-transparent px-2 text-sm"
+            className="h-9 rounded-md border border-white/10 bg-white/5 px-2 text-sm backdrop-blur-sm"
           >
             {PAGE_SIZES.map((s) => (
               <option key={s} value={s}>{s}/pág</option>
@@ -266,7 +266,7 @@ export default function ConversationsPage() {
         <p className="text-destructive">{error}</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-md border">
+          <div className="glass-card overflow-x-auto rounded-xl">
             <Table>
               <TableHeader>
                 <TableRow>

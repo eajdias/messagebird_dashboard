@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import type { AgentRankingItem } from "@/types";
 
 interface AgentRankingProps {
@@ -17,7 +18,7 @@ interface AgentRankingProps {
 
 export function AgentRanking({ agents }: AgentRankingProps) {
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <CardTitle className="text-base">Ranking de Agentes</CardTitle>
       </CardHeader>
@@ -52,7 +53,13 @@ export function AgentRanking({ agents }: AgentRankingProps) {
                     <TableCell className="text-right">{a.total_chats}</TableCell>
                     <TableCell className="text-right">{a.total_messages}</TableCell>
                     <TableCell className="text-right">
-                      {a.nps_score != null ? a.nps_score.toFixed(1) : "—"}
+                      {a.nps_score != null ? (
+                        <Badge variant={a.nps_score >= 50 ? "success" : a.nps_score >= 0 ? "warning" : "destructive"}>
+                          {a.nps_score.toFixed(1)}
+                        </Badge>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       {a.art_avg_minutes != null ? a.art_avg_minutes.toFixed(1) : "—"}

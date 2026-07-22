@@ -12,7 +12,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center py-16 text-center", className)}>
+    <div className={cn("glass-card flex flex-col items-center justify-center rounded-xl py-16 text-center", className)}>
       <div className="mb-4 text-muted-foreground/40">
         {icon ?? <Inbox className="h-16 w-16" />}
       </div>

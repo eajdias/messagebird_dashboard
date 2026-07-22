@@ -9,17 +9,45 @@ interface BSCTableProps {
   data_t2: (string | number | null)[][];
 }
 
+function npsVariant(value: number): "success" | "warning" | "destructive" | "secondary" {
+  if (value >= 75) return "success";
+  if (value >= 50) return "success";
+  if (value >= 0) return "warning";
+  return "destructive";
+}
+
+function formatCell(value: string | number | null): React.ReactNode {
+  if (value == null) return "";
+  if (typeof value === "number") {
+    return value.toFixed(1);
+  }
+  return value;
+}
+
+function isNpsCell(value: string | number | null): boolean {
+  if (typeof value !== "number") return false;
+  return value >= -100 && value <= 100;
+}
+
+function RenderCell({ value }: { value: string | number | null }) {
+  if (value == null) return null;
+  if (isNpsCell(value)) {
+    return <Badge variant={npsVariant(value as number)}>{formatCell(value)}</Badge>;
+  }
+  return <>{formatCell(value)}</>;
+}
+
 export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
   const hasData = header.length > 0 && (data_t1.length > 0 || data_t2.length > 0);
 
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">BSC - Balanced Scorecard</CardTitle>
           <div className="flex gap-2">
-            <Badge variant="success">T1</Badge>
-            <Badge variant="warning">T2</Badge>
+            <Badge variant="success" className="glow-sm [--glow-color:var(--chart-2)]">T1</Badge>
+            <Badge variant="warning" className="glow-sm [--glow-color:var(--chart-3)]">T2</Badge>
           </div>
         </div>
       </CardHeader>
@@ -32,7 +60,7 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b">
+                    <tr className="border-b border-white/5">
                       {header.map((h, i) => (
                         <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">
                           {h}
@@ -42,10 +70,10 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
                   </thead>
                   <tbody>
                     {data_t1.map((row, ri) => (
-                      <tr key={ri} className="border-b">
+                      <tr key={ri} className="border-b border-white/5 transition-colors hover:bg-white/5">
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2">
-                            {cell ?? ""}
+                            <RenderCell value={cell} />
                           </td>
                         ))}
                       </tr>
@@ -59,7 +87,7 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
                 <h4 className="mb-2 text-sm font-medium text-muted-foreground">T2</h4>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b">
+                    <tr className="border-b border-white/5">
                       {header.map((h, i) => (
                         <th key={i} className="px-3 py-2 text-left font-medium text-muted-foreground">
                           {h}
@@ -69,10 +97,10 @@ export function BSCTable({ header, data_t1, data_t2 }: BSCTableProps) {
                   </thead>
                   <tbody>
                     {data_t2.map((row, ri) => (
-                      <tr key={ri} className="border-b">
+                      <tr key={ri} className="border-b border-white/5 transition-colors hover:bg-white/5">
                         {row.map((cell, ci) => (
                           <td key={ci} className="px-3 py-2">
-                            {cell ?? ""}
+                            <RenderCell value={cell} />
                           </td>
                         ))}
                       </tr>

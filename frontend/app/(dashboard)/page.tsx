@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
+import { MessageSquare, Users, Clock, MessagesSquare, TrendingUp, Building2 } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const EvolutionChart = dynamic(
   () => import("@/components/dashboard/evolution-chart").then((m) => ({ default: m.EvolutionChart })),
@@ -31,11 +33,26 @@ const BSCTable = dynamic(
   { loading: () => <TableSkeleton rows={4} /> }
 );
 
+const NPSGauge = dynamic(
+  () => import("@/components/dashboard/nps-gauge").then((m) => ({ default: m.NPSGauge })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const ChannelChart = dynamic(
+  () => import("@/components/dashboard/channel-chart").then((m) => ({ default: m.ChannelChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const AgentRadar = dynamic(
+  () => import("@/components/dashboard/agent-radar").then((m) => ({ default: m.AgentRadar })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
 function KPIGridSkeleton() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i}>
+        <Card key={i} variant="glass">
           <CardHeader className="pb-2">
             <Skeleton className="h-4 w-24" />
           </CardHeader>
@@ -51,7 +68,7 @@ function KPIGridSkeleton() {
 
 function ChartSkeleton() {
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <Skeleton className="h-5 w-32" />
       </CardHeader>
@@ -64,7 +81,7 @@ function ChartSkeleton() {
 
 function TableSkeleton({ rows }: { rows: number }) {
   return (
-    <Card>
+    <Card variant="glass">
       <CardHeader>
         <Skeleton className="h-5 w-40" />
       </CardHeader>
@@ -120,15 +137,17 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold">Dashboard</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:bento-grid">
-        <KPICard
-          title="NPS"
-          value={summary?.nps_score != null ? summary.nps_score.toFixed(1) : "—"}
-          subtitle={summary?.nps_score != null ? (summary.nps_score >= 50 ? "Excelente" : summary.nps_score >= 0 ? "Neutro" : "Negativo") : undefined}
-          trend={summary?.nps_score != null ? (summary.nps_score >= 50 ? "up" : summary.nps_score >= 0 ? "neutral" : "down") : undefined}
-          className="bento-nps bg-gradient-to-br from-primary/5 to-primary/10 ring-1 ring-primary/20"
-          sparklineData={evolution?.evolution?.map((e) => ({ value: e.nps_score ?? 0 }))}
-          sparklineColor="var(--chart-1)"
-        />
+        <motion.div
+          className={cn("bento-nps")}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05, ease: "easeOut" }}
+        >
+          <Suspense fallback={<ChartSkeleton />}>
+            <NPSGauge value={summary?.nps_score ?? null} className="h-full" />
+          </Suspense>
+        </motion.div>
+
         <KPICard
           title="Conversas"
           value={summary?.total_conversations ?? 0}
@@ -136,6 +155,9 @@ export default function DashboardPage() {
           className="bento-conv"
           sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
           sparklineColor="var(--chart-2)"
+          icon={MessageSquare}
+          accentColor="success"
+          index={1}
         />
         <KPICard
           title="ART (min)"
@@ -144,6 +166,9 @@ export default function DashboardPage() {
           className="bento-art"
           sparklineData={evolution?.evolution?.map((e) => ({ value: e.art_avg_minutes ?? 0 }))}
           sparklineColor="var(--chart-3)"
+          icon={Clock}
+          accentColor="warning"
+          index={2}
         />
         <KPICard
           title="Mensagens"
@@ -152,46 +177,79 @@ export default function DashboardPage() {
           className="bento-msg"
           sparklineData={evolution?.evolution?.map((e) => ({ value: e.total_conversations }))}
           sparklineColor="var(--chart-4)"
+          icon={MessagesSquare}
+          accentColor="purple"
+          index={3}
         />
+
         <motion.div
           className="bento-chart"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+          transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
         >
           <Suspense fallback={<ChartSkeleton />}>
             <EvolutionChart data={evolution?.evolution ?? []} />
           </Suspense>
         </motion.div>
+
         <motion.div
           className="bento-chan"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
+          transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
         >
-          <Suspense fallback={<TableSkeleton rows={3} />}>
-            <ChannelBreakdown channels={channels?.channels ?? []} />
+          <Suspense fallback={<ChartSkeleton />}>
+            <ChannelChart channels={channels?.channels ?? []} />
           </Suspense>
         </motion.div>
+
         <motion.div
           className="bento-agents"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+          transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
         >
-          <Suspense fallback={<TableSkeleton rows={5} />}>
-            <AgentRanking agents={agents?.agents ?? []} />
+          <Suspense fallback={<ChartSkeleton />}>
+            <AgentRadar agents={agents?.agents ?? []} />
           </Suspense>
         </motion.div>
+
         {bsc && (bsc.data_t1.length > 0 || bsc.data_t2.length > 0) && (
           <motion.div
             className="bento-bsc"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
+            transition={{ duration: 0.4, delay: 0.55, ease: "easeOut" }}
           >
             <Suspense fallback={<TableSkeleton rows={4} />}>
               <BSCTable header={bsc.header} data_t1={bsc.data_t1} data_t2={bsc.data_t2} />
+            </Suspense>
+          </motion.div>
+        )}
+
+        {(agents?.agents?.length ?? 0) > 0 && (
+          <motion.div
+            className="sm:col-span-2 lg:col-span-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
+          >
+            <Suspense fallback={<TableSkeleton rows={5} />}>
+              <AgentRanking agents={agents?.agents ?? []} />
+            </Suspense>
+          </motion.div>
+        )}
+
+        {(channels?.channels?.length ?? 0) > 0 && (
+          <motion.div
+            className="sm:col-span-2 lg:col-span-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.65, ease: "easeOut" }}
+          >
+            <Suspense fallback={<TableSkeleton rows={3} />}>
+              <ChannelBreakdown channels={channels?.channels ?? []} />
             </Suspense>
           </motion.div>
         )}
