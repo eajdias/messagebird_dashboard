@@ -2,18 +2,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { NPSBadge } from "@/components/ui/metric-badge";
+import { formatMetric } from "@/lib/utils";
 
 interface BSCTableProps {
   header: string[];
   data_t1: (string | number | null)[][];
   data_t2: (string | number | null)[][];
-}
-
-function npsVariant(value: number): "success" | "warning" | "destructive" | "secondary" {
-  if (value >= 75) return "success";
-  if (value >= 50) return "success";
-  if (value >= 0) return "warning";
-  return "destructive";
 }
 
 function formatCell(value: string | number | null): React.ReactNode {
@@ -34,7 +29,7 @@ function isNpsCell(value: string | number | null): boolean {
 function RenderCell({ value }: { value: string | number | null }) {
   if (value == null) return null;
   if (isNpsCell(value)) {
-    return <Badge variant={npsVariant(value as number)}>{formatCell(value)}</Badge>;
+    return <NPSBadge value={value as number} />;
   }
   return <>{formatCell(value)}</>;
 }

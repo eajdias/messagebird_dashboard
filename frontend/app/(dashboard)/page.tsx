@@ -8,6 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import api from "@/lib/api";
+import { ymd } from "@/lib/utils";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useBscScorecard } from "@/hooks/useBscScorecard";
@@ -37,10 +38,6 @@ const GRANULARITY_OPTIONS: { value: EvolutionGranularity; label: string }[] = [
 ];
 
 const DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
-
-function ymd(d: Date): string {
-  return d.toISOString().split("T")[0];
-}
 
 // ── Dynamic imports ────────────────────────────────────────────────────────
 

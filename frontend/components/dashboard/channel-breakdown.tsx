@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { NPSBadge } from "@/components/ui/metric-badge";
 import type { ChannelItem } from "@/types";
 
 interface ChannelBreakdownProps {
@@ -41,9 +42,7 @@ export function ChannelBreakdown({ channels }: ChannelBreakdownProps) {
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{c.total_conversations}</Badge>
                 {c.nps_score != null && Number.isFinite(c.nps_score) && (
-                  <Badge variant={c.nps_score >= 50 ? "success" : c.nps_score >= 0 ? "warning" : "destructive"}>
-                    {c.nps_score.toFixed(0)}
-                  </Badge>
+                  <NPSBadge value={c.nps_score} />
                 )}
               </div>
             </div>

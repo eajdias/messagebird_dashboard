@@ -250,10 +250,24 @@ CONVERSATION_LIST_QUERY = """
         ct.cnts_name,
         ct.cnts_phone,
         a.agnt_name,
-        a.agnt_grp
+        a.agnt_grp,
+        ROUND(
+            COALESCE(
+                EXTRACT(EPOCH FROM (first_resp.sent_at - c.cnvs_created)) / 60.0,
+                0
+            )::numeric,
+            1
+        ) AS cnvs_art_minutes
     FROM conversations c
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    LEFT JOIN LATERAL (
+        SELECT MIN(m.msgs_created) AS sent_at
+        FROM messages m
+        WHERE m.msgs_cnvs = c.cnvs_id
+          AND m.msgs_direction = 'sent'
+          AND m.msgs_agnt IS NOT NULL
+    ) first_resp ON true
     WHERE 1=1
 """
 
@@ -279,6 +293,9 @@ CONVERSATION_DETAIL_QUERY = """
         c.cnvs_reopened_count,
         c.cnvs_channel,
         c.cnvs_description,
+        c.cnvs_bird,
+        c.cnvs_tax_id,
+        c.cnvs_software,
         ct.cnts_id,
         ct.cnts_name,
         ct.cnts_phone,

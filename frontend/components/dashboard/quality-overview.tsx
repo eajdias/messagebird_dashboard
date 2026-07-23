@@ -2,7 +2,7 @@
 
 import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, safeNum } from "@/lib/utils";
 import type { NPSBreakdown, QualityDistribution } from "@/types";
 
 interface QualityOverviewProps {
@@ -32,15 +32,6 @@ const NPS_BREAKDOWN_COLORS = {
   neutrals: "var(--chart-3)",
   detractors: "var(--destructive)",
 };
-
-function safeNum(v: unknown, fallback = 0): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  if (typeof v === "string") {
-    const n = Number(v);
-    if (Number.isFinite(n)) return n;
-  }
-  return fallback;
-}
 
 function formatValue(v: unknown): string {
   return safeNum(v).toFixed(1);

@@ -115,3 +115,19 @@ export function useConversationMessages(id: string | null) {
 
   return { ...state, loading, error };
 }
+
+export async function downloadConversationPdf(conversationId: string) {
+  const response = await api.get(
+    `/api/v1/conversations/${conversationId}/pdf`,
+    { responseType: "blob" },
+  );
+  const disposition: string = response.headers["content-disposition"] || "";
+  const match = disposition.match(/filename="?([^";\n]+)"?/);
+  const filename = match ? match[1] : `OS_${conversationId}.pdf`;
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}

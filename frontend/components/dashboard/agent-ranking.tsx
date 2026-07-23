@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { NPSBadge } from "@/components/ui/metric-badge";
 import type { AgentRankingItem } from "@/types";
 
 interface AgentRankingProps {
@@ -53,13 +54,7 @@ export function AgentRanking({ agents }: AgentRankingProps) {
                     <TableCell className="text-right">{a.total_chats}</TableCell>
                     <TableCell className="text-right">{a.total_messages}</TableCell>
                     <TableCell className="text-right">
-                      {a.nps_score != null && Number.isFinite(a.nps_score) ? (
-                        <Badge variant={a.nps_score >= 50 ? "success" : a.nps_score >= 0 ? "warning" : "destructive"}>
-                          {a.nps_score.toFixed(1)}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
+                      <NPSBadge value={a.nps_score} />
                     </TableCell>
                     <TableCell className="text-right">
                       {a.art_avg_minutes != null && Number.isFinite(a.art_avg_minutes)

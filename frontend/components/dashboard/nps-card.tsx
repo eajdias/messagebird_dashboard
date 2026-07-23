@@ -1,16 +1,12 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { safeNum } from "@/lib/utils";
 import type { NPSBreakdown } from "@/types";
 
 interface NPSCardProps {
   breakdown: NPSBreakdown | null;
   className?: string;
-}
-
-function safeNum(v: unknown, fallback = 0): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  return fallback;
 }
 
 export function NPSCard({ breakdown, className }: NPSCardProps) {

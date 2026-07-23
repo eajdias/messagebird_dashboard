@@ -29,6 +29,7 @@
     "recharts": "3.9.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.0",
+    "xlsx": "^0.18.5",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
+    "@types/xlsx": "^0.0.35",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.2.10",
     "postcss": "^8.5.0",

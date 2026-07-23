@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from api.auth import get_current_user
 from api.dependencies import get_repository
@@ -45,6 +47,7 @@ def _row_to_item(r: dict[str, Any]) -> ConversationItem:
         nps=float(r["cnvs_rating_nps"]) if r.get("cnvs_rating_nps") is not None else None,
         msg_count=r.get("cnvs_msgcount") or 0,
         reopened_count=r.get("cnvs_reopened_count") or 0,
+        art_minutes=float(r["cnvs_art_minutes"]) if r.get("cnvs_art_minutes") is not None else None,
     )
 
 
@@ -184,4 +187,35 @@ async def get_conversation_messages(
         conversation_id=str(conversation_id),
         messages=messages,
         total=len(messages),
+    )
+
+
+# ── GET /conversations/{conversation_id}/pdf ──────────────────────────
+
+
+@router.get("/{conversation_id}/pdf")
+async def download_conversation_pdf(
+    conversation_id: int,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Download a PDF report for a single conversation (OS audit)."""
+    detail = await repo.get_conversation_detail(conversation_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    raw_msgs = await repo.fetch_messages_by_conversation(conversation_id)
+
+    from infrastructure.exporters.pdf_exporter import PDFExporter
+
+    exporter = PDFExporter()
+    pdf_bytes = exporter.generate_single_os_pdf_bytes(detail, raw_msgs)
+
+    protocol = detail.get("cnvs_bird") or str(conversation_id)
+    filename = f"OS_{protocol}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

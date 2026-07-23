@@ -5,6 +5,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function safeNum(v: unknown, fallback = 0): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+export function formatMetric(value: number | null | undefined, decimals = 1, suffix = ""): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(decimals)}${suffix}`;
+}
+
+export function ymd(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
 export function downloadCsv<T extends Record<string, unknown>>(
   rows: T[],
   columns: { key: keyof T; label: string; format?: (val: T[keyof T]) => string }[],

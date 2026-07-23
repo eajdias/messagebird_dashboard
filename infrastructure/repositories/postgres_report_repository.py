@@ -323,6 +323,7 @@ class PostgresReportRepository(ReportRepository):
             "updated_at": "cnvs_updated",
             "status": "cnvs_status",
             "rating": "cnvs_rating_agent",
+            "art_minutes": "cnvs_art_minutes",
         }
         sort_col = allowed_sort.get(sort_by, "cnvs_created")
         order = "DESC" if sort_order.lower() == "desc" else "ASC"

@@ -2,15 +2,19 @@
 
 import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { useConversations } from "@/hooks/useConversations";
+import { useConversations, downloadConversationPdf } from "@/hooks/useConversations";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Search, ChevronLeft, ChevronRight, Download, Columns3, ChevronDown, Eye, Archive, ArrowUpDown, ArrowUp, ArrowDown, Inbox } from "lucide-react";
-import { downloadCsv, cn } from "@/lib/utils";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SortIcon } from "@/components/ui/sort-icon";
+import { NPSBadge, RatingBadge, ArtBadge } from "@/components/ui/metric-badge";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
+import { Search, ChevronLeft, ChevronRight, Download, Columns3, ChevronDown, Eye, Archive, FileText, Inbox } from "lucide-react";
+import { downloadCsv, cn, ymd } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ConversationItem } from "@/types";
 
@@ -23,28 +27,59 @@ interface ColumnDef {
   render: (conv: ConversationItem) => React.ReactNode;
 }
 
+const START_DATE = ymd(new Date(Date.now() - 29 * 864e5));
+
+const ALL_COLUMNS: ColumnDef[] = [
+  { key: "contact", label: "Contato", sortable: true, render: (c) => (
+    <div>
+      <Link href={`/conversations/${c.id}`} className="font-medium hover:underline">
+        {c.contact || "Desconhecido"}
+      </Link>
+      <div className="text-xs text-muted-foreground">{c.phone}</div>
+    </div>
+  )},
+  { key: "agent", label: "Agente", sortable: true, render: (c) => <span>{c.agent || "—"}</span> },
+  { key: "department", label: "Departamento", sortable: false, render: (c) => <span>{c.department || "—"}</span> },
+  { key: "msg_count", label: "Msgs", sortable: true, render: (c) => <span className="text-right tabular-nums">{c.msg_count}</span> },
+  { key: "rating", label: "Nota (Agente)", sortable: true, render: (c) => <div className="text-right"><RatingBadge value={c.rating} /></div> },
+  { key: "nps", label: "NPS", sortable: true, render: (c) => <div className="text-right"><NPSBadge value={c.nps} /></div> },
+  { key: "art_minutes", label: "ART (min)", sortable: true, render: (c) => <div className="text-right"><ArtBadge value={c.art_minutes} /></div> },
+  { key: "reopened_count", label: "Retorno (mês)", sortable: true, render: (c) => (
+    <span className="text-right tabular-nums">{c.reopened_count > 0 ? c.reopened_count : "—"}</span>
+  )},
+  { key: "start_time", label: "Data", sortable: true, render: (c) => (
+    <span className="text-xs text-muted-foreground">
+      {c.start_time ? new Date(c.start_time).toLocaleDateString("pt-BR") : "—"}
+    </span>
+  )},
+];
+
+const DEFAULT_VISIBLE = new Set(["contact", "agent", "department", "msg_count", "rating", "nps", "art_minutes", "reopened_count", "start_time"]);
+
 export default function ConversationsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("");
+  const [selectedDept, setSelectedDept] = useState("");
   const [channel, setChannel] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [startDate, setStartDate] = useState(START_DATE);
+  const [endDate, setEndDate] = useState(ymd(new Date()));
   const [sortBy, setSortBy] = useState<string>("start_time");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
-  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
-    new Set(["contact", "agent", "channel", "status", "msg_count", "nps", "art_minutes", "start_time"])
-  );
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(DEFAULT_VISIBLE);
 
   const { data, loading, error, refetch } = useConversations({
     page,
     per_page: pageSize,
     search: search || undefined,
-    department: department || undefined,
+    department: selectedDept || undefined,
     channel: channel || undefined,
     status: statusFilter || undefined,
+    start_date: startDate,
+    end_date: endDate,
     sort_by: sortBy,
     sort_order: sortOrder,
   });
@@ -95,45 +130,6 @@ export default function ConversationsPage() {
     setSelectedIds(new Set());
   }, [selectedIds]);
 
-  function npsBadge(nps: number | null) {
-    if (nps == null) return <span className="text-muted-foreground">—</span>;
-    const variant = nps >= 50 ? "success" : nps >= 0 ? "warning" : "destructive";
-    return <Badge variant={variant}>{nps.toFixed(0)}</Badge>;
-  }
-
-  function SortIcon({ column }: { column: string }) {
-    if (sortBy !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-40" />;
-    return sortOrder === "asc" ? <ArrowUp className="ml-1 h-3 w-3" /> : <ArrowDown className="ml-1 h-3 w-3" />;
-  }
-
-  const columns: ColumnDef[] = useMemo(() => [
-    { key: "contact", label: "Contato", sortable: true, render: (c) => (
-      <div>
-        <Link href={`/conversations/${c.id}`} className="font-medium hover:underline">
-          {c.contact || "Desconhecido"}
-        </Link>
-        <div className="text-xs text-muted-foreground">{c.phone}</div>
-      </div>
-    )},
-    { key: "agent", label: "Agente", sortable: true, render: (c) => <span>{c.agent || "—"}</span> },
-    { key: "channel", label: "Canal", sortable: true, render: (c) => <span>{c.channel || "—"}</span> },
-    { key: "status", label: "Status", sortable: true, render: (c) => (
-      <Badge variant={c.status === "active" ? "success" : "secondary"}>
-        {c.status === "active" ? "Ativo" : "Arquivado"}
-      </Badge>
-    )},
-    { key: "msg_count", label: "Msgs", sortable: true, render: (c) => <span className="text-right tabular-nums">{c.msg_count}</span> },
-    { key: "nps", label: "NPS", sortable: true, render: (c) => <div className="text-right">{npsBadge(c.nps)}</div> },
-    { key: "art_minutes", label: "ART (min)", sortable: true, render: (c) => (
-      <span className="text-right tabular-nums">{c.art_minutes != null ? c.art_minutes.toFixed(1) : "—"}</span>
-    )},
-    { key: "start_time", label: "Data", sortable: true, render: (c) => (
-      <span className="text-xs text-muted-foreground">
-        {c.start_time ? new Date(c.start_time).toLocaleDateString("pt-BR") : "—"}
-      </span>
-    )},
-  ], []);
-
   function handleExportCsv() {
     if (!data?.conversations.length) return;
     downloadCsv(
@@ -142,17 +138,51 @@ export default function ConversationsPage() {
         { key: "contact", label: "Contato" },
         { key: "phone", label: "Telefone" },
         { key: "agent", label: "Agente" },
-        { key: "channel", label: "Canal" },
-        { key: "status", label: "Status" },
+        { key: "department", label: "Departamento" },
         { key: "msg_count", label: "Mensagens" },
+        { key: "rating", label: "Nota (Agente)", format: (v) => (v != null ? String(v) : "") },
         { key: "nps", label: "NPS", format: (v) => (v != null ? Number(v).toFixed(0) : "") },
         { key: "art_minutes", label: "ART (min)", format: (v) => (v != null ? Number(v).toFixed(1) : "") },
+        { key: "reopened_count", label: "Retorno (mês)" },
         { key: "start_time", label: "Data" },
       ],
       `conversas_${new Date().toISOString().slice(0, 10)}.csv`,
     );
     toast.success(`CSV exportado com ${data.conversations.length} conversas`);
   }
+
+  async function handleExportXlsx() {
+    if (!data?.conversations.length) return;
+    const XLSX = await import("xlsx");
+    const rows = data.conversations.map((c) => ({
+      Contato: c.contact || "",
+      Telefone: c.phone || "",
+      Agente: c.agent || "",
+      Departamento: c.department || "",
+      Mensagens: c.msg_count,
+      "Nota (Agente)": c.rating ?? "",
+      NPS: c.nps != null ? Number(c.nps).toFixed(0) : "",
+      "ART (min)": c.art_minutes != null ? Number(c.art_minutes).toFixed(1) : "",
+      "Retorno (mês)": c.reopened_count,
+      Data: c.start_time || "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Conversas");
+    XLSX.writeFile(wb, `conversas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    toast.success(`XLSX exportado com ${data.conversations.length} conversas`);
+  }
+
+  async function handleDownloadPdf(conversationId: string) {
+    try {
+      await downloadConversationPdf(conversationId);
+      toast.success("PDF baixado com sucesso");
+    } catch {
+      toast.error("Erro ao baixar PDF");
+    }
+  }
+
+  const selectCls = "h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm";
 
   return (
     <div className="space-y-4">
@@ -172,21 +202,17 @@ export default function ConversationsPage() {
           />
         </div>
 
-        <select
-          value={department}
-          onChange={(e) => { setDepartment(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
-        >
-          <option value="">Dept: Todos</option>
-          <option value="Suporte">Suporte</option>
-          <option value="Vendas">Vendas</option>
-          <option value="Financeiro">Financeiro</option>
-        </select>
+        <DepartmentMultiSelect
+          selected={selectedDept ? [selectedDept] : []}
+          onChange={(v) => { setSelectedDept(v.length > 0 ? v[0] : ""); setPage(1); }}
+        />
+
+        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); setPage(1); }} />
 
         <select
           value={channel}
           onChange={(e) => { setChannel(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
+          className={selectCls}
         >
           <option value="">Canal: Todos</option>
           <option value="WhatsApp">WhatsApp</option>
@@ -199,7 +225,7 @@ export default function ConversationsPage() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm backdrop-blur-sm"
+          className={selectCls}
         >
           <option value="">Status: Todos</option>
           <option value="active">Ativo</option>
@@ -217,7 +243,7 @@ export default function ConversationsPage() {
               <div className="fixed inset-0 z-10" onClick={() => setColumnMenuOpen(false)} />
               <div className="glass-card absolute right-0 top-full z-20 mt-1 w-44 rounded-md p-2 shadow-2xl">
                 <p className="mb-1 px-2 text-xs font-medium text-muted-foreground">Colunas visíveis</p>
-                {columns.map((col) => (
+                {ALL_COLUMNS.map((col) => (
                   <label key={col.key} className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent cursor-pointer">
                     <input
                       type="checkbox"
@@ -233,21 +259,24 @@ export default function ConversationsPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <select
-            value={pageSize}
-            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-            className="h-9 rounded-md border border-white/10 bg-white/5 px-2 text-sm backdrop-blur-sm"
-          >
-            {PAGE_SIZES.map((s) => (
-              <option key={s} value={s}>{s}/pág</option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className={selectCls}
+        >
+          {PAGE_SIZES.map((s) => (
+            <option key={s} value={s}>{s}/pág</option>
+          ))}
+        </select>
 
         <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!data?.conversations.length}>
           <Download className="mr-1 h-4 w-4" />
           CSV
+        </Button>
+
+        <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!data?.conversations.length}>
+          <Download className="mr-1 h-4 w-4" />
+          XLSX
         </Button>
 
         {selectedIds.size > 0 && (
@@ -259,9 +288,7 @@ export default function ConversationsPage() {
       </div>
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <LoadingSpinner />
       ) : error ? (
         <p className="text-destructive">{error}</p>
       ) : (
@@ -273,22 +300,22 @@ export default function ConversationsPage() {
                   <TableHead className="w-10">
                     <Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} />
                   </TableHead>
-                  {columns.filter((col) => visibleColumns.has(col.key)).map((col) => (
+                  {ALL_COLUMNS.filter((col) => visibleColumns.has(col.key)).map((col) => (
                     <TableHead
                       key={col.key}
                       className={cn(
                         "cursor-pointer select-none",
-                        col.key === "msg_count" || col.key === "nps" || col.key === "art_minutes" ? "text-right" : ""
+                        ["msg_count", "rating", "nps", "art_minutes", "reopened_count"].includes(col.key) ? "text-right" : ""
                       )}
                       onClick={() => col.sortable && handleSort(col.key)}
                     >
                       <span className="inline-flex items-center">
                         {col.label}
-                        {col.sortable && <SortIcon column={col.key} />}
+                        {col.sortable && <SortIcon column={col.key} sortBy={sortBy} sortOrder={sortOrder} />}
                       </span>
                     </TableHead>
                   ))}
-                  <TableHead className="w-12">Ações</TableHead>
+                  <TableHead className="w-16">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,13 +324,22 @@ export default function ConversationsPage() {
                     <TableCell>
                       <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                     </TableCell>
-                    {columns.filter((col) => visibleColumns.has(col.key)).map((col) => (
+                    {ALL_COLUMNS.filter((col) => visibleColumns.has(col.key)).map((col) => (
                       <TableCell key={col.key}>{col.render(c)}</TableCell>
                     ))}
                     <TableCell>
-                      <Link href={`/conversations/${c.id}`} className="text-muted-foreground hover:text-foreground">
-                        <Eye className="h-4 w-4" />
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/conversations/${c.id}`} className="text-muted-foreground hover:text-foreground">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                        <button
+                          className="text-muted-foreground hover:text-foreground"
+                          onClick={() => handleDownloadPdf(c.id)}
+                          title="Baixar PDF"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

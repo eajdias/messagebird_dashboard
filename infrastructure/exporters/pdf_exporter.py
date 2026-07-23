@@ -326,3 +326,134 @@ class PDFExporter:
                 logger.error(f"Failed to generate PDF for row {row}: {e}")
 
         logger.info(f"Generated {generated} OS PDFs in {output_dir}")
+
+    def generate_single_os_pdf_bytes(
+        self,
+        detail: dict[str, Any],
+        messages: list[dict[str, Any]],
+    ) -> bytes:
+        """Generate a single OS PDF from conversation detail and return bytes."""
+        from domain import constants, logic
+
+        agnt_name = detail.get("agnt_name") or "Não Mapeado"
+        dept = constants.resolve_dept(detail.get("cnvs_dept"))
+        contact_reason = constants.resolve_reason(detail.get("cnvs_dept"), detail.get("cnvs_contact_reason"))
+        occurrence = constants.resolve_occurrence(
+            detail.get("cnvs_dept"), detail.get("cnvs_contact_reason"), detail.get("cnvs_occurrence")
+        )
+
+        msgs = messages or []
+        effective_start = logic.get_effective_start_time(msgs, detail.get("cnvs_created"))
+        created = logic.format_local_dt(effective_start)
+        duration = logic.calculate_ticket_duration(effective_start, detail.get("cnvs_updated"))
+
+        has_reopening = (detail.get("cnvs_reopened_count") or 0) > 0
+        if not has_reopening and msgs:
+            from application.services.auditoria_os_service import _detect_reopen_by_gap
+
+            has_reopening = _detect_reopen_by_gap(msgs)
+
+        def _val(v):
+            v = str(v).strip() if v is not None else ""
+            return v if v and v.lower() not in ("none", "nan", "n/d", "") else "N/A"
+
+        row = [
+            detail.get("cnvs_bird") or str(detail["cnvs_id"]),
+            created,
+            agnt_name,
+            detail.get("cnts_name") or "Desconhecido",
+            detail.get("cnts_phone") or "",
+            detail.get("cnvs_tax_id") or "",
+            detail.get("cnvs_software") or "",
+            dept,
+            contact_reason,
+            occurrence,
+            detail["cnvs_rating_agent"] if detail.get("cnvs_rating_agent") is not None else "",
+            detail["cnvs_rating_nps"] if detail.get("cnvs_rating_nps") is not None else "",
+            "Sim" if has_reopening else "Não",
+            detail.get("cnvs_description") or "",
+            duration if duration > 0 else "N/D",
+            detail["cnvs_id"],
+        ]
+
+        pdf = _OSPDF(orientation="P", unit="mm", format="A4")
+        pdf.alias_nb_pages()
+        pdf.set_margins(15, 15, 15)
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+
+        protocolo = str(row[0])
+        pdf._protocol_header(protocolo)
+        pdf._section("Dados do Cliente")
+        pdf._row("Cliente:", _val(row[3]))
+        pdf._row("Telefone:", _val(row[4]))
+        pdf._two_cols("Documento:", _val(row[5]), "ID BD:", _val(row[15]))
+        pdf.ln(4)
+
+        pdf._section("Equipamento / Sistema")
+        sistema = _val(row[6])
+        pdf._two_cols("Sistema:", sistema, "Produto:", "N/A")
+        pdf.ln(4)
+
+        pdf._section("Detalhamento do Atendimento")
+        pdf._two_cols("Motivo:", _val(row[8]), "Ocorrência:", _val(row[9]))
+
+        desc = str(row[13])
+        if not desc.strip():
+            desc = "Sem descrição detalhada."
+        if len(desc) > 800:
+            desc = desc[:797] + "..."
+
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(*_LABEL_COLOR)
+        pdf.cell(0, 7, " Descrição relatada:", fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.multi_cell(0, 6, f"{_sanitize(desc)}", border="B", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+        reclamacao = "SIM" if row[12] == "Sim" else "NÃO"
+        rec_bg = _DANGER_BG if reclamacao == "SIM" else None
+        rec_color = _DANGER_COLOR if reclamacao == "SIM" else None
+        pdf._row("Houve Reclamação?", reclamacao, val_color=rec_color, bg_color=rec_bg)
+        pdf._row("Retornante no mês?", "N/A")
+        pdf.ln(4)
+
+        pdf._section("Métricas e Análise (GP/GQ)")
+        nps_val = _val(row[11])
+        nps_color = None
+        try:
+            nps_int = int(nps_val)
+            if nps_int >= 9:
+                nps_color = _SUCCESS_COLOR
+            elif nps_int <= 6:
+                nps_color = _DANGER_COLOR
+        except Exception:
+            pass
+
+        pdf._two_cols("Nota do Técnico:", _val(row[10]), "Nota NPS:", nps_val, v2_color=nps_color)
+        pdf._two_cols("Agente:", _val(row[2]), "Departamento:", _val(row[7]))
+        pdf._two_cols("Data Início:", _val(row[1]), "Duração (min):", _val(row[14]))
+        pdf._row("Abrir Ação Corretiva:", "NÃO")
+
+        if messages:
+            pdf.add_page()
+            pdf._chat_history_header(protocolo, _val(row[3]), _val(row[4]))
+            for msg in messages:
+                timestamp = msg.get("msgs_created", "")
+                content = msg.get("msgs_content", "")
+                direction = msg.get("msgs_direction", "")
+                agnt = msg.get("agnt_name", "")
+                cnts = msg.get("cnts_name", "Cliente")
+                if timestamp:
+                    try:
+                        if " " in str(timestamp):
+                            timestamp = str(timestamp).split(" ")[1][:5]
+                    except Exception:
+                        pass
+                if not content:
+                    continue
+                is_client = direction == "received"
+                sender = cnts if is_client else agnt if agnt else "Agente"
+                pdf._chat_message(sender, str(content), str(timestamp), is_client)
+
+        return pdf.output()
