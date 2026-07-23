@@ -27,6 +27,7 @@ import { SegmentedToggle } from "@/components/ui/segmented-toggle";
 import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
 import { AgentMultiSelect } from "@/components/dashboard/agent-multi-select";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
+import { DepartmentAgents } from "@/components/dashboard/department-agents";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -192,7 +193,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   // Fetch agent list for the multi-select
   useEffect(() => {
     api
-      .get<{ agents: AgentItem[] }>("/api/v1/admin/agents")
+      .get<{ agents: AgentItem[] }>("/api/v1/admin/agents?include_db=true")
       .then((r) => setAgentList(r.data.agents))
       .catch(() => {});
   }, []);
@@ -413,6 +414,11 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
                 {execWindow.startDate} → {execWindow.endDate}
               </span>
             </div>
+            <DepartmentAgents
+              department={selectedDept}
+              agents={agentList}
+              activeNames={executive.agents?.items?.map((a) => a.name)}
+            />
             <div className="grid gap-4 lg:grid-cols-2">
               <Suspense fallback={<ChartSkeleton />}>
                 <HourlyChart heatmap={executive.heatmap} />

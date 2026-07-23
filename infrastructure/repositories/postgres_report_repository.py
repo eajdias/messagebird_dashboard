@@ -86,6 +86,7 @@ def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> l
         ]
 
         raw_created_str = str(r["cnvs_created"] or "")
+        db_agent_group = r.get("agent_group") or None
         conv = RawConversationData(
             id=cid,
             contact=r["cnts_name"] or "Unknown",
@@ -99,7 +100,7 @@ def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> l
             msgs=raw_msgs,
             rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
             nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
-            dept_label=constants.resolve_dept(r.get("cnvs_dept"), conv_agnt_name),
+            dept_label=constants.resolve_dept(r.get("cnvs_dept"), conv_agnt_name, db_agent_group),
             contact_reason=constants.resolve_reason(r.get("cnvs_dept"), r.get("cnvs_contact_reason"), conv_agnt_name),
             occurrence=constants.resolve_occurrence(
                 r.get("cnvs_dept"), r.get("cnvs_contact_reason"), r.get("cnvs_occurrence"), conv_agnt_name
@@ -130,8 +131,6 @@ class PostgresReportRepository(ReportRepository):
         async def _fetch():
             rows = await self._pool.fetch_all(
                 queries_pg.SURVEY_MV_RANGE,
-                s,
-                e,
                 s,
                 e,
             )

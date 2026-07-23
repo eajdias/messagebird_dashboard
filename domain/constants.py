@@ -441,7 +441,7 @@ def _to_int(val) -> int | None:
         return None
 
 
-def resolve_dept(dept_id, agent_name: str | None = None) -> str:
+def resolve_dept(dept_id, agent_name: str | None = None, agent_group: str | None = None) -> str:
     d = _to_int(dept_id)
     if d is not None:
         return DEPT_MAP.get(d, str(dept_id))
@@ -449,6 +449,8 @@ def resolve_dept(dept_id, agent_name: str | None = None) -> str:
         grp = get_agent_group(agent_name)
         if grp != "Não categorizado":
             return grp
+    if agent_group and agent_group not in ("", "OUTROS", "Não categorizado"):
+        return agent_group
     return "Não categorizado"
 
 

@@ -5,7 +5,7 @@ Admin Routes
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from api.auth import get_current_user
 from api.schemas._base import StatusResponse
@@ -107,12 +107,31 @@ async def trigger_sync(
 
 @router.get("/agents", response_model=AgentListResponse)
 async def list_agents(
+    include_db: bool = Query(False),
     _current_user: dict[str, Any] = Depends(get_current_user),
 ):
-    """List all agents."""
+    """List all agents from YAML config. If include_db=true, also include DB agents not in YAML."""
     items = [
         AgentItem(bird_id=bird_id, name=info["name"], group=info.get("group", "")) for bird_id, info in AGENTS.items()
     ]
+    if include_db:
+        from api.dependencies import get_pool
+
+        pool = await get_pool()
+        db_agents = await pool.fetch_all(
+            "SELECT agnt_id::text as bird_id, agnt_name as name, agnt_grp as group FROM agents ORDER BY agnt_name"
+        )
+        yaml_names = {info["name"] for info in AGENTS.values()}
+        for row in db_agents:
+            if row["name"] and row["name"] not in yaml_names:
+                db_group = row.get("group") or ""
+                items.append(
+                    AgentItem(
+                        bird_id=row["bird_id"],
+                        name=row["name"],
+                        group="Não categorizado",
+                    )
+                )
     return AgentListResponse(agents=items)
 
 

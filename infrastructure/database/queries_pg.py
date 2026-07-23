@@ -293,8 +293,7 @@ CONVERSATION_DETAIL_QUERY = """
 
 SURVEY_MV_RANGE = """
     SELECT * FROM vw_survey_data
-    WHERE (cnvs_created::timestamp BETWEEN $1::timestamp AND $2::timestamp)
-       OR (cnvs_updated::timestamp BETWEEN $3::timestamp AND $4::timestamp)
+    WHERE cnvs_created::timestamp BETWEEN $1::timestamp AND $2::timestamp
     ORDER BY cnvs_id, msgs_created ASC
 """
 
