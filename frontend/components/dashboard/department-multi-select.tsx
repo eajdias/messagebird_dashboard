@@ -64,7 +64,7 @@ export function DepartmentMultiSelect({ selected, onChange }: DepartmentMultiSel
         variant="outline"
         size="sm"
         onClick={() => setOpen((p) => !p)}
-        className="h-9 gap-2 border-white/10 bg-white/5 backdrop-blur-sm"
+        className="h-9 gap-2 border-border bg-card"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -78,7 +78,7 @@ export function DepartmentMultiSelect({ selected, onChange }: DepartmentMultiSel
               e.stopPropagation();
               clear();
             }}
-            className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-xs hover:bg-white/20"
+            className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-secondary text-xs hover:bg-secondary/80"
             aria-label="Limpar seleção"
           >
             <X className="h-3 w-3" />
@@ -95,8 +95,7 @@ export function DepartmentMultiSelect({ selected, onChange }: DepartmentMultiSel
             aria-hidden="true"
           />
           <Card
-            variant="glass"
-            className="absolute right-0 top-full z-50 mt-1 w-72 max-h-80 overflow-hidden p-0"
+            className="absolute right-0 top-full z-50 mt-1 w-72 max-h-80 overflow-hidden border border-border bg-card p-0"
           >
             <CardHeader className="border-b border-white/5 py-3">
               <div className="flex items-center justify-between">

@@ -63,6 +63,8 @@ export function useDashboard(params?: {
       const q = qs.toString();
       const suffix = q ? `?${q}` : "";
 
+      const deptParam = params?.department ? `&department=${encodeURIComponent(params.department)}` : "";
+
       const [summaryRes, bscRes, agentsRes, channelsRes, granularEvoRes] =
         await Promise.all([
           api.get<DashboardSummary>(`/api/v1/dashboard/summary${suffix}`),
@@ -70,7 +72,7 @@ export function useDashboard(params?: {
           api.get<AgentRankingResponse>("/api/v1/dashboard/agents"),
           api.get<ChannelResponse>("/api/v1/dashboard/channels"),
           api.get<GranularEvolutionResponse>(
-            `/api/v1/dashboard/evolution/granular?granularity=${granularity}&count=${granularCount}`
+            `/api/v1/dashboard/evolution/granular?granularity=${granularity}&count=${granularCount}${deptParam}`
           ),
         ]);
 

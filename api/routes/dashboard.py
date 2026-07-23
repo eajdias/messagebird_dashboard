@@ -240,6 +240,7 @@ async def get_evolution(
 async def get_evolution_granular(
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     count: int = Query(12, ge=1, le=90),
+    department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
@@ -270,11 +271,13 @@ async def get_evolution_granular(
             label = f"{MONTH_NAMES[m]}/{y}"
             month_list.append((start, end, y, m, label))
 
-        async def _stats(start: str, end: str):
-            _, processed = await _fetch_and_process(repo, start, end)
+        async def _process(start_s: str, end_s: str):
+            _, processed = await _fetch_and_process(repo, start_s, end_s)
+            if department:
+                processed = _filter_processed(processed, set(), None, department)
             return agg.aggregate_statistics(processed)
 
-        results = await asyncio.gather(*[_stats(s, e) for s, e, _, _, _ in month_list])
+        results = await asyncio.gather(*[_process(s, e) for s, e, _, _, _ in month_list])
 
         buckets: list[EvolutionBucket] = []
         for (start, _, y, m, label), stats in zip(month_list, results, strict=True):
@@ -304,11 +307,13 @@ async def get_evolution_granular(
             iso = d.isoformat()
             day_list.append((iso, iso, d.strftime("%d/%m")))
 
-        async def _day_stats(d_iso: str):
+        async def _process_day(d_iso: str):
             _, processed = await _fetch_and_process(repo, d_iso, d_iso)
+            if department:
+                processed = _filter_processed(processed, set(), None, department)
             return agg.aggregate_statistics(processed)
 
-        results = await asyncio.gather(*[_day_stats(d) for d, _, _ in day_list])
+        results = await asyncio.gather(*[_process_day(d) for d, _, _ in day_list])
 
         buckets = []
         for (start, _, label), stats in zip(day_list, results, strict=True):
@@ -337,13 +342,15 @@ async def get_evolution_granular(
         label = f"{week_start.strftime('%d/%m')}–{week_end.strftime('%d/%m')}"
         week_list.append((week_start, week_end, label))
 
-    async def _week_stats(start_d: date, end_d: date):
+    async def _process_week(start_d: date, end_d: date):
         start = start_d.isoformat()
         end = end_d.isoformat()
         _, processed = await _fetch_and_process(repo, start, end)
+        if department:
+            processed = _filter_processed(processed, set(), None, department)
         return agg.aggregate_statistics(processed)
 
-    results = await asyncio.gather(*[_week_stats(s, e) for s, e, _ in week_list])
+    results = await asyncio.gather(*[_process_week(s, e) for s, e, _ in week_list])
 
     buckets = []
     for (start_d, _, label), stats in zip(week_list, results, strict=True):

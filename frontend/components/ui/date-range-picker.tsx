@@ -14,7 +14,7 @@ export function DateRangePicker({ startDate, endDate, onChange, className }: Dat
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 backdrop-blur-sm",
+        "inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2 py-1",
         className,
       )}
     >

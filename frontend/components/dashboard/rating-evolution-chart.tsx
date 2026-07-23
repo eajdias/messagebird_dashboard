@@ -53,7 +53,7 @@ export function RatingEvolutionChart({ data, className }: RatingEvolutionChartPr
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "hsl(var(--background))",
+                    backgroundColor: "hsl(220 15% 12%)",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: 8,
                     fontSize: 12,
