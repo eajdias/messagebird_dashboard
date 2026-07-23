@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -13,19 +13,18 @@ import {
   Building2,
   AlertCircle,
   RefreshCw,
-  UserCircle2,
 } from "lucide-react";
 import api from "@/lib/api";
 import { useDashboard } from "@/hooks/useDashboard";
-import { useExecutive, granularityWindow } from "@/hooks/useExecutive";
+import { useExecutive } from "@/hooks/useExecutive";
 import type { EvolutionGranularity, AgentItem } from "@/types";
 import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SegmentedToggle } from "@/components/ui/segmented-toggle";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
-import { AgentMultiSelect } from "@/components/dashboard/agent-multi-select";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import { DepartmentAgents } from "@/components/dashboard/department-agents";
 import { Button } from "@/components/ui/button";
@@ -47,6 +46,10 @@ const GRANULARITY_OPTIONS: { value: EvolutionGranularity; label: string }[] = [
 
 const DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
+function ymd(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
 // ── Dynamic imports ────────────────────────────────────────────────────────
 
 const EvolutionChart = dynamic(
@@ -57,11 +60,6 @@ const EvolutionChart = dynamic(
 const AgentRanking = dynamic(
   () => import("@/components/dashboard/agent-ranking").then((m) => ({ default: m.AgentRanking })),
   { loading: () => <TableSkeleton rows={5} /> }
-);
-
-const BSCTable = dynamic(
-  () => import("@/components/dashboard/bsc-table").then((m) => ({ default: m.BSCTable })),
-  { loading: () => <TableSkeleton rows={4} /> }
 );
 
 const NPSGauge = dynamic(
@@ -84,11 +82,6 @@ const HourlyChart = dynamic(
   { ssr: false, loading: () => <ChartSkeleton /> }
 );
 
-const QualityOverview = dynamic(
-  () => import("@/components/dashboard/quality-overview").then((m) => ({ default: m.QualityOverview })),
-  { loading: () => <ChartSkeleton /> }
-);
-
 const NPSCard = dynamic(
   () => import("@/components/dashboard/nps-card").then((m) => ({ default: m.NPSCard })),
   { loading: () => <ChartSkeleton /> }
@@ -104,14 +97,19 @@ const DemandBars = dynamic(
   { loading: () => <ChartSkeleton /> }
 );
 
-const DepartmentChartComp = dynamic(
-  () => import("@/components/dashboard/department-chart").then((m) => ({ default: m.DepartmentChart })),
-  { loading: () => <ChartSkeleton /> }
-);
-
 const BSCExecutiveTable = dynamic(
   () => import("@/components/dashboard/bsc-executive-table").then((m) => ({ default: m.BSCExecutiveTable })),
   { loading: () => <TableSkeleton rows={6} /> }
+);
+
+const ARTDistribution = dynamic(
+  () => import("@/components/dashboard/art-distribution").then((m) => ({ default: m.ARTDistribution })),
+  { loading: () => <ChartSkeleton /> }
+);
+
+const ReturnersCard = dynamic(
+  () => import("@/components/dashboard/returners-card").then((m) => ({ default: m.ReturnersCard })),
+  { loading: () => <ChartSkeleton /> }
 );
 
 // ── Skeletons ──────────────────────────────────────────────────────────────
@@ -179,6 +177,16 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [agentList, setAgentList] = useState<AgentItem[]>([]);
 
+  const defaultStart = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return ymd(d);
+  }, []);
+  const defaultEnd = useMemo(() => ymd(new Date()), []);
+
+  const [startDate, setStartDate] = useState<string>(defaultStart);
+  const [endDate, setEndDate] = useState<string>(defaultEnd);
+
   const setTab = useCallback(
     (next: DashboardTab) => {
       if (next === tab) return;
@@ -190,7 +198,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     [tab, searchParams, router]
   );
 
-  // Fetch agent list for the multi-select
   useEffect(() => {
     api
       .get<{ agents: AgentItem[] }>("/api/v1/admin/agents?include_db=true")
@@ -198,15 +205,16 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
       .catch(() => {});
   }, []);
 
-  // Dashboard data (always loaded for overview tab KPIs)
-  const { summary, agents, channels, granularEvolution, loading, error } = useDashboard({ granularity });
-
-  // Executive data (lazy — only for executive/bsc tabs)
-  const execWindow = granularityWindow(granularity);
-  const executive = useExecutive({
-    startDate: execWindow.startDate,
-    endDate: execWindow.endDate,
+  const { summary, agents, channels, granularEvolution, loading, error } = useDashboard({
     granularity,
+    start_date: startDate,
+    end_date: endDate,
+    department: selectedDept || undefined,
+  });
+
+  const executive = useExecutive({
+    startDate,
+    endDate,
     selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
   });
@@ -250,13 +258,11 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
         <Tabs value={tab} onChange={setTab} options={TAB_OPTIONS} paramName="tab" />
       </div>
       <div className="flex items-center gap-3">
-        {tab !== "overview" && tab !== "bsc" && (
-          <DepartmentMultiSelect
-            selected={selectedDept ? [selectedDept] : []}
-            onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
-          />
-        )}
-        <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
+        <DepartmentMultiSelect
+          selected={selectedDept ? [selectedDept] : []}
+          onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
+        />
+        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
       </div>
     </div>
   );
@@ -265,6 +271,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     return (
       <div className="space-y-6">
         {header}
+        <div className="flex items-center gap-3">
+          <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
+        </div>
 
         <div className="bento-grid sm:grid-cols-2 sm:gap-4 lg:gap-4">
           <motion.div
@@ -363,7 +372,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
 
   if (tab === "executive") {
     const execLoading = executive.loading;
-    // DOW items with peak hour info (derived from heatmap data)
     const heatmapData = executive.heatmap;
     const dowPeaks = new Map<string, { hour: number; value: number }>();
     if (heatmapData?.cells) {
@@ -402,18 +410,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <UserCircle2 className="h-4 w-4" />
-              <span>
-                {selectedDept
-                  ? selectedDept
-                  : "Todos os departamentos"}{" "}
-                · {executive.meta?.total_chats ?? 0} chats no período
-              </span>
-              <span className="ml-auto">
-                {execWindow.startDate} → {execWindow.endDate}
-              </span>
-            </div>
             <DepartmentAgents
               department={selectedDept}
               agents={agentList}
@@ -476,9 +472,14 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
                 hideDOW
               />
             </Suspense>
-            <Suspense fallback={<ChartSkeleton />}>
-              <DepartmentChartComp data={executive.departments} />
-            </Suspense>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Suspense fallback={<ChartSkeleton />}>
+                <ARTDistribution data={executive.artDistribution} />
+              </Suspense>
+              <Suspense fallback={<ChartSkeleton />}>
+                <ReturnersCard data={executive.returners} />
+              </Suspense>
+            </div>
           </>
         )}
       </div>

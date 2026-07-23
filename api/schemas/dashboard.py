@@ -229,3 +229,30 @@ class ExecutiveMeta(BaseModel):
     group: str | None = None
     total_chats: int = 0
     total_messages: int = 0
+
+
+class ARTDistributionBucket(BaseModel):
+    label: str
+    count: int = 0
+    pct: float = 0.0
+
+
+class ARTDistributionResponse(BaseModel):
+    buckets: list[ARTDistributionBucket] = []
+    total: int = 0
+    total_messages: int = 0
+
+
+class ReturnerBucket(BaseModel):
+    label: str
+    count: int = 0
+    pct: float = 0.0
+
+
+class ReturnersResponse(BaseModel):
+    buckets: list[ReturnerBucket] = []
+    total_unique: int = 0
+    total_returners: int = 0
+    pct_returning: float = 0.0
+    total_chats: int = 0
+    returner_chats: int = 0

@@ -300,6 +300,33 @@ export interface ExecutiveMeta {
   total_messages: number;
 }
 
+export interface ARTDistributionBucket {
+  label: string;
+  count: number;
+  pct: number;
+}
+
+export interface ARTDistributionResponse {
+  buckets: ARTDistributionBucket[];
+  total: number;
+  total_messages: number;
+}
+
+export interface ReturnerBucket {
+  label: string;
+  count: number;
+  pct: number;
+}
+
+export interface ReturnersResponse {
+  buckets: ReturnerBucket[];
+  total_unique: number;
+  total_returners: number;
+  pct_returning: number;
+  total_chats: number;
+  returner_chats: number;
+}
+
 export interface AvailableReportsResponse {
   reports: AvailableReportItem[];
 }

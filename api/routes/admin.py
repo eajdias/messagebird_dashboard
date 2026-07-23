@@ -124,7 +124,7 @@ async def list_agents(
         yaml_names = {info["name"] for info in AGENTS.values()}
         for row in db_agents:
             if row["name"] and row["name"] not in yaml_names:
-                db_group = row.get("group") or ""
+                row.get("group") or ""
                 items.append(
                     AgentItem(
                         bird_id=row["bird_id"],

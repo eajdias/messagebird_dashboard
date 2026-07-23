@@ -17,6 +17,8 @@ from api.schemas.dashboard import (
     AgentRankingResponse,
     AgentRow,
     AgentsResponse,
+    ARTDistributionBucket,
+    ARTDistributionResponse,
     BSCResponse,
     ChannelItem,
     ChannelResponse,
@@ -40,6 +42,8 @@ from api.schemas.dashboard import (
     OccurrencesResponse,
     QualityDistribution,
     QualityResponse,
+    ReturnerBucket,
+    ReturnersResponse,
 )
 from application.interfaces.repository import ReportRepository
 from application.services.report_aggregator import ReportAggregator
@@ -840,7 +844,7 @@ async def get_executive_meta(
     """Metadata for current executive view: period, total counts, filters."""
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
-    processed = await _load_executive_processed(repo, s, e, aid, group)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
     return ExecutiveMeta(
         start_date=s,
         end_date=e,
@@ -849,4 +853,103 @@ async def get_executive_meta(
         group=group,
         total_chats=len(processed),
         total_messages=sum(p.msg_count for p in processed),
+    )
+
+
+@router.get("/executive/art-distribution", response_model=ARTDistributionResponse)
+async def get_executive_art_distribution(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """ART distribution: conversations grouped by response time buckets."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
+
+    buckets_def = [
+        ("≤ 3 min", lambda a: a is not None and a <= 3),
+        ("3 - 5 min", lambda a: a is not None and 3 < a <= 5),
+        ("5 - 10 min", lambda a: a is not None and 5 < a <= 10),
+        ("10 - 15 min", lambda a: a is not None and 10 < a <= 15),
+        ("> 15 min", lambda a: a is not None and a > 15),
+        ("Sem resposta", lambda a: a is None),
+    ]
+
+    buckets = []
+    for label, pred in buckets_def:
+        count = sum(1 for p in processed if pred(p.art_min))
+        buckets.append(
+            ARTDistributionBucket(
+                label=label,
+                count=count,
+                pct=_pct(count, len(processed)),
+            )
+        )
+
+    return ARTDistributionResponse(
+        buckets=buckets,
+        total=len(processed),
+        total_messages=sum(p.msg_count for p in processed),
+    )
+
+
+@router.get("/executive/returners", response_model=ReturnersResponse)
+async def get_executive_returners(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    granularity: str = Query("month", pattern="^(day|week|month)$"),
+    agent_ids: str | None = Query(None),
+    department: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Returning-customer frequency: per-client with same-day dedup + outlier capping."""
+    s, e = _granularity_window(granularity, start_date, end_date)
+    aid = _parse_agent_ids(agent_ids)
+    processed = await _load_executive_processed(repo, s, e, aid, None, department)
+
+    total_chats = len(processed)
+
+    contact_days: dict[int, set[str]] = {}
+    for p in processed:
+        if p.contact_id:
+            day = p.raw_created[:10]
+            contact_days.setdefault(p.contact_id, set()).add(day)
+
+    effective: dict[int, int] = {}
+    for cid, days in contact_days.items():
+        effective[cid] = min(len(days), 5)
+
+    unique = len(effective)
+    returners = sum(1 for v in effective.values() if v > 1)
+    pct_returning = _pct(returners, unique)
+
+    returner_contacts = {cid for cid, v in effective.items() if v > 1}
+    returner_chats = sum(1 for p in processed if p.contact_id and p.contact_id in returner_contacts)
+    onetime_chats = total_chats - returner_chats
+
+    freq = Counter(v for cid, v in effective.items() if v > 1)
+
+    buckets = [
+        ReturnerBucket(label="2 visitas", count=freq.get(2, 0), pct=_pct(freq.get(2, 0), returners)),
+        ReturnerBucket(label="3 visitas", count=freq.get(3, 0), pct=_pct(freq.get(3, 0), returners)),
+        ReturnerBucket(
+            label="4-5 visitas",
+            count=freq.get(4, 0) + freq.get(5, 0),
+            pct=_pct(freq.get(4, 0) + freq.get(5, 0), returners),
+        ),
+    ]
+
+    return ReturnersResponse(
+        buckets=buckets,
+        total_unique=unique,
+        total_returners=returners,
+        pct_returning=pct_returning,
+        total_chats=total_chats,
+        returner_chats=returner_chats,
     )
