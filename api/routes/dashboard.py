@@ -44,6 +44,7 @@ from api.schemas.dashboard import (
     KPIItem,
     KPIResponse,
     MotivesResponse,
+    NPSBreakdown,
     OccurrencesResponse,
     QualityDistribution,
     QualityResponse,
