@@ -87,6 +87,14 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
         elif tipo == "binaria":
             return float(peso) if raw_value == meta else 0.0
 
+        elif tipo == "proporcional_inverso":
+            p = float(peso) if peso is not None else 0
+            m = float(meta) if meta is not None else 30
+            if m <= 0:
+                return 0.0
+            score = max(0.0, p * (1 - raw_value / m))
+            return round(score, 1)
+
     except ValueError, TypeError:
         return None
 

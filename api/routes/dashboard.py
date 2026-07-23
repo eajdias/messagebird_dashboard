@@ -224,26 +224,22 @@ async def get_bsc_scorecard(
     start, end = (start_date, end_date) if start_date and end_date else _default_date_range()
     _, processed = await _fetch_and_process(repo, start, end)
 
-    # Filter by department
-    if dept:
-        processed = [p for p in processed if p.dept_label == dept or (not p.dept_label and dept == "Não categorizado")]
+    processed = _filter_processed(processed, set(), None, dept)
 
-    # Build agent map
+    # Build agent map — only agents whose group matches the department
     agent_map: dict[str, list] = {}
     for p in processed:
-        agent_map.setdefault(p.agent, []).append(p)
+        if constants.get_agent_group(p.agent) == dept:
+            agent_map.setdefault(p.agent, []).append(p)
 
-    # Take only agents from the BSC-configured department
-    # Also include agents that have department matching (or the group from agent_map)
     agents = sorted(agent_map.keys())
 
     def _pct_compliments(agent_name):
         p_list = agent_map.get(agent_name, [])
-        ratings = [p.rating for p in p_list if p.rating is not None]
-        elogios = sum(1 for r in ratings if r >= 4)
-        if not ratings:
+        elogios = sum(1 for p in p_list if p.rating is not None and p.rating >= 4)
+        if not p_list:
             return None
-        return round(elogios / len(ratings) * 100, 1)
+        return round(elogios / len(p_list) * 100, 1)
 
     def _pct_negatives(agent_name):
         p_list = agent_map.get(agent_name, [])

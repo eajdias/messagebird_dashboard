@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BSCMetricRow, BSCScorecardResponse } from "@/types";
 import { Input } from "@/components/ui/input";
+import { BookOpen } from "lucide-react";
+import { BSCAgentRadars } from "./bsc-agent-radars";
 
 interface Props {
   data: BSCScorecardResponse;
@@ -14,8 +16,60 @@ interface Props {
 export function BSCScorecardTable({ data, onSaveManual }: Props) {
   if (!data.has_config) return null;
 
+  const allMetrics: BSCMetricRow[] = [
+    ...data.categories.flatMap((c) => c.metrics),
+    ...data.penalidades,
+  ];
+
+  const totalKpi: Record<string, number> = {};
+  for (const agent of data.agents) {
+    let sum = 0;
+    for (const m of allMetrics) {
+      const av = m.per_agent.find((a) => a.agent_name === agent);
+      sum += av?.kpi_score ?? 0;
+    }
+    totalKpi[agent] = sum;
+  }
+
+  const sorted = [...data.agents].sort((a, b) => (totalKpi[b] ?? 0) - (totalKpi[a] ?? 0));
+
+  const allMetricsWithCategory: { category: string; metrics: BSCMetricRow[] }[] = [
+    ...data.categories.map((c) => ({ category: c.name, metrics: c.metrics })),
+    ...(data.penalidades.length > 0
+      ? [{ category: "Penalidades", metrics: data.penalidades }]
+      : []),
+  ];
+
   return (
     <div className="space-y-8">
+      {/* ── Resumo Total ── */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${Math.min(sorted.length, 4)}, 1fr)` }}>
+        {sorted.map((agent) => (
+          <Card key={agent} variant="glass" className="overflow-hidden">
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground truncate" title={agent}>
+                {agent.split(" ").slice(0, 2).join(" ")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4 px-4 pt-0">
+              <span className={cn(
+                "text-2xl font-bold tabular-nums",
+                (totalKpi[agent] ?? 0) > 0 ? "text-emerald-500" : (totalKpi[agent] ?? 0) < 0 ? "text-red-400" : "text-foreground"
+              )}>
+                {(totalKpi[agent] ?? 0).toFixed(1)}
+              </span>
+              <span className="text-xs text-muted-foreground ml-1">pts</span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <BSCAgentRadars
+        agents={data.agents}
+        categories={data.categories}
+        penalidades={data.penalidades}
+      />
+
       {data.categories.map((cat) => (
         <BSCCategorySection
           key={cat.name}
@@ -35,6 +89,36 @@ export function BSCScorecardTable({ data, onSaveManual }: Props) {
           isPenalidade
         />
       )}
+
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-base font-semibold tracking-tight flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Legenda
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-border/40">
+            {allMetricsWithCategory.map((group) => (
+              <div key={group.category} className="px-4 py-3">
+                <p className="text-sm font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                  {group.category}
+                </p>
+                <div className="space-y-2 pl-2">
+                  {group.metrics.map((m) => (
+                    <div key={m.name} className="text-xs">
+                      <span className="font-medium text-foreground">{m.name}</span>
+                      {m.description && (
+                        <span className="text-muted-foreground"> — {m.description}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -167,13 +251,8 @@ function BSCMetricRowComponent({
 }) {
   return (
     <tr className={cn("border-b border-border/40 hover:bg-muted/30 transition-colors", isLast && "border-b-2")}>
-      <td className="sticky left-0 bg-background px-3 py-2 font-medium" title={metric.description || undefined}>
-        <div>{metric.name}</div>
-        {metric.description && (
-          <div className="text-[10px] text-muted-foreground font-normal leading-tight max-w-[240px]">
-            {metric.description}
-          </div>
-        )}
+      <td className="sticky left-0 bg-background px-3 py-2 font-medium">
+        {metric.name}
       </td>
       <td className="px-3 py-2 text-center text-muted-foreground text-xs">{metric.meta}</td>
       <td className="px-3 py-2 text-center text-muted-foreground text-xs">{metric.peso}</td>
