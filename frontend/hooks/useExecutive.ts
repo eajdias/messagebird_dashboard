@@ -76,55 +76,56 @@ export function useExecutive(params: ExecutiveParams) {
     const q = buildQuery(params);
     const qBsc = buildQuery(params, false);
 
-    try {
-      const [
-        meta,
-        quality,
-        heatmap,
-        motives,
-        occurrences,
-        dow,
-        departments,
-        agents,
-        bsc,
-        artDistribution,
-        returners,
-      ] = await Promise.all([
-        api.get<ExecutiveMeta>(`/api/v1/dashboard/executive/meta${q}`),
-        api.get<QualityResponse>(`/api/v1/dashboard/executive/quality${q}`),
-        api.get<HeatmapResponse>(`/api/v1/dashboard/executive/heatmap${q}`),
-        api.get<MotivesResponse>(`/api/v1/dashboard/executive/motives${q}`),
-        api.get<OccurrencesResponse>(`/api/v1/dashboard/executive/occurrences${q}`),
-        api.get<DOWResponse>(`/api/v1/dashboard/executive/dow${q}`),
-        api.get<DepartmentsResponse>(`/api/v1/dashboard/executive/departments${q}`),
-        api.get<AgentsResponse>(`/api/v1/dashboard/executive/agents${q}`),
-        api.get<ExecutiveBSCResponse>(`/api/v1/dashboard/executive/bsc${qBsc}`),
-        api.get<ARTDistributionResponse>(`/api/v1/dashboard/executive/art-distribution${q}`),
-        api.get<ReturnersResponse>(`/api/v1/dashboard/executive/returners${q}`),
-      ]);
+    const endpoints = [
+      { key: "meta", url: `/api/v1/dashboard/executive/meta${q}` },
+      { key: "quality", url: `/api/v1/dashboard/executive/quality${q}` },
+      { key: "heatmap", url: `/api/v1/dashboard/executive/heatmap${q}` },
+      { key: "motives", url: `/api/v1/dashboard/executive/motives${q}` },
+      { key: "occurrences", url: `/api/v1/dashboard/executive/occurrences${q}` },
+      { key: "dow", url: `/api/v1/dashboard/executive/dow${q}` },
+      { key: "departments", url: `/api/v1/dashboard/executive/departments${q}` },
+      { key: "agents", url: `/api/v1/dashboard/executive/agents${q}` },
+      { key: "bsc", url: `/api/v1/dashboard/executive/bsc${qBsc}` },
+      { key: "artDistribution", url: `/api/v1/dashboard/executive/art-distribution${q}` },
+      { key: "returners", url: `/api/v1/dashboard/executive/returners${q}` },
+    ];
 
-      setState({
-        meta: meta.data,
-        quality: quality.data,
-        heatmap: heatmap.data,
-        motives: motives.data,
-        occurrences: occurrences.data,
-        dow: dow.data,
-        departments: departments.data,
-        agents: agents.data,
-        bsc: bsc.data,
-        artDistribution: artDistribution.data,
-        returners: returners.data,
-        loading: false,
-        error: null,
-      });
-    } catch (err) {
-      setState((prev) => ({
-        ...prev,
-        loading: false,
-        error: err instanceof Error ? err.message : "Erro ao carregar dados executivos",
-      }));
-    }
+    const results = await Promise.allSettled(
+      endpoints.map((e) => api.get(e.url))
+    );
+
+    const data: Record<string, unknown> = {};
+    const failures: string[] = [];
+
+    endpoints.forEach((ep, i) => {
+      const r = results[i];
+      if (r.status === "fulfilled") {
+        data[ep.key] = r.value.data;
+      } else {
+        const msg = _errorReason(r.reason);
+        failures.push(`${ep.key}${msg ? ` (${msg})` : ""}`);
+      }
+    });
+
+    const error = failures.length > 0
+      ? `Falha ao carregar: ${failures.join(", ")}`
+      : null;
+
+    setState({
+      meta: data.meta as ExecutiveMeta | null ?? null,
+      quality: data.quality as QualityResponse | null ?? null,
+      heatmap: data.heatmap as HeatmapResponse | null ?? null,
+      motives: data.motives as MotivesResponse | null ?? null,
+      occurrences: data.occurrences as OccurrencesResponse | null ?? null,
+      dow: data.dow as DOWResponse | null ?? null,
+      departments: data.departments as DepartmentsResponse | null ?? null,
+      agents: data.agents as AgentsResponse | null ?? null,
+      bsc: data.bsc as ExecutiveBSCResponse | null ?? null,
+      artDistribution: data.artDistribution as ARTDistributionResponse | null ?? null,
+      returners: data.returners as ReturnersResponse | null ?? null,
+      loading: false,
+      error,
+    });
   }, [params.startDate, params.endDate, params.selectedDept, params.group]);
 
   useEffect(() => {
@@ -132,6 +133,16 @@ export function useExecutive(params: ExecutiveParams) {
   }, [fetchData]);
 
   return { ...state, refetch: fetchData };
+}
+
+function _errorReason(err: unknown): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const r = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
+    if (r?.data?.detail) return `${r.status} — ${r.data.detail}`;
+    if (r?.status) return String(r.status);
+  }
+  if (err instanceof Error) return err.message;
+  return "";
 }
 
 export type { ExecutiveParams };
