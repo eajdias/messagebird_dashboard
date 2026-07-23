@@ -379,3 +379,38 @@ export interface HealthResponse {
   version: string;
   database: string;
 }
+
+// ── BSC Scorecard ──────────────────────────────────────────────────────
+
+export interface BSCAgentValue {
+  agent_name: string;
+  raw_value: number | null;
+  kpi_score: number | null;
+  is_manual: boolean;
+}
+
+export interface BSCMetricRow {
+  name: string;
+  meta: string;
+  peso: number;
+  tipo: string;
+  description: string;
+  is_manual: boolean;
+  metric: string;
+  per_agent: BSCAgentValue[];
+}
+
+export interface BSCScorecardCategory {
+  name: string;
+  metrics: BSCMetricRow[];
+}
+
+export interface BSCScorecardResponse {
+  department: string;
+  start_date: string;
+  end_date: string;
+  agents: string[];
+  has_config: boolean;
+  categories: BSCScorecardCategory[];
+  penalidades: BSCMetricRow[];
+}

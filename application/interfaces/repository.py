@@ -99,3 +99,21 @@ class ReportRepository(ABC):
     @abstractmethod
     async def get_conversation_detail(self, conversation_id: int) -> dict[str, Any] | None:
         pass
+
+    @abstractmethod
+    async def get_bsc_manual_values(
+        self, department: str, period_start: str, period_end: str
+    ) -> dict[str, dict[str, float]]:
+        pass
+
+    @abstractmethod
+    async def upsert_bsc_manual_value(
+        self,
+        department: str,
+        agent_name: str,
+        metric_name: str,
+        period_start: str,
+        period_end: str,
+        value: float,
+    ) -> None:
+        pass

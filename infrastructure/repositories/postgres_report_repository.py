@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from application.interfaces.repository import ReportRepository
@@ -346,3 +346,52 @@ class PostgresReportRepository(ReportRepository):
         """Get a single conversation with all metadata."""
         row = await self._pool.fetch_one(queries_pg.CONVERSATION_DETAIL_QUERY, conversation_id)
         return dict(row) if row else None
+
+    # ── BSC Manual Values ──────────────────────────────────────────────
+
+    async def get_bsc_manual_values(
+        self, department: str, period_start: str, period_end: str
+    ) -> dict[str, dict[str, float]]:
+        """Return {metric_name: {agent_name: value}} for a department/period."""
+        ps = date.fromisoformat(period_start)
+        pe = date.fromisoformat(period_end)
+        rows = await self._pool.fetch_all(
+            "SELECT agent_name, metric_name, value FROM bsc_manual_values "
+            "WHERE department = $1 AND period_start = $2 AND period_end = $3",
+            department,
+            ps,
+            pe,
+        )
+        result: dict[str, dict[str, float]] = {}
+        for row in rows:
+            metric = row["metric_name"]
+            agent = row["agent_name"]
+            value = float(row["value"])
+            if metric not in result:
+                result[metric] = {}
+            result[metric][agent] = value
+        return result
+
+    async def upsert_bsc_manual_value(
+        self,
+        department: str,
+        agent_name: str,
+        metric_name: str,
+        period_start: str,
+        period_end: str,
+        value: float,
+    ) -> None:
+        ps = date.fromisoformat(period_start)
+        pe = date.fromisoformat(period_end)
+        await self._pool.execute(
+            "INSERT INTO bsc_manual_values (department, agent_name, metric_name, period_start, period_end, value) "
+            "VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT (department, agent_name, metric_name, period_start, period_end) "
+            "DO UPDATE SET value = $6, updated_at = NOW()",
+            department,
+            agent_name,
+            metric_name,
+            ps,
+            pe,
+            value,
+        )

@@ -10,6 +10,7 @@ import {
 import api from "@/lib/api";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useExecutive } from "@/hooks/useExecutive";
+import { useBscScorecard } from "@/hooks/useBscScorecard";
 import type { EvolutionGranularity, AgentItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -91,6 +92,11 @@ const NPSEvolutionChart = dynamic(
 const AgentContribution = dynamic(
   () => import("@/components/dashboard/agent-contribution").then((m) => ({ default: m.AgentContribution })),
   { loading: () => <ChartSkeleton /> }
+);
+
+const BSCScorecardTable = dynamic(
+  () => import("@/components/dashboard/bsc-scorecard-table").then((m) => ({ default: m.BSCScorecardTable })),
+  { loading: () => <TableSkeleton rows={8} /> }
 );
 
 // ── Skeletons ──────────────────────────────────────────────────────────────
@@ -209,6 +215,12 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     endDate,
     selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
+  });
+
+  const bscScorecard = useBscScorecard({
+    department: selectedDept || "",
+    startDate,
+    endDate,
   });
 
   if (!mounted || loading || executive.loading) {
@@ -413,9 +425,44 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   return (
     <div className="space-y-6">
       {header}
-      <Suspense fallback={<TableSkeleton rows={6} />}>
-        <BSCExecutiveTable data={executive.bsc} />
-      </Suspense>
+      {(() => {
+        if (!selectedDept) {
+          return (
+            <EmptyState
+              icon={<AlertCircle className="h-12 w-12 text-muted-foreground" />}
+              title="Selecione um departamento"
+              description="Cada setor possui seu próprio BSC. Use o filtro acima para selecionar um departamento."
+            />
+          );
+        }
+        if (bscScorecard.loading) {
+          return <TableSkeleton rows={8} />;
+        }
+        if (bscScorecard.error) {
+          return <EmptyState
+            icon={<AlertCircle className="h-12 w-12 text-destructive" />}
+            title="Erro ao carregar BSC"
+            description={bscScorecard.error}
+          />;
+        }
+        if (!bscScorecard.scorecard?.has_config) {
+          return (
+            <EmptyState
+              icon={<AlertCircle className="h-12 w-12 text-muted-foreground" />}
+              title="BSC não configurado"
+              description={`O departamento "${selectedDept}" ainda não possui um BSC configurado. Configure as métricas no arquivo business_bsc.yaml.`}
+            />
+          );
+        }
+        return (
+          <Suspense fallback={<TableSkeleton rows={8} />}>
+            <BSCScorecardTable
+              data={bscScorecard.scorecard}
+              onSaveManual={bscScorecard.saveManualValue}
+            />
+          </Suspense>
+        );
+      })()}
     </div>
   );
 }

@@ -263,3 +263,55 @@ class ReturnersResponse(BaseModel):
     pct_returning: float = 0.0
     total_chats: int = 0
     returner_chats: int = 0
+
+
+# ── BSC Scorecard (aba BSC estruturada por departamento) ──────────────────
+
+
+class BSCAgentValue(BaseModel):
+    agent_name: str
+    raw_value: float | None = None
+    kpi_score: float | None = None
+    is_manual: bool = False
+
+
+class BSCMetricRow(BaseModel):
+    name: str
+    meta: str = ""
+    peso: int = 0
+    tipo: str = ""
+    description: str = ""
+    is_manual: bool = False
+    metric: str = ""
+    per_agent: list[BSCAgentValue] = []
+
+
+class BSCScorecardCategory(BaseModel):
+    name: str
+    metrics: list[BSCMetricRow] = []
+
+
+class BSCScorecardResponse(BaseModel):
+    department: str
+    start_date: str
+    end_date: str
+    agents: list[str] = []
+    has_config: bool = False
+    categories: list[BSCScorecardCategory] = []
+    penalidades: list[BSCMetricRow] = []
+
+
+class BSCManualValuePayload(BaseModel):
+    department: str
+    agent_name: str
+    metric_name: str
+    period_start: str
+    period_end: str
+    value: float
+
+
+class BSCManualValueResponse(BaseModel):
+    department: str
+    agent_name: str
+    metric_name: str
+    value: float

@@ -5,7 +5,7 @@ from __future__ import annotations
 import calendar
 import logging
 from collections import Counter
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
@@ -19,7 +19,13 @@ from api.schemas.dashboard import (
     AgentsResponse,
     ARTDistributionBucket,
     ARTDistributionResponse,
+    BSCAgentValue,
+    BSCManualValuePayload,
+    BSCManualValueResponse,
+    BSCMetricRow,
     BSCResponse,
+    BSCScorecardCategory,
+    BSCScorecardResponse,
     ChannelItem,
     ChannelResponse,
     CountedItem,
@@ -38,7 +44,6 @@ from api.schemas.dashboard import (
     KPIItem,
     KPIResponse,
     MotivesResponse,
-    NPSBreakdown,
     OccurrencesResponse,
     QualityDistribution,
     QualityResponse,
@@ -46,6 +51,7 @@ from api.schemas.dashboard import (
     ReturnersResponse,
 )
 from application.interfaces.repository import ReportRepository
+from application.services.bsc_kpi import compute_kpi_score
 from application.services.report_aggregator import ReportAggregator
 from domain import constants
 from domain.entities.report_data import RawConversationData
@@ -178,6 +184,307 @@ async def get_kpis(
         )
 
     return KPIResponse(department=dept, kpis=kpis)
+
+
+# ── GET /dashboard/bsc/scorecard ────────────────────────────────────────
+
+
+@router.get("/bsc/scorecard", response_model=BSCScorecardResponse)
+async def get_bsc_scorecard(
+    department: str = Query(...),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Structured BSC data with per-agent metrics and KPI scores.
+
+    Returns empty categories with has_config=False when:
+    - department is empty (no filter selected)
+    - department has no BSC config in business_bsc.yaml
+    """
+    dept = department.strip()
+    if not dept:
+        return BSCScorecardResponse(
+            department="",
+            start_date=start_date or "",
+            end_date=end_date or "",
+            has_config=False,
+        )
+
+    kpi_cfg = constants.KPI_CONFIG.get(dept)
+    if not kpi_cfg:
+        return BSCScorecardResponse(
+            department=dept,
+            start_date=start_date or "",
+            end_date=end_date or "",
+            has_config=False,
+        )
+
+    start, end = (start_date, end_date) if start_date and end_date else _default_date_range()
+    _, processed = await _fetch_and_process(repo, start, end)
+
+    # Filter by department
+    if dept:
+        processed = [p for p in processed if p.dept_label == dept or (not p.dept_label and dept == "Não categorizado")]
+
+    # Build agent map
+    agent_map: dict[str, list] = {}
+    for p in processed:
+        agent_map.setdefault(p.agent, []).append(p)
+
+    # Take only agents from the BSC-configured department
+    # Also include agents that have department matching (or the group from agent_map)
+    agents = sorted(agent_map.keys())
+
+    def _pct_compliments(agent_name):
+        p_list = agent_map.get(agent_name, [])
+        ratings = [p.rating for p in p_list if p.rating is not None]
+        elogios = sum(1 for r in ratings if r >= 4)
+        if not ratings:
+            return None
+        return round(elogios / len(ratings) * 100, 1)
+
+    def _pct_negatives(agent_name):
+        p_list = agent_map.get(agent_name, [])
+        ratings = [p.rating for p in p_list if p.rating is not None]
+        neg = sum(1 for r in ratings if r <= 2)
+        if not ratings:
+            return None
+        return round(neg / len(ratings) * 100, 1)
+
+    def _nps_score(agent_name):
+        p_list = agent_map.get(agent_name, [])
+        nps_scores = [p.nps for p in p_list if p.nps is not None]
+        from domain.services.metrics_calculator import MetricsCalculator
+
+        return MetricsCalculator.calculate_nps(nps_scores)
+
+    def _count(agent_name):
+        return len(agent_map.get(agent_name, []))
+
+    # Auto-compute map
+    _auto_computers = {
+        "Elogios de atendimento / Feedback": _pct_compliments,
+        "NPS (Net Promoter Score)": _nps_score,
+        "Feedback Negativo (Penalidade)": _pct_negatives,
+        "Atendimentos | Ligações Finalizados": _count,
+    }
+
+    # Get manual values from DB
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    parsed_start = date.fromisoformat(start)
+    parsed_end = date.fromisoformat(end)
+    manual_rows = await pool.fetch_all(
+        "SELECT agent_name, metric_name, value FROM bsc_manual_values "
+        "WHERE department = $1 AND period_start = $2 AND period_end = $3",
+        dept,
+        parsed_start,
+        parsed_end,
+    )
+    manual_map: dict[str, dict[str, float]] = {}
+    for row in manual_rows:
+        metric = row["metric_name"]
+        agent = row["agent_name"]
+        if metric not in manual_map:
+            manual_map[metric] = {}
+        manual_map[metric][agent] = float(row["value"])
+
+    # T1 metrics
+    t1_defs = kpi_cfg.get("t1", [])
+    categories: list[BSCScorecardCategory] = []
+
+    # Group T1 metrics by logical category
+    current_category = "Qualidade e Satisfação"
+    cat_metrics: list[dict] = []
+    cat_names = [
+        "Qualidade e Satisfação",
+        "Produtividade e Volume",
+        "Operacional e Comercial",
+    ]
+    cat_idx = 0
+
+    for i, m_def in enumerate(t1_defs):
+        name = str(m_def.get("name", ""))
+        # Determine category transitions
+        if i == 3:
+            if cat_metrics:
+                categories.append(
+                    BSCScorecardCategory(
+                        name=cat_names[cat_idx], metrics=_build_metric_rows(cat_metrics, agents, manual_map)
+                    )
+                )
+            cat_metrics = []
+            cat_idx += 1
+        elif i == 5:
+            if cat_metrics:
+                categories.append(
+                    BSCScorecardCategory(
+                        name=cat_names[cat_idx], metrics=_build_metric_rows(cat_metrics, agents, manual_map)
+                    )
+                )
+            cat_metrics = []
+            cat_idx += 1
+
+        auto_computer = _auto_computers.get(name)
+        is_manual = name not in _auto_computers
+
+        metric_info = {
+            "name": name,
+            "meta": str(m_def.get("meta", "")),
+            "peso": int(m_def.get("peso", 0)),
+            "tipo": str(m_def.get("tipo", "")),
+            "description": str(m_def.get("description", "")),
+            "metric": str(m_def.get("metric", "")),
+            "is_manual": is_manual,
+            "m_def": m_def,
+            "auto_computer": auto_computer,
+        }
+        cat_metrics.append(metric_info)
+
+    # Append last category
+    if cat_metrics:
+        categories.append(
+            BSCScorecardCategory(name=cat_names[cat_idx], metrics=_build_metric_rows(cat_metrics, agents, manual_map))
+        )
+
+    # T2 metrics as separate category
+    t2_defs = kpi_cfg.get("t2", [])
+    t2_metrics = []
+    for m_def in t2_defs:
+        name = str(m_def.get("name", ""))
+        t2_metrics.append(
+            {
+                "name": name,
+                "meta": str(m_def.get("meta", "")),
+                "peso": int(m_def.get("peso", 0)),
+                "tipo": str(m_def.get("tipo", "")),
+                "description": str(m_def.get("description", "")),
+                "metric": "",
+                "is_manual": True,
+                "m_def": m_def,
+                "auto_computer": None,
+            }
+        )
+    if t2_metrics:
+        categories.append(
+            BSCScorecardCategory(
+                name="Updates, Treinamentos e Tarefas", metrics=_build_metric_rows(t2_metrics, agents, manual_map)
+            )
+        )
+
+    # Penalidades setoriais
+    penalidades_defs = kpi_cfg.get("penalidades_setoriais", [])
+    penalidades = _build_metric_rows(
+        [
+            {
+                "name": str(p.get("name", "")),
+                "meta": str(p.get("meta", "")),
+                "peso": int(p.get("peso", 0)),
+                "tipo": str(p.get("tipo", "")),
+                "description": str(p.get("description", "")),
+                "metric": "",
+                "is_manual": True,
+                "m_def": p,
+                "auto_computer": None,
+            }
+            for p in penalidades_defs
+        ],
+        agents,
+        manual_map,
+    )
+
+    return BSCScorecardResponse(
+        department=dept,
+        start_date=start,
+        end_date=end,
+        agents=agents,
+        has_config=True,
+        categories=categories,
+        penalidades=penalidades,
+    )
+
+
+def _build_metric_rows(
+    metric_infos: list[dict],
+    agents: list[str],
+    manual_map: dict[str, dict[str, float]],
+) -> list[BSCMetricRow]:
+    rows = []
+    for info in metric_infos:
+        per_agent = []
+        for agent in agents:
+            if info["is_manual"] and info["auto_computer"] is None:
+                manual_val = manual_map.get(info["name"], {}).get(agent)
+                raw_value = manual_val
+            else:
+                raw_value = info["auto_computer"](agent) if info["auto_computer"] else 0.0
+
+            kpi_score = compute_kpi_score(raw_value, info["m_def"]) if raw_value is not None else None
+
+            per_agent.append(
+                BSCAgentValue(
+                    agent_name=agent,
+                    raw_value=raw_value,
+                    kpi_score=kpi_score,
+                    is_manual=info["is_manual"] and info["auto_computer"] is None,
+                )
+            )
+
+        rows.append(
+            BSCMetricRow(
+                name=info["name"],
+                meta=info["meta"],
+                peso=info["peso"],
+                tipo=info["tipo"],
+                description=info["description"],
+                is_manual=info["is_manual"] and info["auto_computer"] is None,
+                metric=info["metric"],
+                per_agent=per_agent,
+            )
+        )
+    return rows
+
+
+# ── PUT /dashboard/bsc/manual-value ─────────────────────────────────────
+
+
+@router.put("/bsc/manual-value", response_model=BSCManualValueResponse)
+async def put_bsc_manual_value(
+    payload: BSCManualValuePayload,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    await repo.upsert_bsc_manual_value(
+        department=payload.department,
+        agent_name=payload.agent_name,
+        metric_name=payload.metric_name,
+        period_start=payload.period_start,
+        period_end=payload.period_end,
+        value=payload.value,
+    )
+    return BSCManualValueResponse(
+        department=payload.department,
+        agent_name=payload.agent_name,
+        metric_name=payload.metric_name,
+        value=payload.value,
+    )
+
+
+# ── GET /dashboard/bsc/manual-values ────────────────────────────────────
+
+
+@router.get("/bsc/manual-values", response_model=dict[str, dict[str, float]])
+async def get_bsc_manual_values(
+    department: str = Query(...),
+    start_date: str = Query(...),
+    end_date: str = Query(...),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    return await repo.get_bsc_manual_values(department, start_date, end_date)
 
 
 # ── GET /dashboard/evolution ────────────────────────────────────────────
