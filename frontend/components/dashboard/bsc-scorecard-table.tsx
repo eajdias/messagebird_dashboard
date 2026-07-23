@@ -149,18 +149,18 @@ function BSCCategorySection({
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="sticky left-0 bg-muted/50 px-3 py-2 text-left font-medium">
+                <th className="sticky left-0 bg-muted/50 px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wider text-muted-foreground">
                   Métrica
                 </th>
-                <th className="px-3 py-2 text-left font-medium w-16">Meta</th>
-                <th className="px-3 py-2 text-left font-medium w-14">Peso</th>
-                <th className="px-3 py-2 text-left font-medium w-20">Tipo</th>
+                <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-16">Meta</th>
+                <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-14">Peso</th>
+                <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-20">Tipo</th>
                 {agents.map((agent) => (
-                  <th key={agent + "-val"} className="px-2 py-2 text-center font-medium min-w-[80px]">
-                    <div className="truncate max-w-[100px]" title={agent}>
+                  <th key={agent + "-val"} className="px-2 py-2.5 text-center font-semibold min-w-[90px] text-sm">
+                    <div className="truncate max-w-[110px] mx-auto" title={agent}>
                       {agent.split(" ").slice(0, 2).join(" ")}
                     </div>
-                    <div className="flex text-[10px] text-muted-foreground font-normal mt-0.5 justify-center gap-1">
+                    <div className="flex text-[10px] text-muted-foreground font-normal mt-0.5 justify-center gap-2">
                       <span>Dado</span>
                       <span>KPI</span>
                     </div>
@@ -331,9 +331,8 @@ function BSCAgentCell({
   };
 
   return (
-    <td className="px-2 py-2 text-center">
-      <div className="flex justify-center gap-1 items-center">
-        {/* Data column */}
+    <td className="px-2 py-2.5 text-center">
+      <div className="flex justify-center gap-1.5 items-center">
         {isManual && editing ? (
           <Input
             ref={inputRef}
@@ -343,12 +342,12 @@ function BSCAgentCell({
             onChange={(e) => setLocalVal(e.target.value)}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
-            className="h-6 w-16 text-xs text-center px-1"
+            className="h-7 w-18 text-sm text-center px-1"
           />
         ) : (
           <span
             className={cn(
-              "text-xs tabular-nums min-w-[40px]",
+              "text-sm tabular-nums min-w-[44px] font-medium",
               isManual && "cursor-pointer border-b border-dashed border-muted-foreground/50 hover:border-primary px-1",
               !isManual && "text-foreground"
             )}
@@ -358,8 +357,7 @@ function BSCAgentCell({
             {fmt(rawValue)}
           </span>
         )}
-        {/* KPI score */}
-        <span className={cn("text-xs tabular-nums font-medium min-w-[32px]", kpiColor(kpiScore))}>
+        <span className={cn("text-sm tabular-nums font-bold min-w-[38px]", kpiColor(kpiScore))}>
           {kpiFmt(kpiScore)}
         </span>
       </div>
