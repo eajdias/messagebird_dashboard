@@ -486,7 +486,7 @@ def _filter_processed(
     """Filter processed data by agent_ids and/or group (sector) and/or department."""
     out = processed
     if department:
-        out = [p for p in out if p.dept_label == department]
+        out = [p for p in out if p.dept_label == department or constants.get_agent_group(p.agent) == department]
     elif group:
         out = [p for p in out if constants.resolve_conversation_group(p.agent, p.dept_label) == group]
     if agent_ids:

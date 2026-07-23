@@ -99,10 +99,10 @@ def _rows_to_conversations(rows: list[Any], agent_group: str | None = None) -> l
             msgs=raw_msgs,
             rating=float(r["cnvs_rating_agent"]) if r["cnvs_rating_agent"] is not None else None,
             nps=float(r["cnvs_rating_nps"]) if r["cnvs_rating_nps"] is not None else None,
-            dept_label=constants.resolve_dept(r.get("cnvs_dept")),
-            contact_reason=constants.resolve_reason(r.get("cnvs_dept"), r.get("cnvs_contact_reason")),
+            dept_label=constants.resolve_dept(r.get("cnvs_dept"), conv_agnt_name),
+            contact_reason=constants.resolve_reason(r.get("cnvs_dept"), r.get("cnvs_contact_reason"), conv_agnt_name),
             occurrence=constants.resolve_occurrence(
-                r.get("cnvs_dept"), r.get("cnvs_contact_reason"), r.get("cnvs_occurrence")
+                r.get("cnvs_dept"), r.get("cnvs_contact_reason"), r.get("cnvs_occurrence"), conv_agnt_name
             ),
             metadata={
                 "agent_name": conv_agnt_name,

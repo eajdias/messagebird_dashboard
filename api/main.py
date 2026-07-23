@@ -181,6 +181,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
+    # Ensure YAML config is loaded BEFORE any endpoint handler runs
+    # (FastAPI lifespan can race with uvicorn --reload)
     config_path = os.path.join(os.path.dirname(__file__), "..", "business_config.yaml")
     bsc_path = os.path.join(os.path.dirname(__file__), "..", "business_bsc.yaml")
     load_and_configure_business(config_path)

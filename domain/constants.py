@@ -1,4 +1,8 @@
 # ── ART / SLA ────────────────────────────────────────────────────────────────
+import os
+
+import yaml
+
 SLA_FRT_THRESHOLD_SECONDS = 3600
 SLA_FRT_THRESHOLD_MINUTES = 60
 MAX_ART_MINUTES = 480  # 8 horas — máximo aceitável para Average Response Time
@@ -329,22 +333,87 @@ DEFAULT_METRIC_THRESHOLDS = {
 
 # ── Dynamic Configuration ──────────────
 
-DEPT_MAP = DEFAULT_DEPT_MAP
-REASON_MAP = DEFAULT_REASON_MAP
-OCCURRENCE_MAP = DEFAULT_OCCURRENCE_MAP
-LANG_MAP = DEFAULT_LANG_MAP
-CHANNEL_MAP = DEFAULT_CHANNEL_MAP
-AGENTS = {}
-KPI_CONFIG = DEFAULT_KPI_CONFIG
+
+def _load_business_yaml() -> tuple[dict, dict, dict, dict, dict, dict, dict, dict]:
+    """Load business + BSC config from YAML files.
+
+    Called at module import time so constants are always populated before
+    any endpoint handler runs, regardless of FastAPI lifespan timing.
+    """
+    base = os.environ.get("CONFIG_DIR", os.path.join(os.path.dirname(__file__), ".."))
+    business_path = os.path.join(base, "business_config.yaml")
+    bsc_path = os.path.join(base, "business_bsc.yaml")
+
+    dept_map = dict(DEFAULT_DEPT_MAP)
+    reason_map = dict(DEFAULT_REASON_MAP)
+    occurrence_map = dict(DEFAULT_OCCURRENCE_MAP)
+    lang_map = dict(DEFAULT_LANG_MAP)
+    channel_map = dict(DEFAULT_CHANNEL_MAP)
+    agents: dict = {}
+    kpi_config = dict(DEFAULT_KPI_CONFIG)
+    dept_routing: dict = {}
+
+    def _keys_to_int(d):
+        if not isinstance(d, dict):
+            return d
+        return {int(k) if isinstance(k, str) and k.isdigit() else k: _keys_to_int(v) for k, v in d.items()}
+
+    # Load business config
+    if os.path.exists(business_path):
+        try:
+            with open(business_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+        except Exception:
+            data = {}
+        if "DEPT_MAP" in data:
+            dept_map = _keys_to_int(data["DEPT_MAP"])
+        if "REASON_MAP" in data:
+            reason_map = _keys_to_int(data["REASON_MAP"])
+        if "OCCURRENCE_MAP" in data:
+            occurrence_map = _keys_to_int(data["OCCURRENCE_MAP"])
+        if "LANG_MAP" in data:
+            lang_map = _keys_to_int(data["LANG_MAP"])
+        if "CHANNEL_MAP" in data:
+            channel_map = data["CHANNEL_MAP"]
+        if "AGENTS" in data:
+            agents = data["AGENTS"]
+        if "KPI_CONFIG" in data:
+            kpi_config = data["KPI_CONFIG"]
+        if "DEPT_ROUTING" in data:
+            dept_routing = data["DEPT_ROUTING"]
+
+    # Load BSC config (merges into KPI_CONFIG)
+    if os.path.exists(bsc_path):
+        try:
+            with open(bsc_path, encoding="utf-8") as f:
+                bsc_data = yaml.safe_load(f) or {}
+        except Exception:
+            bsc_data = {}
+        if "KPI_CONFIG" in bsc_data:
+            kpi_config = bsc_data["KPI_CONFIG"]
+
+    return dept_map, reason_map, occurrence_map, lang_map, channel_map, agents, kpi_config, dept_routing
+
+
+(
+    DEPT_MAP,
+    REASON_MAP,
+    OCCURRENCE_MAP,
+    LANG_MAP,
+    CHANNEL_MAP,
+    AGENTS,
+    KPI_CONFIG,
+    DEPT_ROUTING,
+) = _load_business_yaml()
+
 METRIC_THRESHOLDS = DEFAULT_METRIC_THRESHOLDS
-DEPT_ROUTING: dict[str, str] = {}
 
 # ── Helper functions ──────────────────────────────────────────────────────────
 
 
 def get_agent_group(agent_name: str | None) -> str:
     if not agent_name:
-        return "N/A"
+        return "Não categorizado"
     norm_name = agent_name.strip().strip("'").strip('"').strip()
 
     # Procura pelo nome no novo dicionário AGENTS
@@ -352,7 +421,7 @@ def get_agent_group(agent_name: str | None) -> str:
         if info["name"] == norm_name:
             return info["group"]
 
-    return "OUTROS"
+    return "Não categorizado"
 
 
 def resolve_conversation_group(agent_name: str | None, dept_label: str) -> str:
@@ -361,7 +430,7 @@ def resolve_conversation_group(agent_name: str | None, dept_label: str) -> str:
     if not DEPT_ROUTING:
         return get_agent_group(agent_name)
     if not dept_label or dept_label in ("N/A", "None", ""):
-        return "Sem Departamento"
+        return get_agent_group(agent_name)
     return get_agent_group(agent_name)
 
 
@@ -372,9 +441,15 @@ def _to_int(val) -> int | None:
         return None
 
 
-def resolve_dept(dept_id) -> str:
+def resolve_dept(dept_id, agent_name: str | None = None) -> str:
     d = _to_int(dept_id)
-    return DEPT_MAP.get(d, str(dept_id or "N/A")) if d is not None else str(dept_id or "N/A")
+    if d is not None:
+        return DEPT_MAP.get(d, str(dept_id))
+    if agent_name:
+        grp = get_agent_group(agent_name)
+        if grp != "Não categorizado":
+            return grp
+    return "Não categorizado"
 
 
 def resolve_channel(channel_id) -> str:
@@ -387,30 +462,60 @@ def resolve_channel(channel_id) -> str:
 def resolve_lang(lang_id: int | None) -> str:
     """Resolve language ID to human-readable label."""
     if lang_id is None:
-        return "N/A"
+        return "Não categorizado"
     return LANG_MAP.get(lang_id, "Desconhecido")
 
 
-def resolve_reason(dept_id, reason_id) -> str:
+def resolve_reason(dept_id, reason_id, agent_name: str | None = None) -> str:
     d = _to_int(dept_id)
-    if d == 5:
-        return "Instalações"
     r = _to_int(reason_id)
     if r is None:
         return "Contato Direto"
-    label = REASON_MAP.get(d or 0, {}).get(r)
-    return label if label is not None else "Contato Direto"
+    if d is not None:
+        label = REASON_MAP.get(d, {}).get(r)
+        if label is not None:
+            return label
+    # Fallback: try agent's department
+    if d is None and agent_name:
+        agent_dept = get_agent_group(agent_name)
+        # Map agent group back to dept_id
+        for dept_num, dept_label in DEPT_MAP.items():
+            if dept_label == agent_dept:
+                label = REASON_MAP.get(dept_num, {}).get(r)
+                if label is not None:
+                    return label
+    return "Contato Direto"
 
 
-def resolve_occurrence(dept_id, reason_id, occ_id) -> str:
+def resolve_occurrence(dept_id, reason_id, occ_id, agent_name: str | None = None) -> str:
     d = _to_int(dept_id)
-    if d == 5:
-        return "Coleta de dados"
     r = _to_int(reason_id)
     o = _to_int(occ_id)
-    if d is None or o is None:
+    if o is None:
         return "Outros"
-    reason_occs = OCCURRENCE_MAP.get(d, {}).get(r, {})
-    if not reason_occs:
-        return "Outros"
-    return reason_occs.get(o, "Outros")
+
+    def _lookup(dept_num: int, reason_num: int | None) -> str | None:
+        if reason_num is not None:
+            reason_occs = OCCURRENCE_MAP.get(dept_num, {}).get(reason_num, {})
+            if reason_occs:
+                return reason_occs.get(o)
+        # Try all reasons for this dept
+        for reason_occs in OCCURRENCE_MAP.get(dept_num, {}).values():
+            label = reason_occs.get(o)
+            if label is not None:
+                return label
+        return None
+
+    if d is not None:
+        result = _lookup(d, r)
+        if result is not None:
+            return result
+    # Fallback: try agent's department
+    if d is None and agent_name:
+        agent_dept = get_agent_group(agent_name)
+        for dept_num, dept_label in DEPT_MAP.items():
+            if dept_label == agent_dept:
+                result = _lookup(dept_num, r)
+                if result is not None:
+                    return result
+    return "Outros"

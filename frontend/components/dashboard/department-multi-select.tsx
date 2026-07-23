@@ -24,7 +24,11 @@ export function DepartmentMultiSelect({ selected, onChange }: DepartmentMultiSel
   useEffect(() => {
     api
       .get<{ departments: DeptItem[] }>("/api/v1/admin/departments")
-      .then((r) => setDepts(r.data.departments))
+      .then((r) => {
+        const list = r.data.departments;
+        list.push({ dept_id: 0, label: "Não categorizado" });
+        setDepts(list);
+      })
       .catch(() => {});
   }, []);
 

@@ -47,6 +47,8 @@ services:
       - ./application:/app/application
       - ./infrastructure:/app/infrastructure
       - ./reports:/app/reports
+      - ./business_config.yaml:/app/business_config.yaml
+      - ./business_bsc.yaml:/app/business_bsc.yaml
     restart: unless-stopped
     logging:
       driver: json-file

@@ -128,6 +128,15 @@ async def update_conversation_surveys(manager: PgSyncManager, conn: PostgresSync
                 if found:
                     break
 
+    # Infer missing contact_reason from dept + occurrence (reverse lookup via OCCURRENCE_MAP)
+    if "cnvs_dept" in updates and "cnvs_occurrence" in updates and "cnvs_contact_reason" not in updates:
+        dept = updates["cnvs_dept"]
+        occ = updates["cnvs_occurrence"]
+        for reason_id, reason_occs in constants.OCCURRENCE_MAP.get(dept, {}).items():
+            if occ in reason_occs:
+                updates["cnvs_contact_reason"] = reason_id
+                break
+
     if updates:
         values = []
         for k, v in updates.items():
@@ -151,14 +160,16 @@ async def backfill_surveys(manager: PgSyncManager, conn: PostgresSyncConnection)
         "AND ("
         "  m.msgs_content LIKE '%Avalie%' "
         "  OR m.msgs_content LIKE '%avalia o atendimento%' "
-        "  OR m.msgs_content LIKE '%Qual o motivo do contato%' "
+        "  OR m.msgs_content LIKE '%Qual o motivo del contato%' "
+        "  OR m.msgs_content LIKE '%Qual a sua dúvida%' "
         "  OR m.msgs_content LIKE '%Selecione o departamento%'"
         ") "
         "AND ("
         "  cv.cnvs_rating_nps IS NULL "
         "  OR cv.cnvs_rating_agent IS NULL "
         "  OR cv.cnvs_contact_reason IS NULL "
-        "  OR cv.cnvs_dept IS NULL"
+        "  OR cv.cnvs_dept IS NULL "
+        "  OR (cv.cnvs_occurrence IS NOT NULL AND cv.cnvs_contact_reason IS NULL)"
         ")"
     )
     total = len(rows)
