@@ -3,14 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
 import {
-  MessageSquare,
-  Users,
-  Clock,
-  MessagesSquare,
-  TrendingUp,
-  Building2,
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
@@ -18,7 +11,6 @@ import api from "@/lib/api";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useExecutive } from "@/hooks/useExecutive";
 import type { EvolutionGranularity, AgentItem } from "@/types";
-import { KPICard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,7 +20,6 @@ import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import { DepartmentAgents } from "@/components/dashboard/department-agents";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 type DashboardTab = "overview" | "executive" | "bsc";
 
@@ -51,31 +42,6 @@ function ymd(d: Date): string {
 }
 
 // ── Dynamic imports ────────────────────────────────────────────────────────
-
-const EvolutionChart = dynamic(
-  () => import("@/components/dashboard/evolution-chart").then((m) => ({ default: m.EvolutionChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
-
-const AgentRanking = dynamic(
-  () => import("@/components/dashboard/agent-ranking").then((m) => ({ default: m.AgentRanking })),
-  { loading: () => <TableSkeleton rows={5} /> }
-);
-
-const NPSGauge = dynamic(
-  () => import("@/components/dashboard/nps-gauge").then((m) => ({ default: m.NPSGauge })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
-
-const ChannelChart = dynamic(
-  () => import("@/components/dashboard/channel-chart").then((m) => ({ default: m.ChannelChart })),
-  { ssr: false, loading: () => <ChartSkeleton /> }
-);
-
-const AgentComparison = dynamic(
-  () => import("@/components/dashboard/agent-comparison").then((m) => ({ default: m.AgentComparison })),
-  { loading: () => <ChartSkeleton /> }
-);
 
 const HourlyChart = dynamic(
   () => import("@/components/dashboard/hourly-chart").then((m) => ({ default: m.HourlyChart })),
@@ -109,6 +75,21 @@ const ARTDistribution = dynamic(
 
 const ReturnersCard = dynamic(
   () => import("@/components/dashboard/returners-card").then((m) => ({ default: m.ReturnersCard })),
+  { loading: () => <ChartSkeleton /> }
+);
+
+const RatingEvolutionChart = dynamic(
+  () => import("@/components/dashboard/rating-evolution-chart").then((m) => ({ default: m.RatingEvolutionChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const NPSEvolutionChart = dynamic(
+  () => import("@/components/dashboard/nps-evolution-chart").then((m) => ({ default: m.NPSEvolutionChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const AgentContribution = dynamic(
+  () => import("@/components/dashboard/agent-contribution").then((m) => ({ default: m.AgentContribution })),
   { loading: () => <ChartSkeleton /> }
 );
 
@@ -164,6 +145,17 @@ function PageLoader() {
   );
 }
 
+// ── Simple stat card ───────────────────────────────────────────────────────
+
+function StatCard({ title, value }: { title: string; value: string | number }) {
+  return (
+    <Card variant="glass">
+      <CardHeader className="pb-1"><CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle></CardHeader>
+      <CardContent><span className="text-2xl font-bold tabular-nums">{value}</span></CardContent>
+    </Card>
+  );
+}
+
 // ── Inner component (uses useSearchParams, requires Suspense) ───────────────
 
 function DashboardContent({ mounted }: { mounted: boolean }) {
@@ -205,7 +197,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
       .catch(() => {});
   }, []);
 
-  const { summary, agents, channels, granularEvolution, loading, error } = useDashboard({
+  const { granularEvolution, loading, error } = useDashboard({
     granularity,
     start_date: startDate,
     end_date: endDate,
@@ -219,7 +211,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     group: "Suporte Tecnico",
   });
 
-  if (!mounted || loading) {
+  if (!mounted || loading || executive.loading) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
@@ -268,6 +260,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   );
 
   if (tab === "overview") {
+    const nps = executive.quality?.nps_breakdown?.real_nps;
+    const pctReturning = executive.returners?.pct_returning;
+
     return (
       <div className="space-y-6">
         {header}
@@ -275,97 +270,25 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
         </div>
 
-        <div className="bento-grid sm:grid-cols-2 sm:gap-4 lg:gap-4">
-          <motion.div
-            className={cn("bento-nps")}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.05, ease: "easeOut" }}
-          >
-            <Suspense fallback={<ChartSkeleton />}>
-              <NPSGauge value={summary?.nps_score ?? null} className="h-full" />
-            </Suspense>
-          </motion.div>
-
-          <KPICard
-            title="Conversas"
-            value={summary?.total_conversations ?? 0}
-            subtitle={`${summary?.unique_contacts ?? 0} clientes${summary?.returning_contacts ? ` · ${summary.returning_contacts} retornantes` : ""}`}
-            className="bento-conv"
-            sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.total_conversations }))}
-            sparklineColor="var(--chart-2)"
-            icon={MessageSquare}
-            accentColor="success"
-            index={1}
-          />
-          <KPICard
-            title="ART (min)"
-            value={summary?.art_avg_minutes != null ? summary.art_avg_minutes.toFixed(1) : "—"}
-            subtitle={summary?.sla_compliance_pct != null ? `SLA: ${summary.sla_compliance_pct.toFixed(1)}%` : undefined}
-            className="bento-art"
-            sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.art_avg_minutes ?? 0 }))}
-            sparklineColor="var(--chart-3)"
-            icon={Clock}
-            accentColor="warning"
-            index={2}
-          />
-          <KPICard
-            title="Mensagens"
-            value={summary?.total_messages ?? 0}
-            className="bento-msg"
-            sparklineData={granularEvolution?.buckets?.map((e) => ({ value: e.total_conversations }))}
-            sparklineColor="var(--chart-4)"
-            icon={MessagesSquare}
-            accentColor="purple"
-            index={3}
-          />
-
-          <motion.div
-            className="bento-chart"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
-          >
-            <Suspense fallback={<ChartSkeleton />}>
-              <EvolutionChart data={granularEvolution?.buckets ?? []} />
-            </Suspense>
-          </motion.div>
-
-          <motion.div
-            className="bento-chan"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
-          >
-            <Suspense fallback={<ChartSkeleton />}>
-              <ChannelChart channels={channels?.channels ?? []} />
-            </Suspense>
-          </motion.div>
-
-          <motion.div
-            className="bento-agents"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.45, ease: "easeOut" }}
-          >
-            <Suspense fallback={<ChartSkeleton />}>
-              <AgentComparison agents={agents?.agents ?? []} />
-            </Suspense>
-          </motion.div>
-
-          {(agents?.agents?.length ?? 0) > 0 && (
-            <motion.div
-              className="sm:col-span-2 lg:col-span-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
-            >
-              <Suspense fallback={<TableSkeleton rows={5} />}>
-                <AgentRanking agents={agents?.agents ?? []} />
-              </Suspense>
-            </motion.div>
-          )}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Chats" value={(executive.meta?.total_chats ?? 0).toLocaleString("pt-BR")} />
+          <StatCard title="Mensagens" value={(executive.meta?.total_messages ?? 0).toLocaleString("pt-BR")} />
+          <StatCard title="NPS" value={nps != null && Number.isFinite(nps) ? nps.toFixed(1) : "—"} />
+          <StatCard title="Retornantes" value={pctReturning != null ? `${pctReturning.toFixed(1)}%` : "—"} />
         </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Suspense fallback={<ChartSkeleton />}>
+            <RatingEvolutionChart data={granularEvolution?.buckets ?? []} />
+          </Suspense>
+          <Suspense fallback={<ChartSkeleton />}>
+            <NPSEvolutionChart data={granularEvolution?.buckets ?? []} />
+          </Suspense>
+        </div>
+
+        <Suspense fallback={<ChartSkeleton />}>
+          <AgentContribution agents={executive.agents?.items ?? []} />
+        </Suspense>
       </div>
     );
   }

@@ -289,6 +289,10 @@ async def get_evolution_granular(
                     art_avg_minutes=stats.get("avg_art"),
                     sla_compliance_pct=stats.get("sla_compliance"),
                     rating_avg=stats.get("avg_rating"),
+                    rated_chats=stats.get("rated_chats", 0),
+                    nps_rated_chats=stats.get("nps_rated_chats", 0),
+                    high_notes=stats.get("high_notes", 0),
+                    low_notes=stats.get("low_notes", 0),
                 )
             )
         return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
@@ -317,6 +321,10 @@ async def get_evolution_granular(
                     art_avg_minutes=stats.get("avg_art"),
                     sla_compliance_pct=stats.get("sla_compliance"),
                     rating_avg=stats.get("avg_rating"),
+                    rated_chats=stats.get("rated_chats", 0),
+                    nps_rated_chats=stats.get("nps_rated_chats", 0),
+                    high_notes=stats.get("high_notes", 0),
+                    low_notes=stats.get("low_notes", 0),
                 )
             )
         return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
@@ -348,6 +356,10 @@ async def get_evolution_granular(
                 art_avg_minutes=stats.get("avg_art"),
                 sla_compliance_pct=stats.get("sla_compliance"),
                 rating_avg=stats.get("avg_rating"),
+                rated_chats=stats.get("rated_chats", 0),
+                nps_rated_chats=stats.get("nps_rated_chats", 0),
+                high_notes=stats.get("high_notes", 0),
+                low_notes=stats.get("low_notes", 0),
             )
         )
     return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
@@ -772,6 +784,19 @@ async def get_executive_agents(
         depts = Counter(p.dept_label for p in plist)
         main_dept = depts.most_common(1)[0][0] if depts else "N/A"
         dist = rating_agg.aggregate_distributions(plist)
+
+        nps_scores = [p.nps for p in plist if p.nps is not None]
+        nps_dist: dict[str, int] = {str(i): 0 for i in range(1, 11)}
+        for n in nps_scores:
+            key = str(int(n))
+            if key in nps_dist:
+                nps_dist[key] += 1
+
+        arts = [p.art_min for p in plist if isinstance(p.art_min, (int, float)) and p.art_min > 0]
+        total_arts = len(arts)
+        good_art = sum(1 for a in arts if a <= 10)
+        bad_art = sum(1 for a in arts if a >= 15)
+
         items.append(
             AgentRow(
                 name=agent,
@@ -789,9 +814,10 @@ async def get_executive_agents(
                 rating_distribution={
                     str(i): int(dist.get("rating_distribution", {}).get(str(i), 0)) for i in range(1, 6)
                 },
-                nps_score_distribution={
-                    str(i): int(dist.get("nps_distribution", {}).get(str(i), 0)) for i in range(1, 11)
-                },
+                nps_score_distribution=nps_dist,
+                good_art_chats=good_art,
+                bad_art_chats=bad_art,
+                total_art_chats=total_arts,
             )
         )
     return AgentsResponse(
@@ -931,7 +957,6 @@ async def get_executive_returners(
 
     returner_contacts = {cid for cid, v in effective.items() if v > 1}
     returner_chats = sum(1 for p in processed if p.contact_id and p.contact_id in returner_contacts)
-    onetime_chats = total_chats - returner_chats
 
     freq = Counter(v for cid, v in effective.items() if v > 1)
 

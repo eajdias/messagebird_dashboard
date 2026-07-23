@@ -75,6 +75,10 @@ export interface EvolutionBucket {
   frt_avg_minutes: number | null;
   sla_compliance_pct: number | null;
   rating_avg: number | null;
+  rated_chats: number;
+  nps_rated_chats: number;
+  high_notes: number;
+  low_notes: number;
 }
 
 export interface GranularEvolutionResponse {
@@ -274,6 +278,9 @@ export interface AgentRow {
   unique_contacts: number;
   rating_distribution: Record<string, number>;
   nps_score_distribution: Record<string, number>;
+  good_art_chats: number;
+  bad_art_chats: number;
+  total_art_chats: number;
 }
 
 export interface AgentsResponse {

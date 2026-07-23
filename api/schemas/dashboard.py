@@ -71,6 +71,10 @@ class EvolutionBucket(BaseModel):
     frt_avg_minutes: float | None = None
     sla_compliance_pct: float | None = None
     rating_avg: float | None = None
+    rated_chats: int = 0
+    nps_rated_chats: int = 0
+    high_notes: int = 0
+    low_notes: int = 0
 
 
 class GranularEvolutionResponse(BaseModel):
@@ -195,6 +199,9 @@ class AgentRow(BaseModel):
     unique_contacts: int = 0
     rating_distribution: dict[str, int] = {}
     nps_score_distribution: dict[str, int] = {}
+    good_art_chats: int = 0
+    bad_art_chats: int = 0
+    total_art_chats: int = 0
 
 
 class AgentsResponse(BaseModel):
