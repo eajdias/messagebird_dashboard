@@ -320,10 +320,16 @@ class PostgresReportRepository(ReportRepository):
         # Validate sort column
         allowed_sort = {
             "created_at": "cnvs_created",
+            "start_time": "cnvs_created",
             "updated_at": "cnvs_updated",
             "status": "cnvs_status",
+            "contact": "cnts_name",
+            "agent": "agnt_name",
+            "msg_count": "cnvs_msgcount",
             "rating": "cnvs_rating_agent",
+            "nps": "cnvs_rating_nps",
             "art_minutes": "cnvs_art_minutes",
+            "reopened_count": "cnvs_reopened_count",
         }
         sort_col = allowed_sort.get(sort_by, "cnvs_created")
         order = "DESC" if sort_order.lower() == "desc" else "ASC"
@@ -336,7 +342,9 @@ class PostgresReportRepository(ReportRepository):
         # Data query with LIMIT/OFFSET
         offset = (page - 1) * per_page
         data_sql = (
-            queries_pg.CONVERSATION_LIST_QUERY + where + f" ORDER BY {sort_col} {order} LIMIT ${idx} OFFSET ${idx + 1}"
+            queries_pg.CONVERSATION_LIST_QUERY
+            + where
+            + f" ORDER BY {sort_col} {order} NULLS LAST LIMIT ${idx} OFFSET ${idx + 1}"
         )
         params.extend([per_page, offset])
         rows = await self._pool.fetch_all(data_sql, *params)

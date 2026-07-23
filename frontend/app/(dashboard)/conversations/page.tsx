@@ -45,7 +45,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: "nps", label: "NPS", sortable: true, render: (c) => <div className="text-right"><NPSBadge value={c.nps} /></div> },
   { key: "art_minutes", label: "ART (min)", sortable: true, render: (c) => <div className="text-right"><ArtBadge value={c.art_minutes} /></div> },
   { key: "reopened_count", label: "Retorno (mês)", sortable: true, render: (c) => (
-    <span className="text-right tabular-nums">{c.reopened_count > 0 ? c.reopened_count : "—"}</span>
+    <span className="text-right tabular-nums">{c.reopened_count != null ? c.reopened_count : "—"}</span>
   )},
   { key: "start_time", label: "Data", sortable: true, render: (c) => (
     <span className="text-xs text-muted-foreground">
