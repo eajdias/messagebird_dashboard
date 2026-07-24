@@ -1,3 +1,5 @@
+from domain.constants import MAX_ART_MINUTES
+
 SURVEY_DATA_METADATA_QUERY = """
     SELECT
         ca.agnt_name AS conversation_agent_name,
@@ -234,7 +236,7 @@ DEPT_LIST_QUERY_ALL = """
 
 # ── Conversation list / detail queries ───────────────────────────────
 
-CONVERSATION_LIST_QUERY = """
+CONVERSATION_LIST_QUERY = f"""
     SELECT
         c.cnvs_id,
         c.cnvs_created,
@@ -251,23 +253,41 @@ CONVERSATION_LIST_QUERY = """
         ct.cnts_phone,
         a.agnt_name,
         a.agnt_grp,
-        ROUND(
-            COALESCE(
-                EXTRACT(EPOCH FROM (first_resp.sent_at - c.cnvs_created)) / 60.0,
-                0
-            )::numeric,
-            1
-        ) AS cnvs_art_minutes
+        CASE
+            WHEN first_resp.sent_at IS NOT NULL
+             AND last_client.client_at IS NOT NULL
+             AND first_resp.sent_at > last_client.client_at
+            THEN ROUND(
+                LEAST(
+                    EXTRACT(EPOCH FROM (first_resp.sent_at - last_client.client_at)) / 60.0,
+                    {MAX_ART_MINUTES}.0
+                ),
+                1
+            )::numeric
+            ELSE NULL
+        END AS cnvs_art_minutes
     FROM conversations c
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
     LEFT JOIN LATERAL (
         SELECT MIN(m.msgs_created) AS sent_at
         FROM messages m
+        LEFT JOIN agents a_resp ON a_resp.agnt_id = m.msgs_agnt
         WHERE m.msgs_cnvs = c.cnvs_id
           AND m.msgs_direction = 'sent'
           AND m.msgs_agnt IS NOT NULL
+          AND a_resp.agnt_grp IS NOT NULL
     ) first_resp ON true
+    LEFT JOIN LATERAL (
+        SELECT MAX(m.msgs_created) AS client_at
+        FROM messages m
+        WHERE m.msgs_cnvs = c.cnvs_id
+          AND m.msgs_direction = 'received'
+          AND (first_resp.sent_at IS NULL OR (
+              m.msgs_created < first_resp.sent_at
+              AND m.msgs_created >= first_resp.sent_at - INTERVAL '24 hours'
+          ))
+    ) last_client ON true
     WHERE 1=1
 """
 
