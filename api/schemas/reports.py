@@ -13,7 +13,8 @@ class ReportRequest(BaseModel):
 
 
 class ExportConversationsRequest(BaseModel):
-    format: str = Field(..., pattern=r"^(csv|xlsx|pdf_zip)$")
+    format: str = Field(..., pattern=r"^(csv|xlsx)$")
+    report_type: str = Field(default="conversations", pattern=r"^(conversations|returners|art_high)$")
     start_date: str
     end_date: str
     department: str | None = None
@@ -21,6 +22,7 @@ class ExportConversationsRequest(BaseModel):
     channel: str | None = None
     status: str | None = None
     search: str | None = None
+    art_threshold: float | None = Field(default=None, ge=1)
     save_to_history: bool = False
 
 

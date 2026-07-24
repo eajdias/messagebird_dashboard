@@ -7,9 +7,11 @@ import logging
 import os
 import uuid
 import zipfile
+from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
+from domain import constants
 from infrastructure.exporters.csv_exporter import CSVExporter
 from infrastructure.exporters.pdf_exporter import PDFExporter
 from infrastructure.exporters.xlsx_exporter import XLSXExporter
@@ -21,6 +23,16 @@ EXPORT_DIRS: dict[str, str] = {
     "xlsx": "exports/xlsx",
     "pdf_zip": "exports/zip",
 }
+
+
+def _fmt_ts(val: Any) -> str:
+    if not val:
+        return ""
+    if isinstance(val, str):
+        return val[:19]
+    if hasattr(val, "strftime"):
+        return val.strftime("%Y-%m-%d %H:%M:%S")
+    return str(val)[:19]
 
 
 class ExportService:
@@ -65,6 +77,150 @@ class ExportService:
         data = zip_buf.getvalue()
         return self._save_file("pdf_zip", "zip", data, start_date, end_date, [{"_count": count}], created_by)
 
+    def save_returners_report(
+        self,
+        rows: list[dict[str, Any]],
+        start_date: str,
+        end_date: str,
+        created_by: str,
+        format: str = "csv",
+    ) -> dict[str, Any]:
+        """Aggregate conversations by contact_id for the returners report."""
+        by_contact: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        for r in rows:
+            cid = r.get("cnts_id") or r.get("contact_id", 0)
+            if cid:
+                by_contact[cid].append(r)
+
+        agg_rows: list[dict[str, Any]] = []
+        for _cid, convs in sorted(by_contact.items()):
+            first = convs[-1]
+            last = convs[0]
+            contact = first.get("cnts_name") or first.get("contact", "")
+            phone = first.get("cnts_phone") or first.get("phone", "")
+            visit_count = len(convs)
+            agents = sorted({str(c.get("agnt_name") or c.get("agent", "Desconhecido")) for c in convs})
+            departments = sorted(
+                {constants.resolve_dept(int(c.get("cnvs_dept"))) for c in convs if c.get("cnvs_dept") is not None}
+            )
+            channels = sorted(
+                {constants.resolve_channel(str(c.get("cnvs_channel"))) for c in convs if c.get("cnvs_channel")}
+            )
+            ratings = [c.get("cnvs_rating_agent") for c in convs if c.get("cnvs_rating_agent") is not None]
+            nps_vals = [c.get("cnvs_rating_nps") for c in convs if c.get("cnvs_rating_nps") is not None]
+            arts = [c.get("cnvs_art_minutes") for c in convs if c.get("cnvs_art_minutes") is not None]
+
+            # Count distinct days
+            days = set()
+            for c in convs:
+                val = c.get("cnvs_created")
+                if val:
+                    if isinstance(val, str):
+                        days.add(val[:10])
+                    elif hasattr(val, "strftime"):
+                        days.add(val.strftime("%Y-%m-%d"))
+                    else:
+                        days.add(str(val)[:10])
+
+            agg_rows.append(
+                {
+                    "contact": contact,
+                    "phone": phone,
+                    "visitas": visit_count,
+                    "dias_distintos": len(days),
+                    "agentes": ", ".join(agents),
+                    "departamentos": ", ".join(map(str, departments)),
+                    "canais": ", ".join(map(str, channels)),
+                    "nota_media": round(sum(ratings) / len(ratings), 1) if ratings else "",
+                    "nps_medio": round(sum(nps_vals) / len(nps_vals), 0) if nps_vals else "",
+                    "art_medio_min": round(sum(arts) / len(arts), 1) if arts else "",
+                    "primeira_visita": _fmt_ts(last.get("cnvs_created", "")),
+                    "ultima_visita": _fmt_ts(first.get("cnvs_created", "")),
+                    "total_msgs": sum(c.get("cnvs_msgcount", 0) for c in convs),
+                }
+            )
+
+        prefix = "retornantes" if format == "csv" else "xlsx"
+        ext = "csv" if format == "csv" else "xlsx"
+        if format == "csv":
+            data = self._csv_aggregated(agg_rows, RETURNER_COLUMNS)
+        else:
+            data = self._xlsx_aggregated(agg_rows, RETURNER_COLUMNS, "Retornantes")
+
+        return self._save_file(prefix, ext, data, start_date, end_date, agg_rows, created_by)
+
+    def save_art_high_report(
+        self,
+        rows: list[dict[str, Any]],
+        start_date: str,
+        end_date: str,
+        created_by: str,
+        format: str = "csv",
+    ) -> dict[str, Any]:
+        """Save ART > threshold report (rows already filtered by the query)."""
+        prefix = "art_high" if format == "csv" else "xlsx"
+        ext = "csv" if format == "csv" else "xlsx"
+        data = self._csv.generate(rows) if format == "csv" else self._xlsx.generate(rows)
+
+        return self._save_file(prefix, ext, data, start_date, end_date, rows, created_by)
+
+    def _csv_aggregated(self, rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> bytes:
+        import csv
+
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        fieldnames = [c[0] for c in columns]
+        labels = [c[1] for c in columns]
+        writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writerow(dict(zip(fieldnames, labels, strict=True)))
+        for r in rows:
+            writer.writerow(r)
+        return buf.getvalue().encode("utf-8")
+
+    def _xlsx_aggregated(self, rows: list[dict[str, Any]], columns: list[tuple[str, str]], sheet_name: str) -> bytes:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = Workbook()
+        ws = wb.active
+        assert ws is not None
+        ws.title = sheet_name
+
+        border_style = Side(style="thin", color="D0D5DD")
+        all_borders = Border(top=border_style, bottom=border_style, left=border_style, right=border_style)
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(patternType="solid", fgColor="1A3A5C")
+        alt_fill = PatternFill(patternType="solid", fgColor="F3F6FA")
+
+        for col_idx, (_, label) in enumerate(columns, 1):
+            cell = ws.cell(row=1, column=col_idx, value=label)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(vertical="center", horizontal="center", wrapText=True)
+            cell.border = all_borders
+            ws.column_dimensions[get_column_letter(col_idx)].width = 18
+
+        ws.row_dimensions[1].height = 28
+
+        for row_idx, r in enumerate(rows, 2):
+            for col_idx, (key, _) in enumerate(columns, 1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=r.get(key, ""))
+                cell.border = all_borders
+                cell.alignment = Alignment(vertical="center")
+                if row_idx % 2 == 0:
+                    cell.fill = alt_fill
+            ws.row_dimensions[row_idx].height = 22
+
+        last_row = ws.max_row
+        last_col = get_column_letter(len(columns))
+        ws.auto_filter.ref = f"A1:{last_col}{last_row}"
+        ws.freeze_panes = "A2"
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
     def _save_file(
         self,
         format: str,
@@ -79,7 +235,7 @@ class ExportService:
         safe_ts = datetime.now().strftime("%H%M%S")
         filename = f"conversas_{start_date}_{end_date}_{safe_ts}.{ext}"
 
-        rel_dir = EXPORT_DIRS[format]
+        rel_dir = EXPORT_DIRS.get(format, "exports")
         abs_dir = os.path.join(self._reports_dir, rel_dir)
         os.makedirs(abs_dir, exist_ok=True)
 
@@ -125,3 +281,20 @@ class ExportService:
             "cnts_name": r.get("cnts_name") or r.get("contact", ""),
             "cnts_phone": r.get("cnts_phone") or r.get("phone", ""),
         }
+
+
+RETURNER_COLUMNS: list[tuple[str, str]] = [
+    ("contact", "Contato"),
+    ("phone", "Telefone"),
+    ("visitas", "Visitas"),
+    ("dias_distintos", "Dias distintos"),
+    ("agentes", "Agentes"),
+    ("departamentos", "Departamentos"),
+    ("canais", "Canais"),
+    ("nota_media", "Nota média"),
+    ("nps_medio", "NPS médio"),
+    ("art_medio_min", "ART médio (min)"),
+    ("total_msgs", "Total msgs"),
+    ("primeira_visita", "1ª visita"),
+    ("ultima_visita", "Última visita"),
+]

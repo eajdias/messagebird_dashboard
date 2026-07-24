@@ -197,7 +197,8 @@ export interface AvailableReportItem {
 }
 
 export interface ExportConversationsRequest {
-  format: "csv" | "xlsx" | "pdf_zip";
+  format: "csv" | "xlsx";
+  report_type: "conversations" | "returners" | "art_high";
   start_date: string;
   end_date: string;
   department?: string;
@@ -205,6 +206,7 @@ export interface ExportConversationsRequest {
   channel?: string;
   status?: string;
   search?: string;
+  art_threshold?: number;
   save_to_history: boolean;
 }
 

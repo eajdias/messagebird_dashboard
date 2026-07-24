@@ -29,6 +29,42 @@ COLUMNS = [
 RIGHT_ALIGN_COLS = {"msg_count", "rating", "nps", "art_minutes"}
 
 
+def _normalize_row(r: dict[str, Any]) -> dict[str, Any]:
+    from domain import constants
+
+    dept_id = r.get("cnvs_dept")
+    dept_label = ""
+    if "department" in r and r["department"] and isinstance(r["department"], str) and not r["department"].isdigit():
+        dept_label = r["department"]
+    elif dept_id is not None:
+        dept_label = constants.resolve_dept(int(dept_id) if isinstance(dept_id, str) else dept_id)
+
+    return {
+        "contact": r.get("cnts_name") or r.get("contact", ""),
+        "phone": r.get("cnts_phone") or r.get("phone", ""),
+        "agent": r.get("agnt_name") or r.get("agent", ""),
+        "department": dept_label,
+        "msg_count": r.get("cnvs_msgcount") or r.get("msg_count", 0),
+        "rating": r.get("cnvs_rating_agent") if r.get("cnvs_rating_agent") is not None else r.get("rating"),
+        "nps": r.get("cnvs_rating_nps") if r.get("cnvs_rating_nps") is not None else r.get("nps"),
+        "art_minutes": r.get("cnvs_art_minutes") if r.get("cnvs_art_minutes") is not None else r.get("art_minutes"),
+        "start_time": _fmt_ts(r.get("cnvs_created") or r.get("start_time")),
+    }
+
+
+def _fmt_ts(val: Any) -> str:
+    if not val:
+        return ""
+    try:
+        from datetime import datetime
+
+        if isinstance(val, datetime):
+            return val.strftime("%d/%m/%Y %H:%M")
+        return str(val)[:19]
+    except Exception:
+        return str(val)
+
+
 class XLSXExporter:
     def generate(self, rows: list[dict[str, Any]]) -> bytes:
         wb = Workbook()
@@ -37,7 +73,12 @@ class XLSXExporter:
         ws.title = "Conversas"
 
         border_style = Side(style="thin", color=BORDER_COLOR)
-        all_borders = Border(top=border_style, bottom=border_style, left=border_style, right=border_style)
+        all_borders = Border(
+            top=border_style,
+            bottom=border_style,
+            left=border_style,
+            right=border_style,
+        )
         header_font = Font(bold=True, color=HEADER_WHITE, size=11)
         header_fill = PatternFill(patternType="solid", fgColor=HEADER_BLUE)
         alt_fill = PatternFill(patternType="solid", fgColor=ALT_ROW)
@@ -53,17 +94,17 @@ class XLSXExporter:
         ws.row_dimensions[1].height = 28
 
         for row_idx, r in enumerate(rows, 2):
+            n = _normalize_row(r)
             for col_idx, (_, key, _) in enumerate(COLUMNS, 1):
-                value = r.get(key)
-                if key == "start_time":
-                    value = self._fmt(r.get("cnvs_created") or value)
-                elif key == "rating" and value is not None:
-                    value = int(value) if value == int(value) else value
-                elif key == "nps" and value is not None:
-                    value = int(round(float(value), 0))
-                elif key == "art_minutes" and value is not None:
-                    value = round(float(value), 1)
-                elif value is None:
+                value = n.get(key)
+                if key in RIGHT_ALIGN_COLS and value is not None:
+                    if key == "nps":
+                        value = int(round(float(value), 0))
+                    elif key == "art_minutes":
+                        value = round(float(value), 1)
+                    elif key == "rating":
+                        value = int(value) if value == int(value) else value
+                if value is None:
                     value = ""
 
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
@@ -87,15 +128,3 @@ class XLSXExporter:
         buf = io.BytesIO()
         wb.save(buf)
         return buf.getvalue()
-
-    def _fmt(self, val: Any) -> str:
-        if not val:
-            return ""
-        try:
-            from datetime import datetime
-
-            if isinstance(val, datetime):
-                return val.strftime("%d/%m/%Y %H:%M")
-            return str(val)[:19]
-        except Exception:
-            return str(val)

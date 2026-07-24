@@ -108,8 +108,19 @@ class ReportRepository(ABC):
         search: str | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
+        art_min_threshold: float | None = None,
     ) -> list[dict[str, Any]]:
         """Export all conversations matching filters (no pagination)."""
+        pass
+
+    @abstractmethod
+    async def export_conversations_by_contacts(
+        self,
+        contact_ids: list[int],
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Export all conversations for a list of contact IDs in a date range."""
         pass
 
     @abstractmethod

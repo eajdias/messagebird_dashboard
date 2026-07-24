@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { ymd } from "@/lib/utils";
-import { saveExport, type ExportFilters } from "@/hooks/useExportConversations";
+import { saveExport, exportReturners, exportArtHigh, exportPdfBulk, type ExportFilters } from "@/hooks/useExportConversations";
 import type {
   AvailableReportItem,
   ExportConversationsRequest,
@@ -18,7 +18,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import {
   Download, FileBarChart, FileSpreadsheet, FileText, FileArchive,
-  Loader2, Inbox, Calendar, Trash2, AlertTriangle, X, CheckCheck,
+  Loader2, Inbox, Calendar, Trash2, AlertTriangle, X, Users, Timer,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -59,6 +59,7 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
   const [saveToHistory, setSaveToHistory] = useState(false);
+  const [artThreshold, setArtThreshold] = useState(15);
 
   const [reports, setReports] = useState<AvailableReportItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
@@ -134,6 +135,42 @@ export default function ReportsPage() {
     } catch (err) {
       console.error(`${format} export failed`, err);
       toast.error(`Erro ao exportar ${FORMAT_LABELS[format]}`);
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportReturners(format: "csv" | "xlsx") {
+    setExporting(`returners_${format}`);
+    try {
+      const result = await exportReturners(filters, format, saveToHistory);
+      if (saveToHistory) {
+        toast.success(`Retornantes ${format.toUpperCase()} salvo (${result.record_count} contatos)`);
+        loadReports();
+      } else {
+        toast.success(`Retornantes ${format.toUpperCase()} baixado com sucesso`);
+      }
+    } catch (err) {
+      console.error("Returners export failed", err);
+      toast.error("Erro ao exportar retornantes");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportArtHigh(format: "csv" | "xlsx") {
+    setExporting(`art_${format}`);
+    try {
+      const result = await exportArtHigh(filters, format, saveToHistory, artThreshold);
+      if (saveToHistory) {
+        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()} salvo (${result.record_count} registros)`);
+        loadReports();
+      } else {
+        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()} baixado com sucesso`);
+      }
+    } catch (err) {
+      console.error("ART high export failed", err);
+      toast.error("Erro ao exportar ART alto");
     } finally {
       setExporting(null);
     }
@@ -248,6 +285,9 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-1">Exportação geral</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="outline"
               size="sm"
@@ -256,10 +296,7 @@ export default function ReportsPage() {
               className="gap-2"
             >
               {exporting === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              CSV
-              <span className="text-xs text-muted-foreground font-normal">
-                {saveToHistory ? "salvar" : "baixar"}
-              </span>
+              CSV (conversas)
             </Button>
             <Button
               variant="outline"
@@ -269,23 +306,90 @@ export default function ReportsPage() {
               className="gap-2"
             >
               {exporting === "xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-              Excel
-              <span className="text-xs text-muted-foreground font-normal">
-                {saveToHistory ? "salvar" : "baixar"}
-              </span>
+              Excel (conversas)
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleExport("pdf_zip")}
+              onClick={async () => {
+                setExporting("zip_os");
+                try {
+                  await exportPdfBulk(filters);
+                  toast.success("ZIP das OS baixado com sucesso");
+                } catch (err) {
+                  console.error("ZIP OS export failed", err);
+                  toast.error("Erro ao exportar ZIP das OS");
+                } finally {
+                  setExporting(null);
+                }
+              }}
               disabled={!!exporting}
               className="gap-2"
             >
-              {exporting === "pdf_zip" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
+              {exporting === "zip_os" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileArchive className="h-4 w-4" />}
               ZIP (OS)
-              <span className="text-xs text-muted-foreground font-normal">
-                {saveToHistory ? "salvar" : "baixar"}
-              </span>
+            </Button>
+          </div>
+
+          <div className="border-t border-border my-1" />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-1">Relatórios específicos</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportReturners("csv")}
+              disabled={!!exporting}
+              className="gap-2"
+            >
+              {exporting === "returners_csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+              Retornantes CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportReturners("xlsx")}
+              disabled={!!exporting}
+              className="gap-2"
+            >
+              {exporting === "returners_xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+              Retornantes Excel
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Timer className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">ART &gt;</span>
+              <Input
+                type="number"
+                min={1}
+                value={artThreshold}
+                onChange={(e) => setArtThreshold(Math.max(1, Number(e.target.value)))}
+                className="h-7 w-16 text-xs px-2"
+              />
+              <span className="text-xs text-muted-foreground">min</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportArtHigh("csv")}
+              disabled={!!exporting}
+              className="gap-2"
+            >
+              {exporting === "art_csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportArtHigh("xlsx")}
+              disabled={!!exporting}
+              className="gap-2"
+            >
+              {exporting === "art_xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
+              Excel
             </Button>
           </div>
         </CardContent>

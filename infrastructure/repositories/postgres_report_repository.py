@@ -362,6 +362,7 @@ class PostgresReportRepository(ReportRepository):
         search: str | None = None,
         sort_by: str = "cnvs_created",
         sort_order: str = "desc",
+        art_min_threshold: float | None = None,
     ) -> list[dict[str, Any]]:
         """Export all conversations matching filters (no pagination)."""
         conditions: list[str] = []
@@ -417,7 +418,48 @@ class PostgresReportRepository(ReportRepository):
         sort_col = allowed_sort.get(sort_by, "cnvs_created")
         order = "DESC" if sort_order.lower() == "desc" else "ASC"
 
-        data_sql = queries_pg.CONVERSATION_LIST_QUERY + where + f" ORDER BY {sort_col} {order} NULLS LAST"
+        # Wrap in subquery for ART threshold filtering (alias can't be used in WHERE directly)
+        base_sql = queries_pg.CONVERSATION_LIST_QUERY + where
+        if art_min_threshold is not None:
+            data_sql = (
+                f"SELECT * FROM ({base_sql}) sub "
+                f"WHERE sub.cnvs_art_minutes > ${idx} "
+                f"ORDER BY {sort_col} {order} NULLS LAST"
+            )
+            params.append(art_min_threshold)
+        else:
+            data_sql = base_sql + f" ORDER BY {sort_col} {order} NULLS LAST"
+
+        rows = await self._pool.fetch_all(data_sql, *params)
+
+        return [dict(r) for r in rows]
+
+    async def export_conversations_by_contacts(
+        self,
+        contact_ids: list[int],
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Export all conversations for a list of contact IDs within an optional date range."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        idx = 1
+
+        conditions.append(f"ct.cnts_id = ANY(${idx}::int[])")
+        params.append(contact_ids)
+        idx += 1
+
+        if start_date and end_date:
+            s, e = _utc_range(start_date, end_date)
+            conditions.append(
+                f"(c.cnvs_created::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp"
+                f" OR c.cnvs_updated::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp)"
+            )
+            params.extend([s, e])
+            idx += 2
+
+        where = " AND " + " AND ".join(conditions)
+        data_sql = queries_pg.CONVERSATION_LIST_QUERY + where + " ORDER BY ct.cnts_id, c.cnvs_created DESC"
         rows = await self._pool.fetch_all(data_sql, *params)
 
         return [dict(r) for r in rows]

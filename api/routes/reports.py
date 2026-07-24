@@ -19,7 +19,6 @@ from api.schemas._base import StatusResponse
 from api.schemas.reports import (
     AvailableReportItem,
     AvailableReportsResponse,
-    DownloadReportResponse,
     ExportConversationsRequest,
     ExportConversationsResponse,
     GenerateReportResponse,
@@ -91,9 +90,64 @@ async def export_conversations_data(
     repo: ReportRepository = Depends(get_repository),
     reports_dir: str = Depends(get_reports_dir),
 ):
-    """Generate CSV/XLSX/ZIP from conversation filters and optionally save to history."""
+    """Generate CSV/XLSX/ZIP from filters and optionally save to history.
+    Supports report_type: conversations, returners, art_high."""
     user_email = current_user.get("sub", "unknown")
+    svc = ExportService(reports_dir)
 
+    # ── Returners report ─────────────────────────────────────────────
+    if request.report_type == "returners":
+        raw = await repo.fetch_raw_data_range(request.start_date, request.end_date)
+
+        contact_days: dict[int, set[str]] = {}
+        for r in raw:
+            if r.contact_id:
+                created = r.raw_created
+                if isinstance(created, str):
+                    day = created[:10]
+                elif hasattr(created, "strftime"):
+                    day = created.strftime("%Y-%m-%d")
+                else:
+                    day = str(created)[:10]
+                if day:
+                    contact_days.setdefault(r.contact_id, set()).add(day)
+
+        returner_ids = [cid for cid, days in contact_days.items() if len(days) > 1]
+
+        if not returner_ids:
+            raise HTTPException(status_code=404, detail="Nenhum retornante encontrado no período")
+
+        rows = await repo.export_conversations_by_contacts(returner_ids, request.start_date, request.end_date)
+
+        entry = svc.save_returners_report(rows, request.start_date, request.end_date, user_email, request.format)
+        _append_manifest(reports_dir, entry)
+        return _respond(request, entry, reports_dir)
+
+    # ── ART above threshold ──────────────────────────────────────────
+    if request.report_type == "art_high":
+        threshold = request.art_threshold or 15.0
+
+        rows = await repo.export_conversations(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            department=request.department,
+            agent=request.agent,
+            channel=request.channel,
+            status=request.status,
+            search=request.search,
+            sort_by="art_minutes",
+            sort_order="desc",
+            art_min_threshold=threshold,
+        )
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"Nenhuma conversa com ART > {threshold} min")
+
+        entry = svc.save_art_high_report(rows, request.start_date, request.end_date, user_email, request.format)
+        _append_manifest(reports_dir, entry)
+        return _respond(request, entry, reports_dir)
+
+    # ── Standard conversations export ────────────────────────────────
     rows = await repo.export_conversations(
         start_date=request.start_date,
         end_date=request.end_date,
@@ -109,28 +163,19 @@ async def export_conversations_data(
     if not rows:
         raise HTTPException(status_code=404, detail="Nenhuma conversa encontrada")
 
-    svc = ExportService(reports_dir)
-
     if request.format == "csv":
         entry = svc.save_csv(rows, request.start_date, request.end_date, user_email)
         content_type = "text/csv; charset=utf-8"
     elif request.format == "xlsx":
         entry = svc.save_xlsx(rows, request.start_date, request.end_date, user_email)
         content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    elif request.format == "pdf_zip":
-        ids = [int(r.get("cnvs_id", r.get("id", 0))) for r in rows if r.get("cnvs_id") or r.get("id")]
-        msgs_map = await repo.fetch_messages_for_conversations(ids)
-        entry = svc.save_zip_os(rows, msgs_map, request.start_date, request.end_date, user_email)
-        content_type = "application/zip"
     else:
         raise HTTPException(status_code=400, detail=f"Formato inválido: {request.format}")
 
-    manifest = _load_manifest(reports_dir)
-    manifest.append(entry)
-    _save_manifest(reports_dir, manifest)
+    _append_manifest(reports_dir, entry)
 
-    filepath = os.path.join(reports_dir, entry["path"])
     if not request.save_to_history:
+        filepath = os.path.join(reports_dir, entry["path"])
         return StreamingResponse(
             open(filepath, "rb"),
             media_type=content_type,
@@ -147,6 +192,43 @@ async def export_conversations_data(
         download_url=f"/api/v1/reports/{entry['report_id']}/download",
         size_bytes=entry["size_bytes"],
         record_count=entry["record_count"],
+    )
+
+
+def _append_manifest(reports_dir: str, entry: dict[str, Any]) -> None:
+    manifest = _load_manifest(reports_dir)
+    manifest.append(entry)
+    _save_manifest(reports_dir, manifest)
+
+
+def _respond(
+    request: ExportConversationsRequest,
+    entry: dict[str, Any],
+    reports_dir: str,
+) -> ExportConversationsResponse | StreamingResponse:
+    if request.save_to_history:
+        return ExportConversationsResponse(
+            status="ok",
+            message="Relatório salvo no histórico",
+            report_id=entry["report_id"],
+            download_url=f"/api/v1/reports/{entry['report_id']}/download",
+            size_bytes=entry["size_bytes"],
+            record_count=entry["record_count"],
+        )
+
+    content_type = (
+        "text/csv; charset=utf-8"
+        if request.format == "csv"
+        else ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    )
+    filepath = os.path.join(reports_dir, entry["path"])
+    return StreamingResponse(
+        open(filepath, "rb"),
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{entry["filename"]}"',
+            "X-Report-Id": entry["report_id"],
+        },
     )
 
 
