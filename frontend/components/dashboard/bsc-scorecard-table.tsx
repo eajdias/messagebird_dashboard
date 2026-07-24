@@ -85,7 +85,13 @@ export function BSCScorecardTable({ data, onSaveManual }: Props) {
           categoryName="Penalidades"
           metrics={data.penalidades}
           agents={data.agents}
-          onSaveManual={onSaveManual}
+          onSaveManual={async (agentName, metricName, value) => {
+            if (metricName.includes("Setor")) {
+              await Promise.all(data.agents.map((a) => onSaveManual(a, metricName, value)));
+            } else {
+              await onSaveManual(agentName, metricName, value);
+            }
+          }}
           isPenalidade
         />
       )}
@@ -136,8 +142,9 @@ function BSCCategorySection({
   onSaveManual: (agentName: string, metricName: string, value: number) => Promise<void>;
   isPenalidade?: boolean;
 }) {
-  const t2Label = "Updates, Treinamentos e Tarefas";
+  const t2Label = "Tarefas";
   const isT2 = categoryName === t2Label;
+  const isSetorial = isPenalidade && metrics.some((m) => m.name.includes("Setor")) && metrics.length === 1;
 
   return (
     <Card>
@@ -155,17 +162,27 @@ function BSCCategorySection({
                 <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-16">Meta</th>
                 <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-14">Peso</th>
                 <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wider text-muted-foreground w-20">Tipo</th>
-                {agents.map((agent) => (
-                  <th key={agent + "-val"} className="px-2 py-2.5 text-center font-semibold min-w-[90px] text-sm">
-                    <div className="truncate max-w-[110px] mx-auto" title={agent}>
-                      {agent.split(" ").slice(0, 2).join(" ")}
-                    </div>
+                {isSetorial ? (
+                  <th className="px-2 py-2.5 text-center font-semibold min-w-[90px] text-sm">
+                    <div className="text-sm">Setor</div>
                     <div className="flex text-[10px] text-muted-foreground font-normal mt-0.5 justify-center gap-2">
                       <span>Dado</span>
                       <span>KPI</span>
                     </div>
                   </th>
-                ))}
+                ) : (
+                  agents.map((agent) => (
+                    <th key={agent + "-val"} className="px-2 py-2.5 text-center font-semibold min-w-[90px] text-sm">
+                      <div className="truncate max-w-[110px] mx-auto" title={agent}>
+                        {agent.split(" ").slice(0, 2).join(" ")}
+                      </div>
+                      <div className="flex text-[10px] text-muted-foreground font-normal mt-0.5 justify-center gap-2">
+                        <span>Dado</span>
+                        <span>KPI</span>
+                      </div>
+                    </th>
+                  ))
+                )}
                 {isT2 && <th className="px-2 py-2 text-center font-medium w-16">Total</th>}
               </tr>
             </thead>
@@ -178,6 +195,7 @@ function BSCCategorySection({
                   onSaveManual={onSaveManual}
                   isLast={mi === metrics.length - 1}
                   showTotal={isT2}
+                  isSetorial={isSetorial}
                 />
               ))}
 
@@ -242,12 +260,14 @@ function BSCMetricRowComponent({
   onSaveManual,
   isLast,
   showTotal,
+  isSetorial,
 }: {
   metric: BSCMetricRow;
   agents: string[];
   onSaveManual: (agentName: string, metricName: string, value: number) => Promise<void>;
   isLast: boolean;
   showTotal?: boolean;
+  isSetorial?: boolean;
 }) {
   return (
     <tr className={cn("border-b border-border/40 hover:bg-muted/30 transition-colors", isLast && "border-b-2")}>
@@ -259,19 +279,31 @@ function BSCMetricRowComponent({
       <td className="px-3 py-2 text-center text-muted-foreground text-[10px]">
         {TIPO_LABELS[metric.tipo] || metric.tipo}
       </td>
-      {agents.map((agent) => {
-        const agentVal = metric.per_agent.find((a) => a.agent_name === agent);
-        return (
-          <BSCAgentCell
-            key={agent}
-            agentName={agent}
-            agentValue={agentVal}
-            metricName={metric.name}
-            isManual={metric.is_manual}
-            onSaveManual={onSaveManual}
-          />
-        );
-      })}
+      {isSetorial ? (
+        <BSCAgentCell
+          agentName={agents[0] ?? ""}
+          agentValue={metric.per_agent[0]}
+          metricName={metric.name}
+          isManual={metric.is_manual}
+          onSaveManual={async (_, _metricName, value) => {
+            await Promise.all(agents.map((a) => onSaveManual(a, _metricName, value)));
+          }}
+        />
+      ) : (
+        agents.map((agent) => {
+          const agentVal = metric.per_agent.find((a) => a.agent_name === agent);
+          return (
+            <BSCAgentCell
+              key={agent}
+              agentName={agent}
+              agentValue={agentVal}
+              metricName={metric.name}
+              isManual={metric.is_manual}
+              onSaveManual={onSaveManual}
+            />
+          );
+        })
+      )}
       {showTotal && (
         <td className="px-2 py-2 text-center font-medium text-primary">
           {metric.per_agent.reduce((sum, a) => sum + (a.kpi_score ?? 0), 0).toFixed(1)}

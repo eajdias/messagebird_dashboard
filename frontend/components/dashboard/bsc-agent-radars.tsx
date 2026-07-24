@@ -100,7 +100,13 @@ export function BSCAgentRadars({ agents, categories, penalidades }: Props) {
           const av = m.per_agent.find((a) => a.agent_name === agent);
           raw += av?.kpi_score ?? 0;
         }
-        const shortName = cat.name.length > 14 ? cat.name.slice(0, 14) + "…" : cat.name;
+        const CATEGORY_SHORT: Record<string, string> = {
+          "Qualidade e Satisfação": "Qualidade",
+          "Produtividade e Volume": "Produtividade",
+          "Operacional e Comercial": "Operacional",
+          "Tarefas": "Tarefas",
+        };
+        const shortName = CATEGORY_SHORT[cat.name] ?? cat.name;
         radarData.push({
           category: shortName,
           pct: maxPerCategory[catIdx] > 0 ? Math.round((raw / maxPerCategory[catIdx]) * 100) : 0,

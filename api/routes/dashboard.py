@@ -265,7 +265,7 @@ async def get_bsc_scorecard(
         "Elogios de atendimento / Feedback": _pct_compliments,
         "NPS (Net Promoter Score)": _nps_score,
         "Feedback Negativo (Penalidade)": _pct_negatives,
-        "Atendimentos | Ligações Finalizados": _count,
+        "Atendimentos Finalizados": _count,
     }
 
     # Get manual values from DB
@@ -306,16 +306,7 @@ async def get_bsc_scorecard(
     for i, m_def in enumerate(t1_defs):
         name = str(m_def.get("name", ""))
         # Determine category transitions
-        if i == 3:
-            if cat_metrics:
-                categories.append(
-                    BSCScorecardCategory(
-                        name=cat_names[cat_idx], metrics=_build_metric_rows(cat_metrics, agents, manual_map)
-                    )
-                )
-            cat_metrics = []
-            cat_idx += 1
-        elif i == 5:
+        if i == 3 or i == 7:
             if cat_metrics:
                 categories.append(
                     BSCScorecardCategory(
@@ -367,9 +358,7 @@ async def get_bsc_scorecard(
         )
     if t2_metrics:
         categories.append(
-            BSCScorecardCategory(
-                name="Updates, Treinamentos e Tarefas", metrics=_build_metric_rows(t2_metrics, agents, manual_map)
-            )
+            BSCScorecardCategory(name="Tarefas", metrics=_build_metric_rows(t2_metrics, agents, manual_map))
         )
 
     # Penalidades setoriais
@@ -555,7 +544,7 @@ async def get_evolution_granular(
     - `month`: last `count` months (max 24)
     """
     import asyncio
-    from datetime import date, timedelta
+    from datetime import timedelta
 
     now = datetime.now()
     today = now.date()
