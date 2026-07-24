@@ -51,6 +51,7 @@ export function useBscScorecard({ department, startDate, endDate }: BscScorecard
   }, [department, startDate, endDate]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchScorecard();
   }, [fetchScorecard]);
 

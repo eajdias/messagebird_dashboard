@@ -196,10 +196,16 @@ MESSAGES_FOR_CONVERSATIONS_QUERY = """
     SELECT
         m.msgs_cnvs,
         m.msgs_created,
+        m.msgs_content,
         m.msgs_direction,
-        m.msgs_agnt
+        a.agnt_name,
+        ct.cnts_name
     FROM messages m
+    JOIN conversations cv ON m.msgs_cnvs = cv.cnvs_id
+    JOIN contacts ct ON cv.cnvs_cnts = ct.cnts_id
+    LEFT JOIN agents a ON m.msgs_agnt = a.agnt_id
     WHERE m.msgs_cnvs = ANY($1::int[])
+      AND m.msgs_type = 'text'
     ORDER BY m.msgs_cnvs, m.msgs_created ASC
 """
 
@@ -324,6 +330,41 @@ CONVERSATION_DETAIL_QUERY = """
     LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
     LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
     WHERE c.cnvs_id = $1
+"""
+
+CONVERSATION_EXPORT_IDS = """
+    SELECT c.cnvs_id FROM conversations c
+    LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
+    LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    WHERE 1=1
+"""
+
+CONVERSATION_EXPORT_DETAILS = """
+    SELECT
+        c.cnvs_id,
+        c.cnvs_created,
+        c.cnvs_updated,
+        c.cnvs_status,
+        c.cnvs_dept,
+        c.cnvs_rating_agent,
+        c.cnvs_rating_nps,
+        c.cnvs_contact_reason,
+        c.cnvs_occurrence,
+        c.cnvs_msgcount,
+        c.cnvs_reopened_count,
+        c.cnvs_channel,
+        c.cnvs_description,
+        c.cnvs_bird,
+        c.cnvs_tax_id,
+        c.cnvs_software,
+        ct.cnts_id,
+        ct.cnts_name,
+        ct.cnts_phone,
+        a.agnt_name
+    FROM conversations c
+    LEFT JOIN contacts ct ON ct.cnts_id = c.cnvs_cnts
+    LEFT JOIN agents a ON a.agnt_id = c.cnvs_agnt
+    WHERE c.cnvs_id = ANY($1)
 """
 
 # ── Materialized View queries (fast dashboard) ───────────────────────

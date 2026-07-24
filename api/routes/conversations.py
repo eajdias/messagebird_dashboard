@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+import zipfile
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -109,6 +110,100 @@ async def list_conversations(
         total=total,
         page=page,
         per_page=per_page,
+    )
+
+
+# ── GET /conversations/export ───────────────────────────────────────────
+
+
+@router.get("/export", response_model=list[ConversationItem])
+async def export_conversations(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    department: str | None = Query(None),
+    agent: str | None = Query(None),
+    channel: str | None = Query(None),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    sort_by: str = Query("start_time"),
+    sort_order: str = Query("desc"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Export all conversations matching filters (no pagination)."""
+    rows = await repo.export_conversations(
+        start_date=start_date,
+        end_date=end_date,
+        department=department,
+        agent=agent,
+        channel=channel,
+        status=status,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+
+    items = [_row_to_item(r) for r in rows]
+
+    if department:
+        items = [item for item in items if item.department == department]
+
+    return items
+
+
+# ── GET /conversations/export-pdf ───────────────────────────────────────
+
+
+@router.get("/export-pdf")
+async def export_conversations_pdf(
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    department: str | None = Query(None),
+    agent: str | None = Query(None),
+    channel: str | None = Query(None),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Export all matching conversations as individual OS PDFs in a ZIP."""
+    from infrastructure.exporters.pdf_exporter import PDFExporter
+
+    ids = await repo.export_conversation_ids(
+        start_date=start_date,
+        end_date=end_date,
+        agent=agent,
+        channel=channel,
+        status=status,
+        search=search,
+    )
+
+    if not ids:
+        raise HTTPException(status_code=404, detail="Nenhuma conversa encontrada")
+
+    details_map = await repo.fetch_conversation_details(ids)
+    msgs_map = await repo.fetch_messages_for_conversations(ids)
+
+    exporter = PDFExporter()
+    zip_buf = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for conv_id in ids:
+            detail = details_map.get(conv_id)
+            if not detail:
+                continue
+            msgs = msgs_map.get(conv_id, [])
+            pdf_bytes = exporter.generate_single_os_pdf_bytes(detail, msgs)
+            protocol = detail.get("cnvs_bird") or str(conv_id)
+            zf.writestr(f"OS_{protocol}.pdf", pdf_bytes)
+
+    zip_buf.seek(0)
+
+    date_part = start_date or "inicio"
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="OS_{date_part}_{end_date or "fim"}.zip"'},
     )
 
 

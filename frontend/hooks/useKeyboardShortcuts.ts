@@ -14,7 +14,10 @@ export function useKeyboardShortcuts(shortcuts: Shortcut[]) {
   const buffer = useRef<string[]>([]);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const shortcutsRef = useRef(shortcuts);
-  shortcutsRef.current = shortcuts;
+
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+  }, [shortcuts]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const target = e.target as HTMLElement;

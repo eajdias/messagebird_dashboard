@@ -46,7 +46,8 @@ class PostgresPool:
 
     async def execute(self, query: str, *params) -> str:
         async with self.pool.acquire() as conn:
-            return await conn.execute(query, *params)
+            result = await conn.execute(query, *params)
+            return result or ""
 
     async def executemany(self, query: str, params_list: list[tuple]):
         async with self.pool.acquire() as conn:

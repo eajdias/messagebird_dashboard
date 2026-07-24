@@ -263,7 +263,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           selected={selectedDept ? [selectedDept] : []}
           onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
         />
-        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+        <div suppressHydrationWarning>
+          <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+        </div>
       </div>
     </div>
   );
@@ -470,6 +472,7 @@ export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

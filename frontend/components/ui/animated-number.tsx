@@ -12,6 +12,7 @@ export function AnimatedNumber({ value, decimals = 0 }: AnimatedNumberProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

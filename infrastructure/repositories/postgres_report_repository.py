@@ -351,6 +351,135 @@ class PostgresReportRepository(ReportRepository):
 
         return [dict(r) for r in rows], total
 
+    async def export_conversations(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        department: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        sort_by: str = "cnvs_created",
+        sort_order: str = "desc",
+    ) -> list[dict[str, Any]]:
+        """Export all conversations matching filters (no pagination)."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        idx = 1
+
+        if start_date and end_date:
+            s, e = _utc_range(start_date, end_date)
+            conditions.append(
+                f"(c.cnvs_created::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp"
+                f" OR c.cnvs_updated::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp)"
+            )
+            params.extend([s, e])
+            idx += 2
+
+        if agent:
+            conditions.append(f"a.agnt_name ILIKE ${idx}")
+            params.append(f"%{agent}%")
+            idx += 1
+
+        if channel:
+            conditions.append(f"c.cnvs_channel = ${idx}")
+            params.append(channel)
+            idx += 1
+
+        if status:
+            conditions.append(f"c.cnvs_status = ${idx}")
+            params.append(status)
+            idx += 1
+
+        if search:
+            conditions.append(f"(ct.cnts_name ILIKE ${idx} OR ct.cnts_phone ILIKE ${idx})")
+            params.append(f"%{search}%")
+            idx += 1
+
+        where = ""
+        if conditions:
+            where = " AND " + " AND ".join(conditions)
+
+        allowed_sort = {
+            "created_at": "cnvs_created",
+            "start_time": "cnvs_created",
+            "updated_at": "cnvs_updated",
+            "status": "cnvs_status",
+            "contact": "cnts_name",
+            "agent": "agnt_name",
+            "msg_count": "cnvs_msgcount",
+            "rating": "cnvs_rating_agent",
+            "nps": "cnvs_rating_nps",
+            "art_minutes": "cnvs_art_minutes",
+            "reopened_count": "cnvs_reopened_count",
+        }
+        sort_col = allowed_sort.get(sort_by, "cnvs_created")
+        order = "DESC" if sort_order.lower() == "desc" else "ASC"
+
+        data_sql = queries_pg.CONVERSATION_LIST_QUERY + where + f" ORDER BY {sort_col} {order} NULLS LAST"
+        rows = await self._pool.fetch_all(data_sql, *params)
+
+        return [dict(r) for r in rows]
+
+    async def export_conversation_ids(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[int]:
+        """Export matching conversation IDs (lightweight, no pagination)."""
+        conditions: list[str] = []
+        params: list[Any] = []
+        idx = 1
+
+        if start_date and end_date:
+            s, e = _utc_range(start_date, end_date)
+            conditions.append(
+                f"(c.cnvs_created::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp"
+                f" OR c.cnvs_updated::timestamp BETWEEN ${idx}::timestamp AND ${idx + 1}::timestamp)"
+            )
+            params.extend([s, e])
+            idx += 2
+
+        if agent:
+            conditions.append(f"a.agnt_name ILIKE ${idx}")
+            params.append(f"%{agent}%")
+            idx += 1
+
+        if channel:
+            conditions.append(f"c.cnvs_channel = ${idx}")
+            params.append(channel)
+            idx += 1
+
+        if status:
+            conditions.append(f"c.cnvs_status = ${idx}")
+            params.append(status)
+            idx += 1
+
+        if search:
+            conditions.append(f"(ct.cnts_name ILIKE ${idx} OR ct.cnts_phone ILIKE ${idx})")
+            params.append(f"%{search}%")
+            idx += 1
+
+        where = ""
+        if conditions:
+            where = " AND " + " AND ".join(conditions)
+
+        sql = queries_pg.CONVERSATION_EXPORT_IDS + where + " ORDER BY c.cnvs_created DESC"
+        rows = await self._pool.fetch_all(sql, *params)
+        return [r[0] for r in rows]
+
+    async def fetch_conversation_details(self, conversation_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Batch-fetch conversation details for multiple IDs."""
+        if not conversation_ids:
+            return {}
+        rows = await self._pool.fetch_all(queries_pg.CONVERSATION_EXPORT_DETAILS, conversation_ids)
+        return {r["cnvs_id"]: dict(r) for r in rows}
+
     async def get_conversation_detail(self, conversation_id: int) -> dict[str, Any] | None:
         """Get a single conversation with all metadata."""
         row = await self._pool.fetch_one(queries_pg.CONVERSATION_DETAIL_QUERY, conversation_id)

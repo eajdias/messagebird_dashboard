@@ -126,9 +126,11 @@ export function useExecutive(params: ExecutiveParams) {
       loading: false,
       error,
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.startDate, params.endDate, params.selectedDept, params.group]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
   }, [fetchData]);
 

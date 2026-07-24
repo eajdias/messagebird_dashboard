@@ -23,8 +23,10 @@ function safeNum(v: unknown, fallback = 0): number {
   return fallback;
 }
 
+const EMPTY_BUCKETS: never[] = [];
+
 export function ARTDistribution({ data, className }: ARTDistributionProps) {
-  const buckets = data?.buckets ?? [];
+  const buckets = data?.buckets ?? EMPTY_BUCKETS;
   const total = safeNum(data?.total);
   const maxCount = useMemo(() => Math.max(...buckets.map((b) => b.count), 1), [buckets]);
   const avgBucketIdx = useMemo(() => {

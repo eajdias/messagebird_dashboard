@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
     "python-jose[cryptography]>=3.5.0" "passlib[bcrypt]>=1.7.4" "bcrypt==4.0.1" \
     asyncpg>=0.31.0 "sqlalchemy[asyncio]>=2.0.51" alembic>=1.18.5 \
     "pydantic[email]" python-dotenv pyyaml httpx apscheduler \
-    xlsxwriter fpdf2
+    xlsxwriter fpdf2 openpyxl
 
 # Copy application code
 COPY . .

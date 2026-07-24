@@ -182,11 +182,39 @@ export interface DownloadReportResponse {
 export interface AvailableReportItem {
   report_id: string;
   type: string;
-  year: number;
+  year?: number;
   month?: number;
   group?: string;
+  format?: string;
+  start_date?: string;
+  end_date?: string;
   filename: string;
+  path: string;
+  size_bytes?: number;
+  record_count?: number;
+  created_by: string;
   created_at: string;
+}
+
+export interface ExportConversationsRequest {
+  format: "csv" | "xlsx" | "pdf_zip";
+  start_date: string;
+  end_date: string;
+  department?: string;
+  agent?: string;
+  channel?: string;
+  status?: string;
+  search?: string;
+  save_to_history: boolean;
+}
+
+export interface ExportConversationsResponse {
+  status: string;
+  message: string;
+  report_id: string;
+  download_url: string;
+  size_bytes: number;
+  record_count: number;
 }
 
 // ── Executive Dashboard types ──────────────────────────────────────────────

@@ -61,11 +61,12 @@ export function useConversations(filters?: ConversationFilters) {
         error: err instanceof Error ? err.message : "Erro ao carregar conversas",
       }));
     }
-  }, [filtersKey]);
+  }, []);
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
 
   return { ...state, refetch: fetchData };
 }

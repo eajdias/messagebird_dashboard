@@ -13,14 +13,12 @@ import { SortIcon } from "@/components/ui/sort-icon";
 import { NPSBadge, RatingBadge, ArtBadge } from "@/components/ui/metric-badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
-import { Search, ChevronLeft, ChevronRight, Download, Columns3, ChevronDown, Eye, Archive, FileText, Inbox, Loader2 } from "lucide-react";
-import { downloadCsv, cn, ymd } from "@/lib/utils";
-import api from "@/lib/api";
+import { Search, ChevronLeft, ChevronRight, Columns3, ChevronDown, Eye, Archive, FileText, Inbox } from "lucide-react";
+import { cn, ymd } from "@/lib/utils";
 import { toast } from "sonner";
-import type { ConversationItem, ConversationListResponse } from "@/types";
+import type { ConversationItem } from "@/types";
 
 const PAGE_SIZES = [10, 20, 50, 100];
-const EXPORT_PER_PAGE = 10000;
 
 interface ColumnDef {
   key: string;
@@ -55,43 +53,6 @@ const ALL_COLUMNS: ColumnDef[] = [
 
 const DEFAULT_VISIBLE = new Set(["contact", "agent", "department", "msg_count", "rating", "nps", "art_minutes", "start_time"]);
 
-function fmtDate(val: string | null | undefined): string {
-  if (!val) return "";
-  try { return new Date(val).toLocaleDateString("pt-BR"); } catch { return val; }
-}
-
-function fmtNum(val: number | null | undefined, decimals = 0): number | string {
-  if (val == null || !Number.isFinite(val)) return "";
-  return decimals > 0 ? Number(val.toFixed(decimals)) : val;
-}
-
-function buildExportFilters(
-  search: string, selectedDept: string, channel: string, statusFilter: string,
-  startDate: string, endDate: string,
-) {
-  const qs = new URLSearchParams();
-  qs.set("per_page", String(EXPORT_PER_PAGE));
-  qs.set("page", "1");
-  qs.set("sort_by", "start_time");
-  qs.set("sort_order", "desc");
-  if (search) qs.set("search", search);
-  if (selectedDept) qs.set("department", selectedDept);
-  if (channel) qs.set("channel", channel);
-  if (statusFilter) qs.set("status", statusFilter);
-  qs.set("start_date", startDate);
-  qs.set("end_date", endDate);
-  return qs.toString();
-}
-
-async function fetchAllForExport(
-  search: string, selectedDept: string, channel: string, statusFilter: string,
-  startDate: string, endDate: string,
-): Promise<ConversationItem[]> {
-  const qs = buildExportFilters(search, selectedDept, channel, statusFilter, startDate, endDate);
-  const { data } = await api.get<ConversationListResponse>(`/api/v1/conversations/?${qs}`);
-  return data.conversations;
-}
-
 export default function ConversationsPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -106,7 +67,6 @@ export default function ConversationsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(DEFAULT_VISIBLE);
-  const [exporting, setExporting] = useState<string | null>(null);
 
   const filters = {
     page,
@@ -124,7 +84,6 @@ export default function ConversationsPage() {
   const { data, loading, error, refetch } = useConversations(filters);
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
-  const hasData = (data?.total ?? 0) > 0;
 
   function handleSort(column: string) {
     if (sortBy === column) {
@@ -170,134 +129,12 @@ export default function ConversationsPage() {
     setSelectedIds(new Set());
   }, [selectedIds]);
 
-  async function handleExportCsv() {
-    if (!hasData) return;
-    setExporting("csv");
-    try {
-      const all = await fetchAllForExport(search, selectedDept, channel, statusFilter, startDate, endDate);
-      downloadCsv(
-        all.map((c) => ({ ...c })),
-        [
-          { key: "contact", label: "Contato" },
-          { key: "phone", label: "Telefone" },
-          { key: "agent", label: "Agente" },
-          { key: "department", label: "Departamento" },
-          { key: "msg_count", label: "Mensagens" },
-          { key: "rating", label: "Nota (Agente)", format: (v) => (v != null ? String(v) : "") },
-          { key: "nps", label: "NPS", format: (v) => (v != null ? Number(v).toFixed(0) : "") },
-          { key: "art_minutes", label: "ART (min)", format: (v) => (v != null ? Number(v).toFixed(1) : "") },
-          { key: "start_time", label: "Data" },
-        ],
-        `conversas_${startDate}_${endDate}.csv`,
-      );
-      toast.success(`CSV exportado com ${all.length} conversas`);
-    } catch {
-      toast.error("Erro ao exportar CSV");
-    } finally {
-      setExporting(null);
-    }
-  }
-
-  async function handleExportXlsx() {
-    if (!hasData) return;
-    setExporting("xlsx");
-    try {
-      const all = await fetchAllForExport(search, selectedDept, channel, statusFilter, startDate, endDate);
-      const ExcelJS = await import("exceljs");
-      const wb = new ExcelJS.Workbook();
-      wb.creator = "MBird Dashboard";
-      wb.created = new Date();
-      const ws = wb.addWorksheet("Conversas");
-
-      const headerBlue = "1A3A5C";
-      const headerWhite = "FFFFFF";
-      const altRow = "F3F6FA";
-      const borderStyle = { style: "thin" as const, color: { argb: "D0D5DD" } };
-      const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
-      const headerFont = { bold: true, color: { argb: headerWhite }, size: 11 };
-      const headerFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: headerBlue } };
-      const altFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: altRow } };
-
-      ws.columns = [
-        { header: "Contato", key: "contact", width: 24 },
-        { header: "Telefone", key: "phone", width: 18 },
-        { header: "Agente", key: "agent", width: 22 },
-        { header: "Departamento", key: "department", width: 18 },
-        { header: "Mensagens", key: "msg_count", width: 11 },
-        { header: "Nota (Agente)", key: "rating", width: 14 },
-        { header: "NPS", key: "nps", width: 8 },
-        { header: "ART (min)", key: "art_minutes", width: 12 },
-        { header: "Data", key: "start_time", width: 14 },
-      ];
-
-      const rows = all.map((c) => ({
-        contact: c.contact || "",
-        phone: c.phone || "",
-        agent: c.agent || "",
-        department: c.department || "",
-        msg_count: c.msg_count,
-        rating: c.rating ?? "",
-        nps: c.nps != null ? Number((c.nps as number).toFixed(0)) : "",
-        art_minutes: c.art_minutes != null ? Number((c.art_minutes as number).toFixed(1)) : "",
-        start_time: fmtDate(c.start_time),
-      }));
-
-      for (const row of rows) {
-        ws.addRow(row);
-      }
-
-      const lastRow = ws.rowCount;
-
-      for (let r = 1; r <= lastRow; r++) {
-        const row = ws.getRow(r);
-        if (r === 1) {
-          row.font = headerFont;
-          row.fill = headerFill;
-          row.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-          row.height = 28;
-        } else {
-          row.alignment = { vertical: "middle" };
-          row.height = 22;
-          if (r % 2 === 0) {
-            row.fill = altFill;
-          }
-        }
-        for (let c = 1; c <= 9; c++) {
-          const cell = row.getCell(c);
-          cell.border = allBorders;
-          if (r === 1) continue;
-          const colKey = ws.columns[c - 1]?.key;
-          if (colKey === "msg_count" || colKey === "rating" || colKey === "nps" || colKey === "art_minutes") {
-            cell.alignment = { horizontal: "right", vertical: "middle" };
-          }
-        }
-      }
-
-      ws.autoFilter = { from: "A1", to: `I${lastRow}` };
-
-      ws.views = [{ state: "frozen", ySplit: 1 }];
-
-      const buf = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `conversas_${startDate}_${endDate}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success(`XLSX exportado com ${all.length} conversas`);
-    } catch {
-      toast.error("Erro ao exportar XLSX");
-    } finally {
-      setExporting(null);
-    }
-  }
-
   async function handleDownloadPdf(conversationId: string) {
     try {
       await downloadConversationPdf(conversationId);
       toast.success("PDF baixado com sucesso");
-    } catch {
+    } catch (err) {
+      console.error("PDF download failed", err);
       toast.error("Erro ao baixar PDF");
     }
   }
@@ -327,7 +164,9 @@ export default function ConversationsPage() {
           onChange={(v) => { setSelectedDept(v.length > 0 ? v[0] : ""); setPage(1); }}
         />
 
-        <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); setPage(1); }} />
+        <div suppressHydrationWarning>
+          <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); setPage(1); }} />
+        </div>
 
         <select
           value={channel}
@@ -388,16 +227,6 @@ export default function ConversationsPage() {
             <option key={s} value={s}>{s}/pág</option>
           ))}
         </select>
-
-        <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={!hasData || !!exporting}>
-          {exporting === "csv" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-          CSV
-        </Button>
-
-        <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!hasData || !!exporting}>
-          {exporting === "xlsx" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}
-          XLSX
-        </Button>
 
         {selectedIds.size > 0 && (
           <Button variant="outline" size="sm" onClick={handleArchiveSelected}>

@@ -10,7 +10,7 @@
 
 DROP MATERIALIZED VIEW IF EXISTS vw_survey_data;
 
-CREATE MATERIALIZED VIEW vw_survey_data AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS vw_survey_data AS
 SELECT
     ca.agnt_name AS conversation_agent_name,
     ma.agnt_name AS message_agent_name,

@@ -97,6 +97,40 @@ class ReportRepository(ABC):
         pass
 
     @abstractmethod
+    async def export_conversations(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        department: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        sort_by: str = "created_at",
+        sort_order: str = "desc",
+    ) -> list[dict[str, Any]]:
+        """Export all conversations matching filters (no pagination)."""
+        pass
+
+    @abstractmethod
+    async def export_conversation_ids(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        agent: str | None = None,
+        channel: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[int]:
+        """Export matching conversation IDs (lightweight, no pagination)."""
+        pass
+
+    @abstractmethod
+    async def fetch_conversation_details(self, conversation_ids: list[int]) -> dict[int, dict[str, Any]]:
+        """Batch-fetch conversation details for multiple IDs."""
+        pass
+
+    @abstractmethod
     async def get_conversation_detail(self, conversation_id: int) -> dict[str, Any] | None:
         pass
 
