@@ -207,6 +207,7 @@ export interface ExportConversationsRequest {
   status?: string;
   search?: string;
   art_threshold?: number;
+  bundle_pdfs: boolean;
   save_to_history: boolean;
 }
 

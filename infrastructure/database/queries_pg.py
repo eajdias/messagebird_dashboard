@@ -254,6 +254,8 @@ CONVERSATION_LIST_QUERY = f"""
         c.cnvs_msgcount,
         c.cnvs_reopened_count,
         c.cnvs_channel,
+        c.cnvs_contact_reason,
+        c.cnvs_occurrence,
         ct.cnts_id,
         ct.cnts_name,
         ct.cnts_phone,

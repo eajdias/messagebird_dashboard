@@ -119,7 +119,14 @@ async def export_conversations_data(
 
         rows = await repo.export_conversations_by_contacts(returner_ids, request.start_date, request.end_date)
 
-        entry = svc.save_returners_report(rows, request.start_date, request.end_date, user_email, request.format)
+        if request.bundle_pdfs:
+            ids = [int(r.get("cnvs_id", r.get("id", 0))) for r in rows if r.get("cnvs_id") or r.get("id")]
+            msgs_map = await repo.fetch_messages_for_conversations(ids)
+            entry = svc.save_bundled_zip(
+                rows, msgs_map, "retornantes", request.start_date, request.end_date, user_email, request.format
+            )
+        else:
+            entry = svc.save_returners_report(rows, request.start_date, request.end_date, user_email, request.format)
         _append_manifest(reports_dir, entry)
         return _respond(request, entry, reports_dir)
 
@@ -143,7 +150,14 @@ async def export_conversations_data(
         if not rows:
             raise HTTPException(status_code=404, detail=f"Nenhuma conversa com ART > {threshold} min")
 
-        entry = svc.save_art_high_report(rows, request.start_date, request.end_date, user_email, request.format)
+        if request.bundle_pdfs:
+            ids = [int(r.get("cnvs_id", r.get("id", 0))) for r in rows if r.get("cnvs_id") or r.get("id")]
+            msgs_map = await repo.fetch_messages_for_conversations(ids)
+            entry = svc.save_bundled_zip(
+                rows, msgs_map, "art_high", request.start_date, request.end_date, user_email, request.format
+            )
+        else:
+            entry = svc.save_art_high_report(rows, request.start_date, request.end_date, user_email, request.format)
         _append_manifest(reports_dir, entry)
         return _respond(request, entry, reports_dir)
 
@@ -217,9 +231,13 @@ def _respond(
         )
 
     content_type = (
-        "text/csv; charset=utf-8"
-        if request.format == "csv"
-        else ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        "application/zip"
+        if request.bundle_pdfs
+        else (
+            "text/csv; charset=utf-8"
+            if request.format == "csv"
+            else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     )
     filepath = os.path.join(reports_dir, entry["path"])
     return StreamingResponse(

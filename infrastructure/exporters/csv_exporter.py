@@ -15,6 +15,8 @@ CSV_COLUMNS = [
     ("rating", "Nota (Agente)"),
     ("nps", "NPS"),
     ("art_minutes", "ART (min)"),
+    ("contact_reason", "Motivo do contato"),
+    ("occurrence", "Ocorrência"),
     ("start_time", "Data"),
 ]
 
@@ -29,6 +31,19 @@ def _normalize_row(r: dict[str, Any]) -> dict[str, Any]:
     elif dept_id is not None:
         dept_label = constants.resolve_dept(int(dept_id) if isinstance(dept_id, str) else dept_id)
 
+    reason_id = r.get("cnvs_contact_reason")
+    occ_id = r.get("cnvs_occurrence")
+    reason_label = (
+        constants.resolve_reason(dept_id, reason_id)
+        if dept_id is not None and reason_id is not None
+        else r.get("contact_reason", "")
+    )
+    occurrence_label = (
+        constants.resolve_occurrence(dept_id, reason_id, occ_id)
+        if dept_id is not None and occ_id is not None
+        else r.get("occurrence", "")
+    )
+
     return {
         "contact": r.get("cnts_name") or r.get("contact", ""),
         "phone": r.get("cnts_phone") or r.get("phone", ""),
@@ -38,6 +53,8 @@ def _normalize_row(r: dict[str, Any]) -> dict[str, Any]:
         "rating": r.get("cnvs_rating_agent") if r.get("cnvs_rating_agent") is not None else r.get("rating"),
         "nps": r.get("cnvs_rating_nps") if r.get("cnvs_rating_nps") is not None else r.get("nps"),
         "art_minutes": r.get("cnvs_art_minutes") if r.get("cnvs_art_minutes") is not None else r.get("art_minutes"),
+        "contact_reason": reason_label,
+        "occurrence": occurrence_label,
         "start_time": _fmt_ts(r.get("cnvs_created") or r.get("start_time")),
     }
 

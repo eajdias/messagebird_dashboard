@@ -166,6 +166,7 @@ export async function saveExport(
   saveToHistory: boolean,
   reportType: ExportConversationsRequest["report_type"] = "conversations",
   artThreshold?: number,
+  bundlePdfs = false,
 ): Promise<ExportConversationsResponse> {
   const body: ExportConversationsRequest = {
     format,
@@ -177,6 +178,7 @@ export async function saveExport(
     status: filters.status,
     search: filters.search,
     art_threshold: artThreshold,
+    bundle_pdfs: bundlePdfs,
     save_to_history: saveToHistory,
   };
 
@@ -190,7 +192,7 @@ export async function saveExport(
 
   const disposition: string = response.headers["content-disposition"] || "";
   const match = disposition.match(/filename="?([^";\n]+)"?/);
-  const ext = format === "csv" ? "csv" : "xlsx";
+  const ext = bundlePdfs ? "zip" : format === "csv" ? "csv" : "xlsx";
   const filename = match ? match[1] : `conversas_${filters.startDate}_${filters.endDate}.${ext}`;
 
   const url = URL.createObjectURL(response.data);
@@ -214,8 +216,9 @@ export async function exportReturners(
   filters: ExportFilters,
   format: "csv" | "xlsx",
   saveToHistory: boolean,
+  bundlePdfs = false,
 ): Promise<ExportConversationsResponse> {
-  return saveExport(filters, format, saveToHistory, "returners");
+  return saveExport(filters, format, saveToHistory, "returners", undefined, bundlePdfs);
 }
 
 export async function exportArtHigh(
@@ -223,6 +226,7 @@ export async function exportArtHigh(
   format: "csv" | "xlsx",
   saveToHistory: boolean,
   artThreshold: number,
+  bundlePdfs = false,
 ): Promise<ExportConversationsResponse> {
-  return saveExport(filters, format, saveToHistory, "art_high", artThreshold);
+  return saveExport(filters, format, saveToHistory, "art_high", artThreshold, bundlePdfs);
 }

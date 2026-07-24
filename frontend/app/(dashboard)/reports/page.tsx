@@ -60,6 +60,8 @@ export default function ReportsPage() {
   const [search, setSearch] = useState("");
   const [saveToHistory, setSaveToHistory] = useState(false);
   const [artThreshold, setArtThreshold] = useState(15);
+  const [bundleReturners, setBundleReturners] = useState(false);
+  const [bundleArt, setBundleArt] = useState(false);
 
   const [reports, setReports] = useState<AvailableReportItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
@@ -143,12 +145,12 @@ export default function ReportsPage() {
   async function handleExportReturners(format: "csv" | "xlsx") {
     setExporting(`returners_${format}`);
     try {
-      const result = await exportReturners(filters, format, saveToHistory);
+      const result = await exportReturners(filters, format, saveToHistory, bundleReturners);
       if (saveToHistory) {
-        toast.success(`Retornantes ${format.toUpperCase()} salvo (${result.record_count} contatos)`);
+        toast.success(`Retornantes ${format.toUpperCase()}${bundleReturners ? " + PDFs" : ""} salvo (${result.record_count} contatos)`);
         loadReports();
       } else {
-        toast.success(`Retornantes ${format.toUpperCase()} baixado com sucesso`);
+        toast.success(`Retornantes ${format.toUpperCase()}${bundleReturners ? " + PDFs" : ""} baixado com sucesso`);
       }
     } catch (err) {
       console.error("Returners export failed", err);
@@ -161,12 +163,12 @@ export default function ReportsPage() {
   async function handleExportArtHigh(format: "csv" | "xlsx") {
     setExporting(`art_${format}`);
     try {
-      const result = await exportArtHigh(filters, format, saveToHistory, artThreshold);
+      const result = await exportArtHigh(filters, format, saveToHistory, artThreshold, bundleArt);
       if (saveToHistory) {
-        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()} salvo (${result.record_count} registros)`);
+        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()}${bundleArt ? " + PDFs" : ""} salvo (${result.record_count} registros)`);
         loadReports();
       } else {
-        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()} baixado com sucesso`);
+        toast.success(`ART > ${artThreshold}min ${format.toUpperCase()}${bundleArt ? " + PDFs" : ""} baixado com sucesso`);
       }
     } catch (err) {
       console.error("ART high export failed", err);
@@ -357,6 +359,16 @@ export default function ReportsPage() {
               {exporting === "returners_xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
               Retornantes Excel
             </Button>
+            <div className="flex items-center gap-2 ml-2">
+              <Checkbox
+                id="bundle-returners"
+                checked={bundleReturners}
+                onCheckedChange={(v) => setBundleReturners(!!v)}
+              />
+              <label htmlFor="bundle-returners" className="text-xs text-muted-foreground cursor-pointer select-none">
+                Incluir PDFs das OS (ZIP)
+              </label>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1">
@@ -391,6 +403,16 @@ export default function ReportsPage() {
               {exporting === "art_xlsx" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
               Excel
             </Button>
+            <div className="flex items-center gap-2 ml-2">
+              <Checkbox
+                id="bundle-art"
+                checked={bundleArt}
+                onCheckedChange={(v) => setBundleArt(!!v)}
+              />
+              <label htmlFor="bundle-art" className="text-xs text-muted-foreground cursor-pointer select-none">
+                Incluir PDFs das OS (ZIP)
+              </label>
+            </div>
           </div>
         </CardContent>
       </Card>

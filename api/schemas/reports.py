@@ -23,6 +23,7 @@ class ExportConversationsRequest(BaseModel):
     status: str | None = None
     search: str | None = None
     art_threshold: float | None = Field(default=None, ge=1)
+    bundle_pdfs: bool = False
     save_to_history: bool = False
 
 

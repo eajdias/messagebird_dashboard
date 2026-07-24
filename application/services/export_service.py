@@ -110,6 +110,25 @@ class ExportService:
             nps_vals = [c.get("cnvs_rating_nps") for c in convs if c.get("cnvs_rating_nps") is not None]
             arts = [c.get("cnvs_art_minutes") for c in convs if c.get("cnvs_art_minutes") is not None]
 
+            motivos = sorted(
+                {
+                    constants.resolve_reason(c.get("cnvs_dept"), c.get("cnvs_contact_reason"))
+                    for c in convs
+                    if c.get("cnvs_contact_reason") is not None
+                }
+            )
+            ocorrencias = sorted(
+                {
+                    constants.resolve_occurrence(
+                        c.get("cnvs_dept"),
+                        c.get("cnvs_contact_reason"),
+                        c.get("cnvs_occurrence"),
+                    )
+                    for c in convs
+                    if c.get("cnvs_occurrence") is not None
+                }
+            )
+
             # Count distinct days
             days = set()
             for c in convs:
@@ -137,6 +156,8 @@ class ExportService:
                     "primeira_visita": _fmt_ts(last.get("cnvs_created", "")),
                     "ultima_visita": _fmt_ts(first.get("cnvs_created", "")),
                     "total_msgs": sum(c.get("cnvs_msgcount", 0) for c in convs),
+                    "motivos_contato": ", ".join(motivos),
+                    "ocorrencias": ", ".join(ocorrencias),
                 }
             )
 
@@ -163,6 +184,66 @@ class ExportService:
         data = self._csv.generate(rows) if format == "csv" else self._xlsx.generate(rows)
 
         return self._save_file(prefix, ext, data, start_date, end_date, rows, created_by)
+
+    def save_bundled_zip(
+        self,
+        rows: list[dict[str, Any]],
+        msgs_map: dict[int, list[dict[str, Any]]],
+        prefix: str,
+        start_date: str,
+        end_date: str,
+        created_by: str,
+        format: str = "csv",
+    ) -> dict[str, Any]:
+        """Generate a ZIP containing the report file + OS PDFs for all conversations."""
+        zip_buf = io.BytesIO()
+        safe_ts = datetime.now().strftime("%H%M%S")
+        report_filename = f"relatorio_{prefix}_{start_date}_{end_date}_{safe_ts}.{format}"
+
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Add the report file
+            data = self._csv.generate(rows) if format == "csv" else self._xlsx.generate(rows)
+            zf.writestr(report_filename, data)
+
+            # Add OS PDFs
+            for r in rows:
+                cnvs_id = r.get("cnvs_id") or r.get("id")
+                if not cnvs_id:
+                    continue
+                cnvs_id = int(cnvs_id)
+                detail = self._row_to_detail(r)
+                msgs = msgs_map.get(cnvs_id, [])
+                pdf_bytes = self._pdf.generate_single_os_pdf_bytes(detail, msgs)
+                protocol = detail.get("cnvs_bird") or str(cnvs_id)
+                zf.writestr(f"OS/OS_{protocol}.pdf", pdf_bytes)
+
+        zip_buf.seek(0)
+        data = zip_buf.getvalue()
+        filename = f"relatorio_{prefix}_{start_date}_{end_date}_{safe_ts}.zip"
+
+        # Save ZIP file
+        report_id = f"{prefix}_bundle_{uuid.uuid4().hex[:8]}"
+        abs_dir = os.path.join(self._reports_dir, "exports", "zip")
+        os.makedirs(abs_dir, exist_ok=True)
+        filepath = os.path.join(abs_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(data)
+
+        size_bytes = os.path.getsize(filepath)
+
+        return {
+            "report_id": report_id,
+            "type": "export",
+            "format": f"{prefix}_bundle",
+            "start_date": start_date,
+            "end_date": end_date,
+            "filename": filename,
+            "path": os.path.relpath(filepath, self._reports_dir),
+            "size_bytes": size_bytes,
+            "record_count": len(rows),
+            "created_by": created_by,
+            "created_at": datetime.now().isoformat(),
+        }
 
     def _csv_aggregated(self, rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> bytes:
         import csv
@@ -291,6 +372,8 @@ RETURNER_COLUMNS: list[tuple[str, str]] = [
     ("agentes", "Agentes"),
     ("departamentos", "Departamentos"),
     ("canais", "Canais"),
+    ("motivos_contato", "Motivos de contato"),
+    ("ocorrencias", "Ocorrências"),
     ("nota_media", "Nota média"),
     ("nps_medio", "NPS médio"),
     ("art_medio_min", "ART médio (min)"),
