@@ -29,6 +29,10 @@ async def sync_conversations(
         page = 0
         while True:
             conv_params: dict[str, Any] = {"limit": limit, "offset": offset, "status": status}
+            if min_date:
+                conv_params["created_datetime_after"] = min_date
+            if max_date:
+                conv_params["created_datetime_before"] = max_date
 
             response = await manager.client.list_conversations(**conv_params)
             if "error" in response:
@@ -91,12 +95,6 @@ async def sync_conversations(
                 updated_at_str = c.get("updatedDatetime")
                 updated_dt = parse_dt(updated_at_str) if updated_at_str else None
 
-                cnvs_created_raw = c.get("createdDatetime")
-                if max_date and cnvs_created_raw and cnvs_created_raw >= max_date:
-                    continue
-                if min_date and cnvs_created_raw and cnvs_created_raw < min_date:
-                    continue
-
                 cnvs_bird = c["id"]
                 cnts_id = manager._contact_cache.get(c.get("contactId"))
                 cnvs_msgcount = c.get("messages", {}).get("totalCount", 0)
@@ -158,10 +156,6 @@ async def sync_conversations(
                 logger.info("  convs %s: page %d, %d fetched so far...", status, page, count)
 
             if len(items) < limit:
-                break
-
-            page_max = max(c.get("createdDatetime", "") or "" for c in items)
-            if min_date and page_max < min_date:
                 break
 
             if status == "active":

@@ -457,7 +457,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           <Suspense fallback={<TableSkeleton rows={8} />}>
             <BSCScorecardTable
               data={bscScorecard.scorecard}
-              onSaveManual={bscScorecard.saveManualValue}
             />
           </Suspense>
         );

@@ -575,3 +575,161 @@ class PostgresReportRepository(ReportRepository):
             pe,
             value,
         )
+
+    # ── Agent Manual Entries ─────────────────────────────────────────
+
+    async def get_agent_manual_entries(
+        self,
+        agent_name: str,
+        department: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        query = (
+            "SELECT id, department, agent_name, metric_name, entry_date, value, notes, "
+            "created_at, updated_at FROM agent_manual_entries "
+            "WHERE agent_name = $1 AND department = $2"
+        )
+        params: list[Any] = [agent_name, department]
+        idx = 3
+
+        if start_date:
+            query += f" AND entry_date >= ${idx}"
+            params.append(date.fromisoformat(start_date))
+            idx += 1
+        if end_date:
+            query += f" AND entry_date <= ${idx}"
+            params.append(date.fromisoformat(end_date))
+            idx += 1
+        if metric_name:
+            query += f" AND metric_name = ${idx}"
+            params.append(metric_name)
+            idx += 1
+
+        query += " ORDER BY entry_date DESC, id DESC"
+
+        rows = await self._pool.fetch_all(query, *params)
+        return [
+            {
+                "id": r["id"],
+                "department": r["department"],
+                "agent_name": r["agent_name"],
+                "metric_name": r["metric_name"],
+                "entry_date": r["entry_date"].isoformat() if r["entry_date"] else "",
+                "value": float(r["value"]),
+                "notes": r["notes"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                "updated_at": r["updated_at"].isoformat() if r["updated_at"] else None,
+            }
+            for r in rows
+        ]
+
+    async def create_agent_manual_entry(
+        self,
+        agent_name: str,
+        department: str,
+        metric_name: str,
+        entry_date: str,
+        value: float,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        row = await self._pool.fetch_one(
+            "INSERT INTO agent_manual_entries (department, agent_name, metric_name, entry_date, value, notes) "
+            "VALUES ($1, $2, $3, $4, $5, $6) "
+            "ON CONFLICT (department, agent_name, metric_name, entry_date) "
+            "DO UPDATE SET value = $5, notes = $6, updated_at = NOW() "
+            "RETURNING id, department, agent_name, metric_name, entry_date, value, notes, created_at, updated_at",
+            department,
+            agent_name,
+            metric_name,
+            date.fromisoformat(entry_date),
+            value,
+            notes,
+        )
+        if not row:
+            raise ValueError("Failed to create agent manual entry")
+        return {
+            "id": row["id"],
+            "department": row["department"],
+            "agent_name": row["agent_name"],
+            "metric_name": row["metric_name"],
+            "entry_date": row["entry_date"].isoformat() if row["entry_date"] else "",
+            "value": float(row["value"]),
+            "notes": row["notes"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+        }
+
+    async def update_agent_manual_entry(
+        self,
+        entry_id: int,
+        value: float | None = None,
+        notes: str | None = None,
+    ) -> dict[str, Any] | None:
+        sets: list[str] = []
+        params: list[Any] = []
+        idx = 1
+
+        if value is not None:
+            sets.append(f"value = ${idx}")
+            params.append(value)
+            idx += 1
+        if notes is not None:
+            sets.append(f"notes = ${idx}")
+            params.append(notes)
+            idx += 1
+
+        if not sets:
+            return None
+
+        sets.append("updated_at = NOW()")
+        query = (
+            f"UPDATE agent_manual_entries SET {', '.join(sets)} "
+            f"WHERE id = ${idx} "
+            "RETURNING id, department, agent_name, metric_name, entry_date, value, notes, created_at, updated_at"
+        )
+        params.append(entry_id)
+
+        row = await self._pool.fetch_one(query, *params)
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "department": row["department"],
+            "agent_name": row["agent_name"],
+            "metric_name": row["metric_name"],
+            "entry_date": row["entry_date"].isoformat() if row["entry_date"] else "",
+            "value": float(row["value"]),
+            "notes": row["notes"],
+            "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
+        }
+
+    async def delete_agent_manual_entry(self, entry_id: int) -> bool:
+        result = await self._pool.execute("DELETE FROM agent_manual_entries WHERE id = $1", entry_id)
+        # asyncpg execute returns a string like "DELETE 1"
+        return result != "DELETE 0"
+
+    async def get_aggregated_manual_values(
+        self, department: str, start_date: str, end_date: str
+    ) -> dict[str, dict[str, float]]:
+        ps = date.fromisoformat(start_date)
+        pe = date.fromisoformat(end_date)
+        rows = await self._pool.fetch_all(
+            "SELECT agent_name, metric_name, SUM(value) as total_value "
+            "FROM agent_manual_entries "
+            "WHERE department = $1 AND entry_date >= $2 AND entry_date <= $3 "
+            "GROUP BY agent_name, metric_name",
+            department,
+            ps,
+            pe,
+        )
+        result: dict[str, dict[str, float]] = {}
+        for row in rows:
+            metric = row["metric_name"]
+            agent = row["agent_name"]
+            if metric not in result:
+                result[metric] = {}
+            result[metric][agent] = float(row["total_value"])
+        return result

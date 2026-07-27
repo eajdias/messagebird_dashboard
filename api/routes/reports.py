@@ -2,6 +2,7 @@
 Reports Routes — export, generate, list, download, delete reports.
 """
 
+import io
 import json
 import logging
 import os
@@ -21,10 +22,12 @@ from api.schemas.reports import (
     AvailableReportsResponse,
     ExportConversationsRequest,
     ExportConversationsResponse,
+    ExportDashboardRequest,
     GenerateReportResponse,
     ReportRequest,
 )
 from application.interfaces.repository import ReportRepository
+from application.services.dashboard_export_service import DashboardExportService
 from application.services.export_service import ExportService
 from application.use_cases.generate_report import GenerateReportUseCase
 from infrastructure.exporters.excel_exporter import ExcelExporter
@@ -247,6 +250,36 @@ def _respond(
             "Content-Disposition": f'attachment; filename="{entry["filename"]}"',
             "X-Report-Id": entry["report_id"],
         },
+    )
+
+
+# ── POST /reports/export-dashboard ──────────────────────────────────────
+
+
+@router.post("/export-dashboard")
+async def export_dashboard_data(
+    request: ExportDashboardRequest,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+    repo: ReportRepository = Depends(get_repository),
+):
+    """Generate a multi-sheet Excel with dashboard KPIs from selected sections."""
+    from api.routes.dashboard import _fetch_and_process, _filter_processed
+
+    raw, processed = await _fetch_and_process(repo, request.start_date, request.end_date)
+    filtered = _filter_processed(processed, set(), None, request.department)
+
+    if not filtered:
+        raise HTTPException(status_code=404, detail="Nenhum dado encontrado no período")
+
+    sections = set(request.sections)
+    svc = DashboardExportService()
+    data = svc.generate(filtered, sections)
+
+    filename = f"dashboard_{request.start_date}_{request.end_date}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

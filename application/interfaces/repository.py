@@ -162,3 +162,45 @@ class ReportRepository(ABC):
         value: float,
     ) -> None:
         pass
+
+    @abstractmethod
+    async def get_agent_manual_entries(
+        self,
+        agent_name: str,
+        department: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        metric_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    async def create_agent_manual_entry(
+        self,
+        agent_name: str,
+        department: str,
+        metric_name: str,
+        entry_date: str,
+        value: float,
+        notes: str | None = None,
+    ) -> dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def update_agent_manual_entry(
+        self,
+        entry_id: int,
+        value: float | None = None,
+        notes: str | None = None,
+    ) -> dict[str, Any] | None:
+        pass
+
+    @abstractmethod
+    async def delete_agent_manual_entry(self, entry_id: int) -> bool:
+        pass
+
+    @abstractmethod
+    async def get_aggregated_manual_values(
+        self, department: str, start_date: str, end_date: str
+    ) -> dict[str, dict[str, float]]:
+        pass

@@ -20,8 +20,6 @@ from api.schemas.dashboard import (
     ARTDistributionBucket,
     ARTDistributionResponse,
     BSCAgentValue,
-    BSCManualValuePayload,
-    BSCManualValueResponse,
     BSCMetricRow,
     BSCResponse,
     BSCScorecardCategory,
@@ -268,15 +266,16 @@ async def get_bsc_scorecard(
         "Atendimentos Finalizados": _count,
     }
 
-    # Get manual values from DB
+    # Get manual values from DB (aggregated by date range)
     from api.dependencies import get_pool
 
     pool = await get_pool()
     parsed_start = date.fromisoformat(start)
     parsed_end = date.fromisoformat(end)
     manual_rows = await pool.fetch_all(
-        "SELECT agent_name, metric_name, value FROM bsc_manual_values "
-        "WHERE department = $1 AND period_start = $2 AND period_end = $3",
+        "SELECT agent_name, metric_name, SUM(value) as value FROM agent_manual_entries "
+        "WHERE department = $1 AND entry_date >= $2 AND entry_date <= $3 "
+        "GROUP BY agent_name, metric_name",
         dept,
         parsed_start,
         parsed_end,
@@ -432,45 +431,6 @@ def _build_metric_rows(
             )
         )
     return rows
-
-
-# ── PUT /dashboard/bsc/manual-value ─────────────────────────────────────
-
-
-@router.put("/bsc/manual-value", response_model=BSCManualValueResponse)
-async def put_bsc_manual_value(
-    payload: BSCManualValuePayload,
-    _current_user: dict[str, Any] = Depends(get_current_user),
-    repo: ReportRepository = Depends(get_repository),
-):
-    await repo.upsert_bsc_manual_value(
-        department=payload.department,
-        agent_name=payload.agent_name,
-        metric_name=payload.metric_name,
-        period_start=payload.period_start,
-        period_end=payload.period_end,
-        value=payload.value,
-    )
-    return BSCManualValueResponse(
-        department=payload.department,
-        agent_name=payload.agent_name,
-        metric_name=payload.metric_name,
-        value=payload.value,
-    )
-
-
-# ── GET /dashboard/bsc/manual-values ────────────────────────────────────
-
-
-@router.get("/bsc/manual-values", response_model=dict[str, dict[str, float]])
-async def get_bsc_manual_values(
-    department: str = Query(...),
-    start_date: str = Query(...),
-    end_date: str = Query(...),
-    _current_user: dict[str, Any] = Depends(get_current_user),
-    repo: ReportRepository = Depends(get_repository),
-):
-    return await repo.get_bsc_manual_values(department, start_date, end_date)
 
 
 # ── GET /dashboard/evolution ────────────────────────────────────────────

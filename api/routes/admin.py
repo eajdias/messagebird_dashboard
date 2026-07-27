@@ -5,7 +5,7 @@ Admin Routes
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
 from api.auth import get_current_user
 from api.schemas._base import StatusResponse
@@ -23,7 +23,15 @@ from api.schemas.admin import (
     SyncTriggerRequest,
     SyncTriggerResponse,
 )
-from domain.constants import AGENTS, DEPT_MAP
+from api.schemas.dashboard import (
+    AgentDetailResponse,
+    AgentManualEntryCreate,
+    AgentManualEntryResponse,
+    AgentManualEntryUpdate,
+    AvailableMetric,
+    ManualMetricsListResponse,
+)
+from domain.constants import AGENTS, DEPT_MAP, KPI_CONFIG
 
 logger = logging.getLogger("m_bird.admin")
 
@@ -142,6 +150,185 @@ async def list_departments(
     """List all departments."""
     items = [DepartmentItem(dept_id=dept_id, label=label) for dept_id, label in DEPT_MAP.items()]
     return DepartmentListResponse(departments=items)
+
+
+# ── Agent Detail & Manual Entries ─────────────────────────────────────
+
+
+def _resolve_agent(agent_name: str) -> dict[str, str]:
+    """Find agent by name in YAML config. Returns {bird_id, name, group} or raises 404."""
+    for bird_id, info in AGENTS.items():
+        if info["name"] == agent_name:
+            return {"bird_id": bird_id, "name": info["name"], "group": info.get("group", "")}
+    raise HTTPException(status_code=404, detail=f"Agente '{agent_name}' não encontrado")
+
+
+def _get_available_metrics(department: str) -> list[dict[str, object]]:
+    """Return manual-only metrics available for a department from KPI config."""
+    auto_computers = {
+        "Elogios de atendimento / Feedback",
+        "NPS (Net Promoter Score)",
+        "Feedback Negativo (Penalidade)",
+        "Atendimentos Finalizados",
+    }
+    kpi_cfg = KPI_CONFIG.get(department, {})
+    metrics: list[dict[str, object]] = []
+
+    for m in kpi_cfg.get("t1", []):
+        if m.get("is_automatic_sum"):
+            continue
+        name = str(m.get("name", ""))
+        if name in auto_computers:
+            continue
+        metrics.append(
+            {
+                "name": name,
+                "meta": str(m.get("meta", "")),
+                "peso": int(m.get("peso", 0)),
+                "tipo": str(m.get("tipo", "")),
+                "description": str(m.get("description", "")),
+            }
+        )
+
+    for m in kpi_cfg.get("t2", []):
+        metrics.append(
+            {
+                "name": str(m.get("name", "")),
+                "meta": str(m.get("meta", "")),
+                "peso": int(m.get("peso", 0)),
+                "tipo": str(m.get("tipo", "")),
+                "description": str(m.get("description", "")),
+            }
+        )
+
+    for m in kpi_cfg.get("penalidades_setoriais", []):
+        metrics.append(
+            {
+                "name": str(m.get("name", "")),
+                "meta": str(m.get("meta", "")),
+                "peso": int(m.get("peso", 0)),
+                "tipo": str(m.get("tipo", "")),
+                "description": str(m.get("description", "")),
+            }
+        )
+
+    return metrics
+
+
+@router.get("/agents/{agent_name}", response_model=AgentDetailResponse)
+async def get_agent_detail(
+    agent_name: str = Path(..., description="Nome do agente"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Get agent details and available manual metrics for their department."""
+    agent = _resolve_agent(agent_name)
+    dept = agent["group"]
+    metrics = _get_available_metrics(dept)
+    return AgentDetailResponse(
+        bird_id=agent["bird_id"],
+        name=agent["name"],
+        group=agent["group"],
+        available_metrics=[AvailableMetric(**m) for m in metrics],
+    )
+
+
+@router.get("/agents/{agent_name}/manual-entries", response_model=list[AgentManualEntryResponse])
+async def list_agent_manual_entries(
+    agent_name: str = Path(..., description="Nome do agente"),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
+    metric_name: str | None = Query(None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """List manual metric entries for an agent. Optional date/metric filters."""
+    agent = _resolve_agent(agent_name)
+    dept = agent["group"]
+
+    from api.dependencies import get_pool
+    from infrastructure.repositories.postgres_report_repository import PostgresReportRepository
+
+    pool = await get_pool()
+    repo = PostgresReportRepository(pool)
+    entries = await repo.get_agent_manual_entries(agent_name, dept, start_date, end_date, metric_name)
+    return [AgentManualEntryResponse(**e) for e in entries]
+
+
+@router.post("/agents/{agent_name}/manual-entries", response_model=AgentManualEntryResponse, status_code=201)
+async def create_agent_manual_entry(
+    payload: AgentManualEntryCreate,
+    agent_name: str = Path(..., description="Nome do agente"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Create a manual metric entry for an agent."""
+    _resolve_agent(agent_name)
+
+    from api.dependencies import get_pool
+    from infrastructure.repositories.postgres_report_repository import PostgresReportRepository
+
+    pool = await get_pool()
+    repo = PostgresReportRepository(pool)
+    entry = await repo.create_agent_manual_entry(
+        agent_name=agent_name,
+        department=payload.department,
+        metric_name=payload.metric_name,
+        entry_date=payload.entry_date,
+        value=payload.value,
+        notes=payload.notes,
+    )
+    return AgentManualEntryResponse(**entry)
+
+
+@router.put("/agents/{agent_name}/manual-entries/{entry_id}", response_model=AgentManualEntryResponse)
+async def update_agent_manual_entry(
+    entry_id: int = Path(..., ge=1),
+    agent_name: str = Path(..., description="Nome do agente"),
+    payload: AgentManualEntryUpdate | None = Body(default=None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Update an agent's manual metric entry."""
+    _resolve_agent(agent_name)
+
+    if not payload or (payload.value is None and payload.notes is None):
+        raise HTTPException(status_code=400, detail="Nada para atualizar")
+
+    from api.dependencies import get_pool
+    from infrastructure.repositories.postgres_report_repository import PostgresReportRepository
+
+    pool = await get_pool()
+    repo = PostgresReportRepository(pool)
+    entry = await repo.update_agent_manual_entry(entry_id, payload.value, payload.notes)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entrada não encontrada")
+    return AgentManualEntryResponse(**entry)
+
+
+@router.delete("/agents/{agent_name}/manual-entries/{entry_id}", status_code=204)
+async def delete_agent_manual_entry(
+    entry_id: int = Path(..., ge=1),
+    agent_name: str = Path(..., description="Nome do agente"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Delete an agent's manual metric entry."""
+    _resolve_agent(agent_name)
+
+    from api.dependencies import get_pool
+    from infrastructure.repositories.postgres_report_repository import PostgresReportRepository
+
+    pool = await get_pool()
+    repo = PostgresReportRepository(pool)
+    deleted = await repo.delete_agent_manual_entry(entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Entrada não encontrada")
+
+
+@router.get("/manual-metrics", response_model=ManualMetricsListResponse)
+async def list_manual_metrics(
+    department: str = Query(..., description="Nome do departamento"),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """List all manual metrics available for a department (for dropdown in agent form)."""
+    raw = _get_available_metrics(department)
+    return ManualMetricsListResponse(metrics=[AvailableMetric(**m) for m in raw])
 
 
 @router.get("/health", response_model=HealthResponse)

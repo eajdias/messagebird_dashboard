@@ -14,7 +14,6 @@ interface BscScorecardState {
   scorecard: BSCScorecardResponse | null;
   loading: boolean;
   error: string | null;
-  saveManualValue: (agentName: string, metricName: string, value: number) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -55,23 +54,5 @@ export function useBscScorecard({ department, startDate, endDate }: BscScorecard
     fetchScorecard();
   }, [fetchScorecard]);
 
-  const saveManualValue = useCallback(
-    async (agentName: string, metricName: string, value: number) => {
-      if (!department || !startDate || !endDate) return;
-
-      await api.put("/api/v1/dashboard/bsc/manual-value", {
-        department,
-        agent_name: agentName,
-        metric_name: metricName,
-        period_start: startDate,
-        period_end: endDate,
-        value,
-      });
-
-      await fetchScorecard();
-    },
-    [department, startDate, endDate, fetchScorecard]
-  );
-
-  return { scorecard, loading, error, saveManualValue, refresh: fetchScorecard };
+  return { scorecard, loading, error, refresh: fetchScorecard };
 }

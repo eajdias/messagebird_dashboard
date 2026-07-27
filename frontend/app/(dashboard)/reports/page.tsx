@@ -4,11 +4,7 @@ import { useState, useEffect } from "react";
 import api from "@/lib/api";
 import { ymd } from "@/lib/utils";
 import { saveExport, exportReturners, exportArtHigh, exportPdfBulk, type ExportFilters } from "@/hooks/useExportConversations";
-import type {
-  AvailableReportItem,
-  ExportConversationsRequest,
-  GenerateReportResponse,
-} from "@/types";
+import type { AvailableReportItem, ExportConversationsRequest } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +14,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import {
   Download, FileBarChart, FileSpreadsheet, FileText, FileArchive,
-  Loader2, Inbox, Calendar, Trash2, AlertTriangle, X, Users, Timer,
+  Loader2, Inbox, Trash2, AlertTriangle, X, Users, Timer,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -62,15 +58,21 @@ export default function ReportsPage() {
   const [artThreshold, setArtThreshold] = useState(15);
   const [bundleReturners, setBundleReturners] = useState(false);
   const [bundleArt, setBundleArt] = useState(false);
+  const [dashboardSections, setDashboardSections] = useState<Set<string>>(
+    new Set(["summary", "quality", "agents", "departments", "evolution"]),
+  );
+
+  function toggleSection(key: string) {
+    setDashboardSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   const [reports, setReports] = useState<AvailableReportItem[]>([]);
   const [loadingList, setLoadingList] = useState(false);
-  const [type, setType] = useState<"monthly" | "annual">("monthly");
-  const [year, setYear] = useState(0);
-  const [month, setMonth] = useState(0);
-  const [mounted, setMounted] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [message, setMessage] = useState("");
   const [exporting, setExporting] = useState<string | null>(null);
 
   const [availableTypeFilter, setAvailableTypeFilter] = useState("");
@@ -88,32 +90,9 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    const now = new Date();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setYear(now.getFullYear());
-    setMonth(now.getMonth() + 1);
-    setMounted(true);
     loadReports();
   }, []);
-
-  async function handleGenerate() {
-    setGenerating(true);
-    setMessage("");
-    try {
-      const { data } = await api.post<GenerateReportResponse>("/api/v1/reports/generate", {
-        type,
-        year,
-        month: type === "monthly" ? month : undefined,
-      });
-      toast.success(`Relatório ${data.report_id} gerado com sucesso!`);
-      setMessage(`Relatório ${data.report_id} gerado com sucesso!`);
-      loadReports();
-    } catch {
-      toast.error("Erro ao gerar relatório");
-    } finally {
-      setGenerating(false);
-    }
-  }
 
   const filters: ExportFilters = {
     startDate,
@@ -178,6 +157,35 @@ export default function ReportsPage() {
     }
   }
 
+  async function handleExportDashboard() {
+    setExporting("dashboard");
+    try {
+      const sections = Array.from(dashboardSections);
+      const response = await api.post(
+        "/api/v1/reports/export-dashboard",
+        {
+          start_date: startDate,
+          end_date: endDate,
+          department: selectedDept || undefined,
+          sections,
+        },
+        { responseType: "blob" },
+      );
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `dashboard_${startDate}_${endDate}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Dashboard exportado com ${sections.length} seções`);
+    } catch (err) {
+      console.error("Dashboard export failed", err);
+      toast.error("Erro ao exportar dashboard");
+    } finally {
+      setExporting(null);
+    }
+  }
+
   async function handleDownload(report: AvailableReportItem) {
     window.open(`/api/v1/reports/${report.report_id}/download`, "_blank");
   }
@@ -203,8 +211,6 @@ export default function ReportsPage() {
         return true;
       })
     : reports;
-
-  if (!mounted) return null;
 
   return (
     <div className="space-y-6">
@@ -420,51 +426,59 @@ export default function ReportsPage() {
       <Card variant="glass">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Gerar Relatório Periódico
+            <FileBarChart className="h-4 w-4" />
+            Exportar Dashboard
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Tipo</label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as "monthly" | "annual")}
-                className={selectCls}
-              >
-                <option value="monthly">Mensal</option>
-                <option value="annual">Anual</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">Ano</label>
-              <Input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="w-24"
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <DepartmentMultiSelect
+              selected={selectedDept ? [selectedDept] : []}
+              onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
+            />
+            <div suppressHydrationWarning>
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(s, e) => { setStartDate(s); setEndDate(e); }}
               />
             </div>
-            {type === "monthly" && (
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">Mês</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={month}
-                  onChange={(e) => setMonth(Number(e.target.value))}
-                  className="w-20"
-                />
-              </div>
-            )}
-            <Button onClick={handleGenerate} disabled={generating}>
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileBarChart className="h-4 w-4" />}
-              Gerar
-            </Button>
           </div>
-          {message && <p className="mt-3 text-sm text-muted-foreground">{message}</p>}
+          <p className="text-xs text-muted-foreground mb-3">Selecione as seções do dashboard para incluir no Excel:</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("summary")} onCheckedChange={() => toggleSection("summary")} />
+              Resumo KPIs
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("evolution")} onCheckedChange={() => toggleSection("evolution")} />
+              Evolução Mensal
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("quality")} onCheckedChange={() => toggleSection("quality")} />
+              Qualidade / NPS
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("agents")} onCheckedChange={() => toggleSection("agents")} />
+              Ranking de Agentes
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("departments")} onCheckedChange={() => toggleSection("departments")} />
+              Departamentos
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("motives")} onCheckedChange={() => toggleSection("motives")} />
+              Motivos / Ocorrências
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={dashboardSections.has("heatmap")} onCheckedChange={() => toggleSection("heatmap")} />
+              Heatmap
+            </label>
+          </div>
+          <Button onClick={handleExportDashboard} disabled={dashboardSections.size === 0 || !!exporting}>
+            {exporting === "dashboard" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileBarChart className="h-4 w-4" />}
+            Gerar Dashboard (Excel)
+          </Button>
         </CardContent>
       </Card>
 

@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import type { AgentItem, DepartmentItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Building2 } from "lucide-react";
+import { Users, Building2, ExternalLink } from "lucide-react";
 
 export default function AgentsPage() {
+  const router = useRouter();
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,15 +53,23 @@ export default function AgentsPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>ID Bird</TableHead>
                   <TableHead>Grupo</TableHead>
+                  <TableHead className="w-[40px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {agents.map((a) => (
-                  <TableRow key={a.bird_id}>
-                    <TableCell className="font-medium">{a.name}</TableCell>
+                  <TableRow
+                    key={a.bird_id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => router.push(`/agents/${encodeURIComponent(a.name)}`)}
+                  >
+                    <TableCell className="font-medium text-primary hover:underline">{a.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{a.bird_id}</TableCell>
                     <TableCell>
                       {a.group ? <Badge variant="secondary">{a.group}</Badge> : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                     </TableCell>
                   </TableRow>
                 ))}

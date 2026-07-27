@@ -60,3 +60,12 @@ AvailableReportsResponse = list_response(AvailableReportItem, "reports")
 
 class GenerateReportResponse(StatusResponse):
     report_id: str
+
+
+class ExportDashboardRequest(BaseModel):
+    start_date: str
+    end_date: str
+    department: str | None = None
+    sections: list[str] = Field(
+        default_factory=lambda: ["summary", "quality", "agents", "departments", "evolution", "motives", "heatmap"]
+    )

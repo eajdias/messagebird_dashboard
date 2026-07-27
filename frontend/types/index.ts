@@ -445,3 +445,45 @@ export interface BSCScorecardResponse {
   categories: BSCScorecardCategory[];
   penalidades: BSCMetricRow[];
 }
+
+// ── Agent Manual Entries ──────────────────────────────────────────────
+
+export interface AvailableMetric {
+  name: string;
+  meta: string;
+  peso: number;
+  tipo: string;
+  description: string;
+}
+
+export interface AgentDetailResponse {
+  bird_id: string;
+  name: string;
+  group: string;
+  available_metrics: AvailableMetric[];
+}
+
+export interface AgentManualEntryResponse {
+  id: number;
+  department: string;
+  agent_name: string;
+  metric_name: string;
+  entry_date: string;
+  value: number;
+  notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AgentManualEntryCreate {
+  department: string;
+  metric_name: string;
+  entry_date: string;
+  value: number;
+  notes?: string;
+}
+
+export interface AgentManualEntryUpdate {
+  value?: number;
+  notes?: string;
+}

@@ -153,6 +153,7 @@ async def _init_schema():
         "003_cleanup_unused_columns.sql",
         "004_add_agnt_grp_to_view.sql",
         "005_bsc_manual_values.sql",
+        "006_agent_manual_entries.sql",
     ):
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):

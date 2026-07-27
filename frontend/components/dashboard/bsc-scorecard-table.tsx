@@ -1,19 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BSCMetricRow, BSCScorecardResponse } from "@/types";
-import { Input } from "@/components/ui/input";
 import { BookOpen } from "lucide-react";
 import { BSCAgentRadars } from "./bsc-agent-radars";
 
 interface Props {
   data: BSCScorecardResponse;
-  onSaveManual: (agentName: string, metricName: string, value: number) => Promise<void>;
 }
 
-export function BSCScorecardTable({ data, onSaveManual }: Props) {
+export function BSCScorecardTable({ data }: Props) {
   if (!data.has_config) return null;
 
   const allMetrics: BSCMetricRow[] = [
@@ -76,7 +73,6 @@ export function BSCScorecardTable({ data, onSaveManual }: Props) {
           categoryName={cat.name}
           metrics={cat.metrics}
           agents={data.agents}
-          onSaveManual={onSaveManual}
         />
       ))}
       {data.penalidades.length > 0 && (
@@ -85,13 +81,6 @@ export function BSCScorecardTable({ data, onSaveManual }: Props) {
           categoryName="Penalidades"
           metrics={data.penalidades}
           agents={data.agents}
-          onSaveManual={async (agentName, metricName, value) => {
-            if (metricName.includes("Setor")) {
-              await Promise.all(data.agents.map((a) => onSaveManual(a, metricName, value)));
-            } else {
-              await onSaveManual(agentName, metricName, value);
-            }
-          }}
           isPenalidade
         />
       )}
@@ -133,13 +122,11 @@ function BSCCategorySection({
   categoryName,
   metrics,
   agents,
-  onSaveManual,
   isPenalidade,
 }: {
   categoryName: string;
   metrics: BSCMetricRow[];
   agents: string[];
-  onSaveManual: (agentName: string, metricName: string, value: number) => Promise<void>;
   isPenalidade?: boolean;
 }) {
   const t2Label = "Tarefas";
@@ -192,7 +179,6 @@ function BSCCategorySection({
                   key={metric.name}
                   metric={metric}
                   agents={agents}
-                  onSaveManual={onSaveManual}
                   isLast={mi === metrics.length - 1}
                   showTotal={isT2}
                   isSetorial={isSetorial}
@@ -257,18 +243,31 @@ function BSCCategorySection({
 function BSCMetricRowComponent({
   metric,
   agents,
-  onSaveManual,
   isLast,
   showTotal,
   isSetorial,
 }: {
   metric: BSCMetricRow;
   agents: string[];
-  onSaveManual: (agentName: string, metricName: string, value: number) => Promise<void>;
   isLast: boolean;
   showTotal?: boolean;
   isSetorial?: boolean;
 }) {
+  const fmt = (v: number | null | undefined) => (v != null ? String(v) : "—");
+  const kpiFmt = (v: number | null | undefined) => (v != null ? v.toFixed(1) : "—");
+  const kpiColor = (s: number | null | undefined) => {
+    if (s == null) return "text-muted-foreground";
+    if (s > 0) return "text-emerald-500";
+    if (s < 0) return "text-red-400";
+    return "text-muted-foreground";
+  };
+
+  const cellClass = cn(
+    "text-sm tabular-nums min-w-[44px] font-medium",
+    !metric.is_manual && "text-foreground",
+    metric.is_manual && "text-muted-foreground",
+  );
+
   return (
     <tr className={cn("border-b border-border/40 hover:bg-muted/30 transition-colors", isLast && "border-b-2")}>
       <td className="sticky left-0 bg-background px-3 py-2 font-medium">
@@ -280,27 +279,26 @@ function BSCMetricRowComponent({
         {TIPO_LABELS[metric.tipo] || metric.tipo}
       </td>
       {isSetorial ? (
-        <BSCAgentCell
-          agentName={agents[0] ?? ""}
-          agentValue={metric.per_agent[0]}
-          metricName={metric.name}
-          isManual={metric.is_manual}
-          onSaveManual={async (_, _metricName, value) => {
-            await Promise.all(agents.map((a) => onSaveManual(a, _metricName, value)));
-          }}
-        />
+        <td className="px-2 py-2.5 text-center">
+          <div className="flex justify-center gap-1.5 items-center">
+            <span className={cellClass}>{fmt(metric.per_agent[0]?.raw_value)}</span>
+            <span className={cn("text-sm tabular-nums font-bold min-w-[38px]", kpiColor(metric.per_agent[0]?.kpi_score))}>
+              {kpiFmt(metric.per_agent[0]?.kpi_score)}
+            </span>
+          </div>
+        </td>
       ) : (
         agents.map((agent) => {
           const agentVal = metric.per_agent.find((a) => a.agent_name === agent);
           return (
-            <BSCAgentCell
-              key={agent}
-              agentName={agent}
-              agentValue={agentVal}
-              metricName={metric.name}
-              isManual={metric.is_manual}
-              onSaveManual={onSaveManual}
-            />
+            <td key={agent} className="px-2 py-2.5 text-center">
+              <div className="flex justify-center gap-1.5 items-center">
+                <span className={cellClass}>{fmt(agentVal?.raw_value)}</span>
+                <span className={cn("text-sm tabular-nums font-bold min-w-[38px]", kpiColor(agentVal?.kpi_score))}>
+                  {kpiFmt(agentVal?.kpi_score)}
+                </span>
+              </div>
+            </td>
           );
         })
       )}
@@ -310,90 +308,6 @@ function BSCMetricRowComponent({
         </td>
       )}
     </tr>
-  );
-}
-
-function BSCAgentCell({
-  agentName,
-  agentValue,
-  metricName,
-  isManual,
-  onSaveManual,
-}: {
-  agentName: string;
-  agentValue: { agent_name: string; raw_value: number | null; kpi_score: number | null; is_manual: boolean } | undefined;
-  metricName: string;
-  isManual: boolean;
-  onSaveManual: (agent: string, metric: string, value: number) => Promise<void>;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [editing, setEditing] = useState(false);
-  const [localVal, setLocalVal] = useState("");
-
-  const rawValue = agentValue?.raw_value;
-  const kpiScore = agentValue?.kpi_score;
-
-  const handleStartEdit = () => {
-    if (!isManual) return;
-    setLocalVal(rawValue != null ? String(rawValue) : "");
-    setEditing(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleSave = async () => {
-    const val = parseFloat(localVal.replace(",", "."));
-    if (!isNaN(val)) {
-      await onSaveManual(agentName, metricName, val);
-    }
-    setEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") handleSave();
-    if (e.key === "Escape") setEditing(false);
-  };
-
-  const fmt = (v: number | null | undefined) => (v != null ? String(v) : "—");
-  const kpiFmt = (v: number | null | undefined) => (v != null ? v.toFixed(1) : "—");
-  const kpiColor = (s: number | null | undefined) => {
-    if (s == null) return "text-muted-foreground";
-    if (s > 0) return "text-emerald-500";
-    if (s < 0) return "text-red-400";
-    return "text-muted-foreground";
-  };
-
-  return (
-    <td className="px-2 py-2.5 text-center">
-      <div className="flex justify-center gap-1.5 items-center">
-        {isManual && editing ? (
-          <Input
-            ref={inputRef}
-            type="number"
-            step="any"
-            value={localVal}
-            onChange={(e) => setLocalVal(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={handleKeyDown}
-            className="h-7 w-18 text-sm text-center px-1"
-          />
-        ) : (
-          <span
-            className={cn(
-              "text-sm tabular-nums min-w-[44px] font-medium",
-              isManual && "cursor-pointer border-b border-dashed border-muted-foreground/50 hover:border-primary px-1",
-              !isManual && "text-foreground"
-            )}
-            onClick={handleStartEdit}
-            title={isManual ? "Clique para editar" : undefined}
-          >
-            {fmt(rawValue)}
-          </span>
-        )}
-        <span className={cn("text-sm tabular-nums font-bold min-w-[38px]", kpiColor(kpiScore))}>
-          {kpiFmt(kpiScore)}
-        </span>
-      </div>
-    </td>
   );
 }
 

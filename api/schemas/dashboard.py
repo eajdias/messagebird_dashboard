@@ -315,3 +315,50 @@ class BSCManualValueResponse(BaseModel):
     agent_name: str
     metric_name: str
     value: float
+
+
+# ── Agent Manual Entries ───────────────────────────────────────────────
+
+
+class AvailableMetric(BaseModel):
+    name: str
+    meta: str = ""
+    peso: int = 0
+    tipo: str = ""
+    description: str = ""
+
+
+class AgentDetailResponse(BaseModel):
+    bird_id: str
+    name: str
+    group: str
+    available_metrics: list[AvailableMetric] = []
+
+
+class AgentManualEntryResponse(BaseModel):
+    id: int
+    department: str
+    agent_name: str
+    metric_name: str
+    entry_date: str
+    value: float
+    notes: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class AgentManualEntryCreate(BaseModel):
+    department: str
+    metric_name: str
+    entry_date: str
+    value: float
+    notes: str | None = None
+
+
+class AgentManualEntryUpdate(BaseModel):
+    value: float | None = None
+    notes: str | None = None
+
+
+class ManualMetricsListResponse(BaseModel):
+    metrics: list[AvailableMetric] = []

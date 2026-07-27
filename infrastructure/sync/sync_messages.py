@@ -208,12 +208,12 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
 
     rows = await conn.fetch_all(
         "SELECT cnvs_bird FROM conversations "
-        "WHERE cnvs_updated >= $1::timestamp AND cnvs_updated < $2::timestamp "
-        "ORDER BY cnvs_updated DESC",
+        "WHERE cnvs_created >= $1::timestamp AND cnvs_created < $2::timestamp "
+        "ORDER BY cnvs_created DESC",
         (month_start.replace(tzinfo=None), next_month_start.replace(tzinfo=None)),
     )
     total = len(rows)
-    logger.info("Syncing messages for %d conversations updated in %04d-%02d...", total, year, month)
+    logger.info("Syncing messages for %d conversations created in %04d-%02d...", total, year, month)
     semaphore = asyncio.Semaphore(10)
 
     async def fetch_with_limit(row):
