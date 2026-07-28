@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import { useTheme } from "next-themes";
-import { Search, Moon, Sun, LogOut, User, Command, Menu } from "lucide-react";
+import { Search, Moon, Sun, LogOut, User, Command, Menu, PanelLeftClose, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { MobileNav } from "@/components/layout/mobile-nav";
 
-export function TopBar() {
+interface TopBarProps {
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
+}
+
+export function TopBar({ sidebarCollapsed, onToggleSidebar }: TopBarProps) {
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -26,6 +31,18 @@ export function TopBar() {
         <span className="bg-gradient-to-r from-primary to-chart-4 bg-clip-text text-lg font-semibold text-transparent">
           MBird
         </span>
+      </div>
+
+      <div className="hidden items-center gap-3 lg:flex">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggleSidebar}
+          aria-label={sidebarCollapsed ? "Expandir menu" : "Retrair menu"}
+          className="transition-transform hover:rotate-12"
+        >
+          {sidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+        </Button>
       </div>
 
       <div className="flex-1" />

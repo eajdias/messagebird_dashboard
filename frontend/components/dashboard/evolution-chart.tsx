@@ -68,7 +68,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
         {data.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sem dados disponíveis</p>
         ) : (
-          <div className="h-[300px] w-full">
+          <div className="h-[200px] sm:h-[260px] lg:h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
@@ -84,12 +84,12 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" strokeOpacity={0.3} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                   axisLine={{ stroke: "var(--border)" }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                  tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                   axisLine={{ stroke: "var(--border)" }}
                   tickLine={false}
                 />
@@ -99,7 +99,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                 />
                 <Legend
                   iconType="circle"
-                  wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                  wrapperStyle={{ fontSize: 9, paddingTop: 8 }}
                 />
                 <Area
                   type="monotone"
@@ -108,7 +108,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   stroke="var(--chart-1)"
                   strokeWidth={2.5}
                   fill="url(#gradConversations)"
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--background)" }}
+                  activeDot={{ r: 3, strokeWidth: 2, stroke: "var(--background)" }}
                   isAnimationActive={false}
                   connectNulls
                 />
@@ -119,7 +119,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
                   stroke="var(--chart-2)"
                   strokeWidth={2.5}
                   fill="url(#gradNps)"
-                  activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--background)" }}
+                  activeDot={{ r: 3, strokeWidth: 2, stroke: "var(--background)" }}
                   isAnimationActive={false}
                   connectNulls
                 />

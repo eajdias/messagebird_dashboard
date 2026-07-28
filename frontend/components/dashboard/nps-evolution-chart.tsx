@@ -38,16 +38,16 @@ export function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem avaliações NPS no período</p>
         ) : (
-          <div className="h-[260px]">
+          <div className="h-[180px] sm:h-[220px] lg:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
+                <YAxis yAxisId="left" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 9 }}
                   stroke="var(--muted-foreground)"
                   domain={[Math.floor(npsMin / 10) * 10, 100]}
                 />
@@ -68,7 +68,7 @@ export function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
                   dataKey="NPS Médio"
                   stroke="var(--chart-2)"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: "var(--chart-2)" }}
+                  dot={{ r: 2, fill: "var(--chart-2)" }}
                 />
               </ComposedChart>
             </ResponsiveContainer>

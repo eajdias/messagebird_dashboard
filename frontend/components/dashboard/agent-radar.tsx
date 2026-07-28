@@ -129,13 +129,13 @@ export function AgentRadar({ agents, className }: AgentRadarProps) {
         <CardTitle className="text-base">Comparativo de Agentes</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[320px] w-full">
+        <div className="h-[220px] sm:h-[280px] lg:h-[320px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={data} cx="50%" cy="50%" outerRadius="75%">
               <PolarGrid stroke="var(--border)" strokeOpacity={0.4} />
               <PolarAngleAxis
                 dataKey="metric"
-                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
               />
               <PolarRadiusAxis
                 angle={90}
@@ -162,7 +162,7 @@ export function AgentRadar({ agents, className }: AgentRadarProps) {
               />
               <Legend
                 iconType="circle"
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                wrapperStyle={{ fontSize: 9, paddingTop: 8 }}
               />
             </RadarChart>
           </ResponsiveContainer>

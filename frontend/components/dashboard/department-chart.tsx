@@ -88,13 +88,13 @@ export function DepartmentChart({ data, className }: DepartmentChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-72">
+        <div className="h-[200px] sm:h-[250px] lg:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="var(--border)" strokeOpacity={0.2} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                 axisLine={{ stroke: "var(--border)" }}
                 tickLine={false}
                 angle={-15}
@@ -102,14 +102,14 @@ export function DepartmentChart({ data, className }: DepartmentChartProps) {
                 height={50}
               />
               <YAxis
-                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                 axisLine={{ stroke: "var(--border)" }}
                 tickLine={false}
               />
               <Tooltip content={<DeptTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
               <Legend
                 iconType="circle"
-                wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
+                wrapperStyle={{ fontSize: 9, paddingTop: 4 }}
               />
               <Bar dataKey="ART" name="ART (min)" fill="var(--chart-3)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
               <Bar dataKey="SLA" name="SLA %" fill="var(--chart-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />

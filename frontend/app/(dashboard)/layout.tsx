@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -15,6 +15,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, loading } = useAuth();
   const router = useRouter();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -44,10 +45,10 @@ export default function DashboardLayout({
   return (
     <div className="relative flex h-screen overflow-hidden">
       <div className="animated-bg pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
-      <Sidebar />
+      <Sidebar collapsed={sidebarCollapsed} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">
+        <TopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((v) => !v)} />
+        <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 md:px-6">
           <PageTransition>{children}</PageTransition>
         </main>
       </div>

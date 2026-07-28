@@ -53,12 +53,12 @@ export function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem dados de ART no período</p>
         ) : (
-          <div className="h-[260px]">
+          <div className="h-[180px] sm:h-[220px] lg:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-                <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
+                <YAxis tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "hsl(220 15% 12%)",
@@ -69,7 +69,7 @@ export function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
                   }}
                   labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: 4 }}
                 />
-                <Legend wrapperStyle={{ fontSize: 10 }} iconType="line" />
+                <Legend wrapperStyle={{ fontSize: 9 }} iconType="line" />
                 {BANDS.map((band) => (
                   <Line
                     key={band.key}

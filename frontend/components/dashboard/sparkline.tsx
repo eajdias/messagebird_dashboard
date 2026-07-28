@@ -8,13 +8,13 @@ interface SparklineProps {
   height?: number;
 }
 
-export function Sparkline({ data, color, height = 64 }: SparklineProps) {
+export function Sparkline({ data, color, height }: SparklineProps) {
   if (!data.length) return null;
 
   const gradientId = `grad-${color.replace(/[^a-z0-9]/gi, "")}`;
 
   return (
-    <div className="w-full" style={{ height }}>
+    <div className="w-full h-12 sm:h-14 lg:h-16" style={height ? { height } : undefined}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <defs>

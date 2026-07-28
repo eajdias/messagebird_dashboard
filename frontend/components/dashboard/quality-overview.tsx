@@ -142,17 +142,17 @@ export function QualityOverview({ rating, npsScore, npsBreakdown, className }: Q
             <span className="text-xs text-muted-foreground">Total: {ratingTotal}</span>
           </header>
           {ratingMax > 0 ? (
-            <div className="h-28">
+            <div className="h-20 sm:h-24 lg:h-28">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={ratingData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="label" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fill: "var(--muted-foreground)", fontSize: 9 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
                   <Tooltip content={<BarTooltip />} cursor={false} />
                   <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                     {ratingData.map((d, i) => (
                       <Cell key={i} fill={d.color} />
                     ))}
-                    <LabelList dataKey="value" position="top" fill="var(--foreground)" fontSize={10} />
+                    <LabelList dataKey="value" position="top" fill="var(--foreground)" fontSize={9} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -170,12 +170,12 @@ export function QualityOverview({ rating, npsScore, npsBreakdown, className }: Q
             <span className="text-xs text-muted-foreground">Total: {npsTotal}</span>
           </header>
           {npsMax > 0 ? (
-            <div className="h-28">
+            <div className="h-20 sm:h-24 lg:h-28">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={npsData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <XAxis
                     dataKey="label"
-                    tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                     axisLine={false}
                     tickLine={false}
                   />
@@ -185,7 +185,7 @@ export function QualityOverview({ rating, npsScore, npsBreakdown, className }: Q
                     {npsData.map((d, i) => (
                       <Cell key={i} fill={d.color} />
                     ))}
-                    <LabelList dataKey="value" position="top" fill="var(--foreground)" fontSize={10} />
+                    <LabelList dataKey="value" position="top" fill="var(--foreground)" fontSize={9} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

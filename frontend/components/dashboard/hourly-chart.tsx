@@ -91,7 +91,7 @@ export function HourlyChart({ heatmap, className }: HourlyChartProps) {
         {total === 0 ? (
           <p className="text-xs text-muted-foreground">Sem dados no período</p>
         ) : (
-          <div className="h-64 w-full">
+          <div className="h-[180px] sm:h-[220px] lg:h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.arr} margin={{ top: 16, right: 4, left: 0, bottom: 12 }}>
                 <CartesianGrid stroke="var(--border)" strokeOpacity={0.15} vertical={false} />

@@ -85,7 +85,7 @@ export function AgentComparison({ agents, className }: AgentComparisonProps) {
         <CardTitle className="text-base">Comparativo de Agentes</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
+        <div className="h-[200px] sm:h-[260px] lg:h-[300px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data}
@@ -93,17 +93,17 @@ export function AgentComparison({ agents, className }: AgentComparisonProps) {
               margin={{ top: 4, right: 24, left: 0, bottom: 0 }}
             >
               <CartesianGrid stroke="var(--border)" strokeOpacity={0.2} horizontal={false} />
-              <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 9 }} axisLine={false} tickLine={false} />
               <YAxis
                 dataKey="name"
                 type="category"
-                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 9 }}
                 axisLine={false}
                 tickLine={false}
                 width={140}
               />
               <Tooltip content={<BarTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 9, paddingTop: 4 }} />
               <Bar dataKey="Chats" fill="var(--chart-1)" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false} />
               <Bar dataKey="SLA %" fill="var(--chart-2)" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false} />
               <Bar dataKey="NPS Real" fill="var(--chart-3)" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false} />

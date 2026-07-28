@@ -111,12 +111,12 @@ export function RatedBreakdownChart({ data, className }: RatedBreakdownChartProp
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem dados no período</p>
         ) : (
-          <div className="h-[260px]">
+          <div className="h-[180px] sm:h-[220px] lg:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-                <YAxis tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
+                <YAxis tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
                 <Tooltip content={<BreakdownTooltip />} />
                 {STACK_ORDER.map((key, i) => {
                   const isTop = i === STACK_ORDER.length - 1;

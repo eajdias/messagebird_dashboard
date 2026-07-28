@@ -8,7 +8,7 @@ function ChartSkeleton() {
         <Skeleton className="h-5 w-32" />
       </CardHeader>
       <CardContent>
-        <Skeleton className="h-[300px] w-full" />
+        <Skeleton className="h-[200px] sm:h-[260px] lg:h-[300px] w-full" />
       </CardContent>
     </Card>
   );

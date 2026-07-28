@@ -196,7 +196,8 @@ export function BSCAgentRadars({ agents, categories, penalidades }: Props) {
             </CardTitle>
           </CardHeader>
           <CardContent className="px-2 pb-3">
-            <ResponsiveContainer width="100%" height={300}>
+            <div className="h-[200px] sm:h-[260px] lg:h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
               <RadarChart
                 data={data}
                 cx="50%"
@@ -252,6 +253,7 @@ export function BSCAgentRadars({ agents, categories, penalidades }: Props) {
                 />
               </RadarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       ))}

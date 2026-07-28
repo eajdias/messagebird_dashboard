@@ -19,20 +19,31 @@ const navItems = [
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed?: boolean;
+}
+
+export function Sidebar({ collapsed = false }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-white/5 bg-sidebar/70 text-sidebar-foreground backdrop-blur-xl backdrop-saturate-180 lg:block">
-      <div className="flex h-16 items-center gap-2 border-b border-white/5 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-chart-4 text-primary-foreground text-sm font-bold shadow-md glow-sm [--glow-color:var(--primary)]">
+    <aside
+      className={cn(
+        "hidden shrink-0 border-r border-white/5 bg-sidebar/70 text-sidebar-foreground backdrop-blur-xl backdrop-saturate-180 transition-all duration-300 lg:block",
+        collapsed ? "w-16" : "w-64",
+      )}
+    >
+      <div className={cn("flex h-16 items-center border-b border-white/5 transition-all", collapsed ? "justify-center px-4" : "gap-2 px-6")}>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-chart-4 text-primary-foreground text-sm font-bold shadow-md glow-sm [--glow-color:var(--primary)]">
           MB
         </div>
-        <span className="bg-gradient-to-r from-primary to-chart-4 bg-clip-text text-lg font-semibold text-transparent">
-          MBird
-        </span>
+        {!collapsed && (
+          <span className="bg-gradient-to-r from-primary to-chart-4 bg-clip-text text-lg font-semibold text-transparent whitespace-nowrap overflow-hidden">
+            MBird
+          </span>
+        )}
       </div>
-      <nav className="flex flex-col gap-1 p-4">
+      <nav className={cn("flex flex-col gap-1", collapsed ? "p-2" : "p-4")}>
         {navItems.map((item) => {
           const isActive =
             item.href === "/"
@@ -42,8 +53,10 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                "group relative flex items-center gap-3 rounded-lg text-sm font-medium transition-all",
+                collapsed ? "justify-center px-0 py-2" : "px-3 py-2",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-foreground glow-md [--glow-color:var(--primary)]"
                   : "text-muted-foreground hover:bg-white/5 hover:text-sidebar-foreground"
@@ -54,11 +67,11 @@ export function Sidebar() {
               )}
               <item.icon
                 className={cn(
-                  "h-4 w-4 transition-transform group-hover:scale-110",
+                  "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
                   isActive && "text-primary"
                 )}
               />
-              {item.label}
+              {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}

@@ -38,16 +38,16 @@ export function RatingEvolutionChart({ data, className }: RatingEvolutionChartPr
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem avaliações no período</p>
         ) : (
-          <div className="h-[260px]">
+          <div className="h-[180px] sm:h-[220px] lg:h-[260px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
-                <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
-                <YAxis yAxisId="left" tick={{ fontSize: 10 }} stroke="var(--muted-foreground)" />
+                <XAxis dataKey="label" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
+                <YAxis yAxisId="left" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 10 }}
+                  tick={{ fontSize: 9 }}
                   stroke="var(--muted-foreground)"
                   domain={[0, Math.ceil(maxNotes / 10) * 10]}
                 />
@@ -68,7 +68,7 @@ export function RatingEvolutionChart({ data, className }: RatingEvolutionChartPr
                   dataKey="Altas (4-5)"
                   stroke="var(--chart-2)"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: "var(--chart-2)" }}
+                  dot={{ r: 2, fill: "var(--chart-2)" }}
                 />
                 <Line
                   yAxisId="right"
@@ -76,7 +76,7 @@ export function RatingEvolutionChart({ data, className }: RatingEvolutionChartPr
                   dataKey="Baixas (1-2)"
                   stroke="var(--destructive)"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: "var(--destructive)" }}
+                  dot={{ r: 2, fill: "var(--destructive)" }}
                 />
               </ComposedChart>
             </ResponsiveContainer>

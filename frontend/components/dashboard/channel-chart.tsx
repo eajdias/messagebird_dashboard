@@ -114,7 +114,7 @@ export function ChannelChart({ channels, className }: ChannelChartProps) {
         <CardTitle className="text-base">Por Canal</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] w-full">
+        <div className="h-[180px] sm:h-[240px] lg:h-[280px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -140,7 +140,7 @@ export function ChannelChart({ channels, className }: ChannelChartProps) {
               <Legend
                 verticalAlign="bottom"
                 iconType="circle"
-                wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                wrapperStyle={{ fontSize: 9, paddingTop: 12 }}
               />
             </PieChart>
           </ResponsiveContainer>
