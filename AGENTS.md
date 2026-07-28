@@ -1,6 +1,6 @@
 # MessageBird Dashboard
 
-Dashboard omnichannel para monitoramento de campanhas SMS/voice e atendimento via MessageBird (Bird) API. Suporta WhatsApp, Webchat, Facebook Messenger e Instagram Direct.
+Dashboard omnichannel para monitoramento de atendimento via MessageBird (Bird) API. Suporta WhatsApp, Webchat, Facebook Messenger e Instagram Direct.
 
 ## Stack
 - **Backend:** Python 3.14, FastAPI, asyncpg, APScheduler

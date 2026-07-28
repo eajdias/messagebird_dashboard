@@ -102,10 +102,12 @@ Relatórios gerados são registrados em `reports/manifest.json`:
 
 | Exporter | Arquivo | Tecnologia |
 |----------|---------|-----------|
-| Excel | `excel_exporter.py` | xlsxwriter |
+| CSV | `csv_exporter.py` | Python csv (BOM UTF-8) |
+| Excel (conversas) | `xlsx_exporter.py` | openpyxl |
+| Excel (dashboard/relatórios periódicos) | `excel_exporter.py` | xlsxwriter |
 | PDF | `pdf_exporter.py` | fpdf2 |
 | Markdown | `markdown_exporter.py` | — |
-| BSC Writer | `mappers/_bsc_writer.py` | Fórmulas Excel para BSC |
+| BSC Writer | `exporters/_bsc_writer.py` | Fórmulas Excel para BSC |
 
 ## Convenções
 

@@ -90,7 +90,7 @@ docker compose down
 
 ## Senhas e Segurança
 
-- `Default: password padrão` (usuário admin) — alterar em produção
+- O JWT é usado para autenticação; tokens expiram conforme `JWT_EXPIRATION_MINUTES`
 - `JWT_SECRET` — gerar secret forte mínimo 32 caracteres
 - `MESSAGEBIRD_API_KEY_LIVE` — key de produção do MessageBird
 - `business_config.yaml` e `business_bsc.yaml` estão no `.gitignore`

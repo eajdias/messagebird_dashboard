@@ -55,7 +55,7 @@ NPS = ((Promotores - Detratores) / Total) × 100
 
 ### SLA Compliance
 ```
-SLA = (Conversas com ART ≤ 60min / Total de conversas) × 100
+SLA = (Conversas com FRT ≤ 60min / Total de conversas) × 100
 ```
 
 ### Tipos de Pontuação BSC

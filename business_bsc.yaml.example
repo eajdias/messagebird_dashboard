@@ -3,7 +3,7 @@
 # Copie para business_bsc.yaml e ajuste as metas/pesos da SUA empresa.
 # (Este arquivo de exemplo É versionado; o business_bsc.yaml real é ignorado)
 #
-# Veja business_bsc.yaml (ou a documentação em docs/configuracao.md) para a
+# Veja business_bsc.yaml (ou a documentação em docs/KPI_BSC.md) para a
 # lista completa de campos e dos valores possíveis em "tipo".
 # =============================================================================
 

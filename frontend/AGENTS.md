@@ -46,4 +46,3 @@ types/            # TypeScript interfaces
 
 ## Documentação Relacionada
 - docs/FRONTEND.md — Detalhes completos do frontend
-- GLASSMORPHISM-REDESIGN.md — Plano de redesign visual

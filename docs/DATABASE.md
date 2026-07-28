@@ -23,7 +23,7 @@
 | agnt_name | VARCHAR(255) | Nome do agente |
 | agnt_bird | VARCHAR(255) UNIQUE | ID do agente na MessageBird |
 | agnt_grp | VARCHAR(100) | Grupo/Departamento |
-| cnts_created/updated | TIMESTAMP | Controle de tempo |
+| agnt_created/updated | TIMESTAMP | Controle de tempo |
 
 #### conversations (`cnvs_` prefix)
 | Coluna | Tipo | Descrição |
@@ -79,6 +79,9 @@ As migrations são arquivos SQL puros em `infrastructure/database/migrations/`:
 | `002_materialized_view.sql` | Cria vw_survey_data |
 | `003_cleanup_unused_columns.sql` | Remove colunas não utilizadas |
 | `004_add_agnt_grp_to_view.sql` | Recria MV com agnt_grp |
+| `005_bsc_manual_values.sql` | Tabela bsc_manual_values para KPIs manuais |
+| `006_agent_manual_entries.sql` | Entradas manuais de métricas por agente |
+| `007_users.sql` | Tabela users + admin default |
 
 As migrations são aplicadas automaticamente na inicialização da API (`_init_schema` em `api/main.py`), na ordem numérica, de forma idempotente (IF NOT EXISTS).
 

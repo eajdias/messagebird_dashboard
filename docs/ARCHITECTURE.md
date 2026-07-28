@@ -66,7 +66,7 @@ MessageBird API ──▶ Sync Pipeline ──▶ PostgreSQL ──▶ FastAPI �
 - **Database:** PostgreSQL com asyncpg, pool de conexões, queries centralizadas em `queries_pg.py`
 - **API Client:** MessageBird HTTP client com retry e rate limiting
 - **Sync:** Pipeline contact→conversation→message com modos incremental/full/backfill
-- **Exporters:** Excel (xlsxwriter), PDF (fpdf2), Markdown
+- **Exporters:** CSV (`csv_exporter.py`), Excel xlsx (`xlsx_exporter.py`), Excel multi-sheet (`excel_exporter.py`), PDF (fpdf2), Markdown
 - **Config:** Loader para `business_config.yaml` e `business_bsc.yaml`
 
 ## Decisões Arquiteturais Importantes

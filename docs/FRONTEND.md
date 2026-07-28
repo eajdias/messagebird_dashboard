@@ -91,12 +91,7 @@ O cliente HTTP (`lib/api.ts`) usa axios com:
 - Interceptor de erro (redirect para login em 401)
 - Token armazenado em localStorage
 
-## Redesign (Glassmorphism)
+## Design
 
-O arquivo `GLASSMORPHISM-REDESIGN.md` contém o plano de transformação visual:
-- Background animado com gradiente
-- Cards com efeito glass (backdrop-blur)
-- Glow e hover effects
-- Novos gráficos (NPS Gauge, Channel PieChart, Agent Radar)
-- Sidebar e TopBar vitrificadas
+A interface usa glassmorphism: background animado com gradiente, cards com backdrop-blur, glow e hover effects, sidebar e TopBar vitrificadas, animações stagger.
 - Animações stagger em cascata
