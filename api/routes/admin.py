@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
-from api.auth import get_current_user
+from api.auth import get_current_user, require_admin
 from api.schemas._base import StatusResponse
 from api.schemas.admin import (
     AgentItem,
@@ -22,6 +22,8 @@ from api.schemas.admin import (
     SyncStatusResponse,
     SyncTriggerRequest,
     SyncTriggerResponse,
+    UserItem,
+    UserListResponse,
 )
 from api.schemas.dashboard import (
     AgentDetailResponse,
@@ -76,8 +78,21 @@ async def trigger_sync_range(
 async def get_sync_status(
     _current_user: dict[str, Any] = Depends(get_current_user),
 ):
-    """Get last sync status."""
-    # TODO: Read from sync table in PG
+    """Get last sync status from the sync table."""
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    row = await pool.fetch_one(
+        "SELECT sync_created as last_sync, sync_records_count as records_synced, "
+        "sync_duration as duration_seconds FROM sync ORDER BY sync_created DESC LIMIT 1"
+    )
+    if row:
+        return SyncStatusResponse(
+            last_sync=row["last_sync"].isoformat() if row["last_sync"] else None,
+            status="completed",
+            records_synced=row["records_synced"] or 0,
+            duration_seconds=float(row["duration_seconds"]) if row["duration_seconds"] else None,
+        )
     return SyncStatusResponse()
 
 
@@ -333,8 +348,17 @@ async def list_manual_metrics(
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint (no auth required)."""
-    return HealthResponse(status="healthy", version="2.0.0")
+    """Health check endpoint with real DB connectivity test."""
+    db_status = "unknown"
+    try:
+        from api.dependencies import get_pool
+
+        pool = await get_pool()
+        result = await pool.fetch_val("SELECT 1")
+        db_status = "connected" if result == 1 else "unknown"
+    except Exception:
+        db_status = "disconnected"
+    return HealthResponse(status="healthy", version="2.0.0", database=db_status)
 
 
 @router.get("/sync/profile", response_model=SyncProfileResponse)
@@ -389,3 +413,126 @@ async def stop_scheduler_endpoint(
 
     msg = _stop()
     return StatusResponse(status="ok", message=msg)
+
+
+@router.put("/scheduler/profile", response_model=StatusResponse)
+async def update_scheduler_profile(
+    profile: str = Body(..., embed=True),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Change the active sync profile and restart scheduler."""
+    import os
+
+    from api.main import _configure_scheduler_jobs, start_scheduler, stop_scheduler
+    from infrastructure.config.sync_profiles import list_profiles
+
+    profiles = {p["name"] for p in list_profiles()}
+    if profile not in profiles:
+        raise HTTPException(status_code=400, detail=f"Perfil inválido. Opções: {', '.join(sorted(profiles))}")
+
+    os.environ["SYNC_PROFILE"] = profile
+    try:
+        stop_scheduler()
+    except Exception:
+        pass
+    try:
+        _configure_scheduler_jobs()
+        msg = start_scheduler()
+    except Exception as e:
+        msg = f"Perfil alterado, mas scheduler não pôde ser reiniciado: {e}"
+
+    return StatusResponse(status="ok", message=f"Perfil '{profile}': {msg}")
+
+
+# ── Users ──────────────────────────────────────────────────────────────
+
+
+@router.get("/users", response_model=UserListResponse)
+async def list_users(
+    _current_user: dict[str, Any] = Depends(require_admin),
+):
+    """List all users (admin only)."""
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    rows = await pool.fetch_all("SELECT id, email, role, name, active FROM users ORDER BY id")
+    users = [
+        UserItem(
+            id=row["id"],
+            email=row["email"],
+            role=row["role"],
+            name=row["name"] or "",
+            active=row["active"],
+        )
+        for row in rows
+    ]
+    return UserListResponse(users=users)
+
+
+@router.post("/users", response_model=UserItem, status_code=201)
+async def create_user(
+    email: str = Body(...),
+    password: str = Body(...),
+    role: str = Body("agent"),
+    name: str = Body(""),
+    _current_user: dict[str, Any] = Depends(require_admin),
+):
+    """Create a new user (admin only)."""
+    from api.auth import get_password_hash
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    existing = await pool.fetch_one("SELECT id FROM users WHERE email = $1", email)
+    if existing:
+        raise HTTPException(status_code=409, detail="Email já cadastrado")
+
+    password_hash = get_password_hash(password)
+    row = await pool.fetch_one(
+        "INSERT INTO users (email, password_hash, role, name) VALUES ($1, $2, $3, $4) RETURNING id, email, role, name, active",
+        email,
+        password_hash,
+        role,
+        name,
+    )
+    return UserItem(
+        id=row["id"],
+        email=row["email"],
+        role=row["role"],
+        name=row["name"] or "",
+        active=row["active"],
+    )
+
+
+@router.put("/users/{user_id}/password", response_model=StatusResponse)
+async def admin_change_user_password(
+    user_id: int,
+    new_password: str = Body(..., embed=True),
+    _current_user: dict[str, Any] = Depends(require_admin),
+):
+    """Admin resets a user's password."""
+    from api.auth import get_password_hash
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    result = await pool.execute(
+        "UPDATE users SET password_hash = $1 WHERE id = $2",
+        get_password_hash(new_password),
+        user_id,
+    )
+    if not result or "UPDATE 0" in result:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return StatusResponse(status="ok", message="Senha alterada com sucesso")
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def delete_user(
+    user_id: int,
+    _current_user: dict[str, Any] = Depends(require_admin),
+):
+    """Delete a user (admin only)."""
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+    result = await pool.execute("DELETE FROM users WHERE id = $1", user_id)
+    if not result or "DELETE 0" in result:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")

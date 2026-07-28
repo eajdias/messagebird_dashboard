@@ -13,9 +13,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const userRole = user?.role ?? "agent";
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -45,7 +46,7 @@ export default function DashboardLayout({
   return (
     <div className="relative flex h-screen overflow-hidden">
       <div className="animated-bg pointer-events-none absolute inset-0 -z-10" aria-hidden="true" />
-      <Sidebar collapsed={sidebarCollapsed} />
+      <Sidebar collapsed={sidebarCollapsed} role={userRole} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((v) => !v)} />
         <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 md:px-6">

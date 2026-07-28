@@ -271,6 +271,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
         <Tabs value={tab} onChange={setTab} options={TAB_OPTIONS} paramName="tab" />
       </div>
       <div className="flex items-center gap-3">
+        {tab === "overview" && (
+          <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
+        )}
         <DepartmentMultiSelect
           selected={selectedDept ? [selectedDept] : []}
           onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
@@ -306,9 +309,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     return (
       <div className="space-y-6">
         {header}
-        <div className="flex items-center gap-3">
-          <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
-        </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Chats" value={(executive.meta?.total_chats ?? 0).toLocaleString("pt-BR")} />

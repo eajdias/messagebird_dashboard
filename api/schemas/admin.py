@@ -103,3 +103,14 @@ class SchedulerStatusResponse(BaseModel):
     running: bool
     jobs: list[JobInfo]
     started_by_user: bool = False
+
+
+class UserItem(BaseModel):
+    id: int
+    email: str
+    role: str
+    name: str = ""
+    active: bool = True
+
+
+UserListResponse = list_response(UserItem, "users")

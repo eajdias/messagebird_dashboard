@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import SchedulerControl from "@/components/settings/scheduler-control";
-import { RefreshCw, Activity, User, Palette } from "lucide-react";
+import { UserManagementCard } from "@/components/settings/user-management-card";
+import { RefreshCw, Activity, User, Palette, Shield, Clock } from "lucide-react";
 
 interface HealthInfo {
   status: string;
@@ -29,8 +30,9 @@ export default function SettingsPage() {
   const [sync, setSync] = useState<SyncInfo | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userManagementKey, setUserManagementKey] = useState(0);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const [h, s] = await Promise.all([
         api.get<HealthInfo>("/api/v1/admin/health").then((r) => r.data),
@@ -43,12 +45,11 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStatus();
-  }, []);
+  }, [fetchStatus]);
 
   const triggerSync = async () => {
     setSyncing(true);
@@ -64,89 +65,103 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Configurações</h1>
 
-      <Card variant="glass">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Informações da Conta
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Email</span>
-            <span className="font-medium">{user?.email ?? "—"}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Função</span>
-            <Badge variant="outline">{user?.role ?? "—"}</Badge>
-          </div>
-          <div className="pt-2">
-            <Button variant="outline" size="sm" onClick={logout}>
-              Sair
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card variant="glass">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Status do Sistema
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          {loading ? (
-            <div className="flex justify-center py-4">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <User className="h-4 w-4" />
+              Informações da Conta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Email</span>
+              <span className="font-medium">{user?.email ?? "—"}</span>
             </div>
-          ) : (
-            <>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">API</span>
-                <Badge variant={health?.status === "healthy" ? "success" : "destructive"}>
-                  {health?.status === "healthy" ? "Online" : "Offline"}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Banco de Dados</span>
-                <Badge variant={health?.database === "connected" ? "success" : "destructive"}>
-                  {health?.database === "connected" ? "Conectado" : "Desconectado"}
-                </Badge>
-              </div>
-              {sync && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Última Sincronização</span>
-                    <span>
-                      {sync.last_sync
-                        ? new Date(sync.last_sync).toLocaleString("pt-BR")
-                        : "Nunca"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Registros Sincronizados</span>
-                    <span>{sync.records_synced}</span>
-                  </div>
-                </>
-              )}
-              <div className="pt-2">
-                <Button variant="outline" size="sm" onClick={triggerSync} disabled={syncing}>
-                  <RefreshCw className={`mr-1 h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Sincronizando..." : "Sincronizar Agora"}
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Função</span>
+              <Badge variant={user?.role === "admin" ? "success" : "secondary"}>
+                {user?.role === "admin" ? "Administrador" : "Agente"}
+              </Badge>
+            </div>
+            <div className="pt-2 flex gap-2">
+              <Button variant="outline" size="sm" onClick={logout}>
+                Sair
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      <SchedulerControl />
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Activity className="h-4 w-4" />
+              Status do Sistema
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {loading ? (
+              <div className="flex justify-center py-4">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">API</span>
+                  <Badge variant={health?.status === "healthy" ? "success" : "destructive"}>
+                    {health?.status === "healthy" ? "Online" : "Offline"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Banco de Dados</span>
+                  <Badge variant={health?.database === "connected" ? "success" : "destructive"}>
+                    {health?.database === "connected" ? "Conectado" : "Desconectado"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Versão</span>
+                  <span>{health?.version ?? "—"}</span>
+                </div>
+                {sync && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Última Sinc</span>
+                      <span>
+                        {sync.last_sync
+                          ? new Date(sync.last_sync).toLocaleString("pt-BR")
+                          : "Nunca"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Registros</span>
+                      <span>{sync.records_synced.toLocaleString("pt-BR")}</span>
+                    </div>
+                  </>
+                )}
+                <div className="pt-2">
+                  <Button variant="outline" size="sm" onClick={triggerSync} disabled={syncing}>
+                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+                    {syncing ? "Sincronizando..." : "Sincronizar Agora"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SchedulerControl />
+
+        {user?.role === "admin" && (
+          <UserManagementCard key={userManagementKey} />
+        )}
+      </div>
 
       <Card variant="glass">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Palette className="h-4 w-4" />
             Aparência
           </CardTitle>
         </CardHeader>

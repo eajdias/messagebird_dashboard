@@ -21,10 +21,18 @@ const navItems = [
 
 interface SidebarProps {
   collapsed?: boolean;
+  role?: string;
 }
 
-export function Sidebar({ collapsed = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, role = "agent" }: SidebarProps) {
   const pathname = usePathname();
+
+  const visibleItems = navItems.filter((item) => {
+    if (role === "admin") return true;
+    if (item.href === "/agents") return false;
+    if (item.href === "/settings") return false;
+    return true;
+  });
 
   return (
     <aside
@@ -44,7 +52,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
         )}
       </div>
       <nav className={cn("flex flex-col gap-1", collapsed ? "p-2" : "p-4")}>
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === "/"
               ? pathname === "/"

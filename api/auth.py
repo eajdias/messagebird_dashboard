@@ -77,6 +77,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any
     return verify_token(token)
 
 
+async def require_admin(current_user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    """Dependency that requires admin role."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a administradores",
+        )
+    return current_user
+
+
 async def get_current_user_allow_expired(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
     """Get current user from token without expiration check (for refresh)."""
     return verify_token_allow_expired(token)

@@ -10,6 +10,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     name: str = ""
+    role: str = "agent"
 
 
 class RefreshRequest(BaseModel):
