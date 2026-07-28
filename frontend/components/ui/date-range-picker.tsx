@@ -10,7 +10,31 @@ interface DateRangePickerProps {
   className?: string;
 }
 
+function isValidDate(s: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s));
+}
+
 export function DateRangePicker({ startDate, endDate, onChange, className }: DateRangePickerProps) {
+  const handleStartChange = (value: string) => {
+    if (!isValidDate(value)) return;
+    if (isValidDate(endDate) && value > endDate) {
+      onChange(value, value);
+    } else {
+      onChange(value, endDate);
+    }
+  };
+
+  const handleEndChange = (value: string) => {
+    if (!isValidDate(value)) return;
+    if (isValidDate(startDate) && value < startDate) {
+      onChange(value, startDate);
+    } else {
+      onChange(startDate, value);
+    }
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <div
       className={cn(
@@ -22,14 +46,16 @@ export function DateRangePicker({ startDate, endDate, onChange, className }: Dat
       <input
         type="date"
         value={startDate}
-        onChange={(e) => onChange(e.target.value, endDate)}
+        max={today}
+        onChange={(e) => handleStartChange(e.target.value)}
         className="h-6 w-[130px] bg-transparent text-xs text-foreground outline-none [color-scheme:dark]"
       />
       <span className="text-[10px] text-muted-foreground">→</span>
       <input
         type="date"
         value={endDate}
-        onChange={(e) => onChange(startDate, e.target.value)}
+        max={today}
+        onChange={(e) => handleEndChange(e.target.value)}
         className="h-6 w-[130px] bg-transparent text-xs text-foreground outline-none [color-scheme:dark]"
       />
     </div>

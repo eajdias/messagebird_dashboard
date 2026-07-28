@@ -68,76 +68,84 @@ function buildQuery(params: ExecutiveParams, includeDept = true): string {
   return `?${qs.toString()}`;
 }
 
-export function useExecutive(params: ExecutiveParams) {
+export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
+  const enabled = params.enabled ?? true;
   const [state, setState] = useState<ExecutiveState>(INITIAL_STATE);
 
-  const fetchData = useCallback(async () => {
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    const q = buildQuery(params);
-    const qBsc = buildQuery(params, false);
+  const fetchData = useCallback(
+    async (signal: AbortSignal) => {
+      if (!enabled) return;
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      const q = buildQuery(params);
+      const qBsc = buildQuery(params, false);
 
-    const endpoints = [
-      { key: "meta", url: `/api/v1/dashboard/executive/meta${q}` },
-      { key: "quality", url: `/api/v1/dashboard/executive/quality${q}` },
-      { key: "heatmap", url: `/api/v1/dashboard/executive/heatmap${q}` },
-      { key: "motives", url: `/api/v1/dashboard/executive/motives${q}` },
-      { key: "occurrences", url: `/api/v1/dashboard/executive/occurrences${q}` },
-      { key: "dow", url: `/api/v1/dashboard/executive/dow${q}` },
-      { key: "departments", url: `/api/v1/dashboard/executive/departments${q}` },
-      { key: "agents", url: `/api/v1/dashboard/executive/agents${q}` },
-      { key: "bsc", url: `/api/v1/dashboard/executive/bsc${qBsc}` },
-      { key: "artDistribution", url: `/api/v1/dashboard/executive/art-distribution${q}` },
-      { key: "returners", url: `/api/v1/dashboard/executive/returners${q}` },
-    ];
+      const endpoints = [
+        { key: "meta", url: `/api/v1/dashboard/executive/meta${q}` },
+        { key: "quality", url: `/api/v1/dashboard/executive/quality${q}` },
+        { key: "heatmap", url: `/api/v1/dashboard/executive/heatmap${q}` },
+        { key: "motives", url: `/api/v1/dashboard/executive/motives${q}` },
+        { key: "occurrences", url: `/api/v1/dashboard/executive/occurrences${q}` },
+        { key: "dow", url: `/api/v1/dashboard/executive/dow${q}` },
+        { key: "departments", url: `/api/v1/dashboard/executive/departments${q}` },
+        { key: "agents", url: `/api/v1/dashboard/executive/agents${q}` },
+        { key: "bsc", url: `/api/v1/dashboard/executive/bsc${qBsc}` },
+        { key: "artDistribution", url: `/api/v1/dashboard/executive/art-distribution${q}` },
+        { key: "returners", url: `/api/v1/dashboard/executive/returners${q}` },
+      ];
 
-    const results = await Promise.allSettled(
-      endpoints.map((e) => api.get(e.url))
-    );
+      const results = await Promise.allSettled(
+        endpoints.map((e) => api.get(e.url, { signal })),
+      );
 
-    const data: Record<string, unknown> = {};
-    const failures: string[] = [];
+      const data: Record<string, unknown> = {};
+      const failures: string[] = [];
 
-    endpoints.forEach((ep, i) => {
-      const r = results[i];
-      if (r.status === "fulfilled") {
-        data[ep.key] = r.value.data;
-      } else {
-        const msg = _errorReason(r.reason);
-        failures.push(`${ep.key}${msg ? ` (${msg})` : ""}`);
-      }
-    });
+      endpoints.forEach((ep, i) => {
+        const r = results[i];
+        if (r.status === "fulfilled") {
+          data[ep.key] = r.value.data;
+        } else {
+          const msg = _errorReason(r.reason);
+          failures.push(`${ep.key}${msg ? ` (${msg})` : ""}`);
+        }
+      });
 
-    const error = failures.length > 0
-      ? `Falha ao carregar: ${failures.join(", ")}`
-      : null;
+      const error =
+        failures.length > 0 ? `Falha ao carregar: ${failures.join(", ")}` : null;
 
-    setState({
-      meta: data.meta as ExecutiveMeta | null ?? null,
-      quality: data.quality as QualityResponse | null ?? null,
-      heatmap: data.heatmap as HeatmapResponse | null ?? null,
-      motives: data.motives as MotivesResponse | null ?? null,
-      occurrences: data.occurrences as OccurrencesResponse | null ?? null,
-      dow: data.dow as DOWResponse | null ?? null,
-      departments: data.departments as DepartmentsResponse | null ?? null,
-      agents: data.agents as AgentsResponse | null ?? null,
-      bsc: data.bsc as ExecutiveBSCResponse | null ?? null,
-      artDistribution: data.artDistribution as ARTDistributionResponse | null ?? null,
-      returners: data.returners as ReturnersResponse | null ?? null,
-      loading: false,
-      error,
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.startDate, params.endDate, params.selectedDept, params.group]);
+      setState({
+        meta: (data.meta as ExecutiveMeta | null) ?? null,
+        quality: (data.quality as QualityResponse | null) ?? null,
+        heatmap: (data.heatmap as HeatmapResponse | null) ?? null,
+        motives: (data.motives as MotivesResponse | null) ?? null,
+        occurrences: (data.occurrences as OccurrencesResponse | null) ?? null,
+        dow: (data.dow as DOWResponse | null) ?? null,
+        departments: (data.departments as DepartmentsResponse | null) ?? null,
+        agents: (data.agents as AgentsResponse | null) ?? null,
+        bsc: (data.bsc as ExecutiveBSCResponse | null) ?? null,
+        artDistribution: (data.artDistribution as ARTDistributionResponse | null) ?? null,
+        returners: (data.returners as ReturnersResponse | null) ?? null,
+        loading: false,
+        error,
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [params.startDate, params.endDate, params.selectedDept, params.group, enabled],
+  );
 
   useEffect(() => {
+    if (!enabled) return;
+    const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData();
-  }, [fetchData]);
+    fetchData(controller.signal);
+    return () => controller.abort();
+  }, [fetchData, enabled]);
 
-  return { ...state, refetch: fetchData };
+  return { ...state, refetch: () => fetchData(new AbortController().signal) };
 }
 
 function _errorReason(err: unknown): string {
+  if (err instanceof DOMException && err.name === "AbortError") return "";
   if (err && typeof err === "object" && "response" in err) {
     const r = (err as { response?: { status?: number; data?: { detail?: string } } }).response;
     if (r?.data?.detail) return `${r.status} — ${r.data.detail}`;

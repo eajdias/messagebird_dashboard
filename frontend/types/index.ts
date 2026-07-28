@@ -77,8 +77,15 @@ export interface EvolutionBucket {
   rating_avg: number | null;
   rated_chats: number;
   nps_rated_chats: number;
+  both_rated_chats: number;
   high_notes: number;
   low_notes: number;
+  art_bucket_0_5: number;
+  art_bucket_5_10: number;
+  art_bucket_10_30: number;
+  art_bucket_30_60: number;
+  art_bucket_60_120: number;
+  art_bucket_120_plus: number;
 }
 
 export interface GranularEvolutionResponse {

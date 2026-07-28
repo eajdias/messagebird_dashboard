@@ -83,6 +83,28 @@ class ReportAggregator:
         negatives = sum(1 for p in processed_data if p.is_negative)
         total_ratings = len(ratings)
 
+        # Count contacts where BOTH rating and NPS exist
+        both_rated = sum(1 for p in processed_data if p.rating is not None and p.nps is not None)
+
+        # ART distribution buckets (6 bands)
+        art_buckets = [0, 0, 0, 0, 0, 0]
+        for p in processed_data:
+            a = p.art_min
+            if a is None or not isinstance(a, (int, float)) or a <= 0:
+                continue
+            if a <= 5:
+                art_buckets[0] += 1
+            elif a <= 10:
+                art_buckets[1] += 1
+            elif a <= 30:
+                art_buckets[2] += 1
+            elif a <= 60:
+                art_buckets[3] += 1
+            elif a <= 120:
+                art_buckets[4] += 1
+            else:
+                art_buckets[5] += 1
+
         # Count unique contacts and returners (contacts with >1 chat)
         contacts = Counter(p.contact_id for p in processed_data if p.contact_id)
         unique_clients = len(contacts)
@@ -101,8 +123,15 @@ class ReportAggregator:
             "negatives": negatives,
             "rated_chats": total_ratings,
             "nps_rated_chats": len(nps_scores),
+            "both_rated_chats": both_rated,
             "high_notes": compliments,
             "low_notes": negatives,
+            "art_bucket_0_5": art_buckets[0],
+            "art_bucket_5_10": art_buckets[1],
+            "art_bucket_10_30": art_buckets[2],
+            "art_bucket_30_60": art_buckets[3],
+            "art_bucket_60_120": art_buckets[4],
+            "art_bucket_120_plus": art_buckets[5],
             "pct_compliments": round(compliments / total_ratings * 100, 2) if total_ratings > 0 else "N/A",
             "pct_negatives": round(negatives / total_ratings * 100, 2) if total_ratings > 0 else "N/A",
             "unique_clients": unique_clients,

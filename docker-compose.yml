@@ -31,7 +31,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
-      CORS_ORIGINS: https://zsc-sac.eajdias.com,http://localhost:3050
+      CORS_ORIGINS: https://zscan-sac.eajdias.com,https://zsc-sac.eajdias.com,http://localhost:3050
       SYNC_PROFILE: ${SYNC_PROFILE:-daily}
       SYNC_ENABLED: ${SYNC_ENABLED:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

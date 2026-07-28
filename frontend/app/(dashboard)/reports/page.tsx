@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
-import { ymd } from "@/lib/utils";
+import { ymd, defaultPeriod } from "@/lib/utils";
 import { saveExport, exportReturners, exportArtHigh, exportPdfBulk, type ExportFilters } from "@/hooks/useExportConversations";
 import type { AvailableReportItem, ExportConversationsRequest } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-const START_DATE = ymd(new Date(Date.now() - 29 * 864e5));
+const { start: START_DATE, end: END_DATE } = defaultPeriod();
 
 const selectCls = "h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm";
 
@@ -49,7 +49,7 @@ function formatSize(bytes: number | null | undefined): string {
 
 export default function ReportsPage() {
   const [startDate, setStartDate] = useState(START_DATE);
-  const [endDate, setEndDate] = useState(ymd(new Date()));
+  const [endDate, setEndDate] = useState(END_DATE);
   const [selectedDept, setSelectedDept] = useState("");
   const [channel, setChannel] = useState("");
   const [statusFilter, setStatusFilter] = useState("");

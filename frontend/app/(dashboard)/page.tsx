@@ -8,7 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import api from "@/lib/api";
-import { ymd } from "@/lib/utils";
+import { defaultPeriod } from "@/lib/utils";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useBscScorecard } from "@/hooks/useBscScorecard";
@@ -83,6 +83,16 @@ const RatingEvolutionChart = dynamic(
 
 const NPSEvolutionChart = dynamic(
   () => import("@/components/dashboard/nps-evolution-chart").then((m) => ({ default: m.NPSEvolutionChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const RatedBreakdownChart = dynamic(
+  () => import("@/components/dashboard/rated-breakdown-chart").then((m) => ({ default: m.RatedBreakdownChart })),
+  { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const ARTEvolutionChart = dynamic(
+  () => import("@/components/dashboard/art-evolution-chart").then((m) => ({ default: m.ARTEvolutionChart })),
   { ssr: false, loading: () => <ChartSkeleton /> }
 );
 
@@ -168,16 +178,11 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   const [tab, setTabState] = useState<DashboardTab>(
     () => readTabFromQuery(searchParams, "tab", TAB_OPTIONS, "overview")
   );
-  const [granularity, setGranularity] = useState<EvolutionGranularity>("month");
+  const [granularity, setGranularity] = useState<EvolutionGranularity>("week");
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [agentList, setAgentList] = useState<AgentItem[]>([]);
 
-  const defaultStart = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 29);
-    return ymd(d);
-  }, []);
-  const defaultEnd = useMemo(() => ymd(new Date()), []);
+  const { start: defaultStart, end: defaultEnd } = useMemo(() => defaultPeriod(), []);
 
   const [startDate, setStartDate] = useState<string>(defaultStart);
   const [endDate, setEndDate] = useState<string>(defaultEnd);
@@ -200,11 +205,15 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
       .catch(() => {});
   }, []);
 
-  const { granularEvolution, loading, error } = useDashboard({
+  const overviewActive = tab === "overview";
+  const executiveActive = tab === "executive";
+
+  const { granularEvolution, loading, error, granularLoading } = useDashboard({
     granularity,
     start_date: startDate,
     end_date: endDate,
     department: selectedDept || undefined,
+    enabled: overviewActive,
   });
 
   const executive = useExecutive({
@@ -212,45 +221,48 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     endDate,
     selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
+    enabled: overviewActive || executiveActive,
   });
 
   const bscScorecard = useBscScorecard({
     department: selectedDept || "",
     startDate,
     endDate,
+    enabled: tab === "bsc",
   });
 
-  if (!mounted || loading || executive.loading) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <KPIGridSkeleton />
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ChartSkeleton />
-          <ChartSkeleton />
-        </div>
-        <TableSkeleton rows={5} />
-      </div>
-    );
-  }
+  const dowMemo = useMemo(() => {
+    const heatmapData = executive.heatmap;
+    const dowPeaks = new Map<string, { hour: number; value: number }>();
+    if (heatmapData?.cells) {
+      for (const c of heatmapData.cells) {
+        const dayLabel = DOW_NAMES[c.day] ?? `Dia ${c.day}`;
+        const prev = dowPeaks.get(dayLabel);
+        if (!prev || c.value > prev.value) {
+          dowPeaks.set(dayLabel, { hour: c.hour, value: c.value });
+        }
+      }
+    }
+    const dowData = executive.dow;
+    const items = (dowData?.items ?? [])
+      .filter((m) => m.label !== "Domingo")
+      .map((m) => {
+        const peak = dowPeaks.get(m.label);
+        return {
+          label: m.label,
+          value: m.value,
+          pct: m.pct,
+          peakHour: peak ? `${peak.hour}h · ${peak.value} chats` : null,
+        };
+      });
+    return {
+      dowItems: items,
+      dowMax: Math.max(...items.map((d) => d.value), 1),
+      dowTotal: dowData?.total ?? 0,
+    };
+  }, [executive.heatmap, executive.dow]);
 
-  if (error) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <EmptyState
-          icon={<AlertCircle className="h-12 w-12 text-destructive" />}
-          title="Erro ao carregar dashboard"
-          description={error}
-          action={
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              <RefreshCw className="mr-1 h-4 w-4" />
-              Tentar novamente
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
+  const { dowItems, dowMax, dowTotal } = dowMemo;
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -270,6 +282,23 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     </div>
   );
 
+  const showFirstLoad =
+    !mounted || (overviewActive && loading && granularLoading) || (executiveActive && executive.loading && !executive.meta) || (tab === "bsc" && bscScorecard.loading && !bscScorecard.scorecard);
+
+  if (showFirstLoad && !error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <KPIGridSkeleton />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <TableSkeleton rows={5} />
+      </div>
+    );
+  }
+
   if (tab === "overview") {
     const nps = executive.quality?.nps_breakdown?.real_nps;
     const pctReturning = executive.returners?.pct_returning;
@@ -288,14 +317,37 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           <StatCard title="Retornantes" value={pctReturning != null ? `${pctReturning.toFixed(1)}%` : "—"} />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Suspense fallback={<ChartSkeleton />}>
-            <RatingEvolutionChart data={granularEvolution?.buckets ?? []} />
-          </Suspense>
-          <Suspense fallback={<ChartSkeleton />}>
-            <NPSEvolutionChart data={granularEvolution?.buckets ?? []} />
-          </Suspense>
-        </div>
+        {granularLoading && !granularEvolution ? (
+          <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ChartSkeleton />
+              <ChartSkeleton />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ChartSkeleton />
+              <ChartSkeleton />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Suspense fallback={<ChartSkeleton />}>
+                <RatingEvolutionChart data={granularEvolution?.buckets ?? []} />
+              </Suspense>
+              <Suspense fallback={<ChartSkeleton />}>
+                <NPSEvolutionChart data={granularEvolution?.buckets ?? []} />
+              </Suspense>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Suspense fallback={<ChartSkeleton />}>
+                <RatedBreakdownChart data={granularEvolution?.buckets ?? []} />
+              </Suspense>
+              <Suspense fallback={<ChartSkeleton />}>
+                <ARTEvolutionChart data={granularEvolution?.buckets ?? []} />
+              </Suspense>
+            </div>
+          </>
+        )}
 
         <Suspense fallback={<ChartSkeleton />}>
           <AgentContribution agents={executive.agents?.items ?? []} />
@@ -305,32 +357,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   }
 
   if (tab === "executive") {
-    const execLoading = executive.loading;
-    const heatmapData = executive.heatmap;
-    const dowPeaks = new Map<string, { hour: number; value: number }>();
-    if (heatmapData?.cells) {
-      for (const c of heatmapData.cells) {
-        const dayLabel = DOW_NAMES[c.day] ?? `Dia ${c.day}`;
-        const prev = dowPeaks.get(dayLabel);
-        if (!prev || c.value > prev.value) {
-          dowPeaks.set(dayLabel, { hour: c.hour, value: c.value });
-        }
-      }
-    }
-    const dowData = executive.dow;
-    const dowItems = (dowData?.items ?? [])
-      .filter((m) => m.label !== "Domingo")
-      .map((m) => {
-        const peak = dowPeaks.get(m.label);
-        return {
-          label: m.label,
-          value: m.value,
-          pct: m.pct,
-          peakHour: peak ? `${peak.hour}h · ${peak.value} chats` : null,
-        };
-      });
-    const dowMax = Math.max(...dowItems.map((d) => d.value), 1);
-    const dowTotal = dowData?.total ?? 0;
+    const execLoading = executive.loading && !executive.meta;
 
     return (
       <div className="space-y-6">

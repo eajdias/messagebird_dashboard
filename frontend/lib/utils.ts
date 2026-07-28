@@ -23,6 +23,28 @@ export function ymd(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
+/** Return default billing period: 25th of previous month → 25th of current month.
+ *  If today is before the 25th, both dates shift one month back. */
+export function defaultPeriod(): { start: string; end: string } {
+  const now = new Date();
+  const day = now.getDate();
+  const month = now.getMonth(); // 0-indexed
+  const year = now.getFullYear();
+
+  const endIsCurrentMonth = day >= 25;
+
+  const endYear = endIsCurrentMonth ? year : month === 0 ? year - 1 : year;
+  const endMonth = endIsCurrentMonth ? month : month === 0 ? 11 : month - 1;
+
+  const startYear = endMonth === 0 ? endYear - 1 : endYear;
+  const startMonth = endMonth === 0 ? 11 : endMonth - 1;
+
+  return {
+    start: ymd(new Date(startYear, startMonth, 25)),
+    end: ymd(new Date(endYear, endMonth, 25)),
+  };
+}
+
 export function downloadCsv<T extends Record<string, unknown>>(
   rows: T[],
   columns: { key: keyof T; label: string; format?: (val: T[keyof T]) => string }[],

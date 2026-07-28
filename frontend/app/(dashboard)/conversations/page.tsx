@@ -14,7 +14,7 @@ import { NPSBadge, RatingBadge, ArtBadge } from "@/components/ui/metric-badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import { Search, ChevronLeft, ChevronRight, Columns3, ChevronDown, Eye, Archive, FileText, Inbox } from "lucide-react";
-import { cn, ymd } from "@/lib/utils";
+import { cn, defaultPeriod, ymd } from "@/lib/utils";
 import { toast } from "sonner";
 import type { ConversationItem } from "@/types";
 
@@ -27,7 +27,7 @@ interface ColumnDef {
   render: (conv: ConversationItem) => React.ReactNode;
 }
 
-const START_DATE = ymd(new Date(Date.now() - 29 * 864e5));
+const { start: START_DATE, end: END_DATE } = defaultPeriod();
 
 const ALL_COLUMNS: ColumnDef[] = [
   { key: "contact", label: "Contato", sortable: true, render: (c) => (
@@ -61,7 +61,7 @@ export default function ConversationsPage() {
   const [channel, setChannel] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [startDate, setStartDate] = useState(START_DATE);
-  const [endDate, setEndDate] = useState(ymd(new Date()));
+  const [endDate, setEndDate] = useState(END_DATE);
   const [sortBy, setSortBy] = useState<string>("start_time");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

@@ -80,12 +80,25 @@ MONTH_NAMES = [
 
 
 def _default_date_range() -> tuple[str, str]:
-    """Return current month bounds (local time)."""
+    """Return billing period: 25th of previous month → 25th of current month.
+    If today is before the 25th, both dates shift one month back."""
     now = datetime.now()
-    first = f"{now.year}-{now.month:02d}-01"
-    _, last_day = calendar.monthrange(now.year, now.month)
-    last = f"{now.year}-{now.month:02d}-{last_day}"
-    return first, last
+    if now.day >= 25:
+        end_year, end_month = now.year, now.month
+    else:
+        end_month = now.month - 1
+        end_year = now.year
+        if end_month <= 0:
+            end_month += 12
+            end_year -= 1
+
+    start_month = end_month - 1
+    start_year = end_year
+    if start_month <= 0:
+        start_month += 12
+        start_year -= 1
+
+    return f"{start_year}-{start_month:02d}-25", f"{end_year}-{end_month:02d}-25"
 
 
 def _make_aggregator() -> ReportAggregator:
@@ -489,19 +502,99 @@ async def get_evolution(
 # ── GET /dashboard/evolution/granular ───────────────────────────────────
 
 
+def _build_month_range(start_date: date, end_date: date) -> list[tuple[str, str, int, int, str]]:
+    """Build month buckets between two dates (inclusive)."""
+    months: list[tuple[str, str, int, int, str]] = []
+    y, m = start_date.year, start_date.month
+    while (y, m) <= (end_date.year, end_date.month):
+        mb_start = f"{y}-{m:02d}-01"
+        _, last_day = calendar.monthrange(y, m)
+        mb_end = f"{y}-{m:02d}-{last_day}"
+        label = f"{MONTH_NAMES[m]}/{y}"
+        months.append((mb_start, mb_end, y, m, label))
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    return months
+
+
+def _build_day_range(start_date: date, end_date: date) -> list[tuple[str, str, str]]:
+    """Build daily buckets between two dates (inclusive)."""
+    from datetime import timedelta
+
+    days: list[tuple[str, str, str]] = []
+    d = start_date
+    while d <= end_date:
+        iso = d.isoformat()
+        days.append((iso, iso, d.strftime("%d/%m")))
+        d += timedelta(days=1)
+    return days
+
+
+def _build_week_range(start_date: date, end_date: date) -> list[tuple[date, date, str]]:
+    """Build ISO week buckets covering the date range (inclusive)."""
+    from datetime import timedelta
+
+    # Align start to Monday of that week
+    ws = start_date - timedelta(days=start_date.weekday())
+    weeks: list[tuple[date, date, str]] = []
+    while ws <= end_date:
+        we = ws + timedelta(days=6)
+        # Clamp to actual range
+        eff_start = max(ws, start_date)
+        eff_end = min(we, end_date)
+        label = f"{eff_start.strftime('%d/%m')}–{eff_end.strftime('%d/%m')}"
+        weeks.append((eff_start, eff_end, label))
+        ws += timedelta(days=7)
+    return weeks
+
+
+def _build_bucket(
+    period_start: str,
+    label: str,
+    stats: dict,
+    year: int = 0,
+    month: int = 0,
+) -> EvolutionBucket:
+    return EvolutionBucket(
+        period_start=period_start,
+        label=label,
+        year=year,
+        month=month,
+        total_conversations=stats.get("total_chats", 0),
+        nps_score=stats.get("real_nps"),
+        art_avg_minutes=stats.get("avg_art"),
+        sla_compliance_pct=stats.get("sla_compliance"),
+        rating_avg=stats.get("avg_rating"),
+        rated_chats=stats.get("rated_chats", 0),
+        nps_rated_chats=stats.get("nps_rated_chats", 0),
+        both_rated_chats=stats.get("both_rated_chats", 0),
+        high_notes=stats.get("high_notes", 0),
+        low_notes=stats.get("low_notes", 0),
+        art_bucket_0_5=stats.get("art_bucket_0_5", 0),
+        art_bucket_5_10=stats.get("art_bucket_5_10", 0),
+        art_bucket_10_30=stats.get("art_bucket_10_30", 0),
+        art_bucket_30_60=stats.get("art_bucket_30_60", 0),
+        art_bucket_60_120=stats.get("art_bucket_60_120", 0),
+        art_bucket_120_plus=stats.get("art_bucket_120_plus", 0),
+    )
+
+
 @router.get("/evolution/granular", response_model=GranularEvolutionResponse)
 async def get_evolution_granular(
     granularity: str = Query("month", pattern="^(day|week|month)$"),
     count: int = Query(12, ge=1, le=90),
+    start_date: str | None = Query(None),
+    end_date: str | None = Query(None),
     department: str | None = Query(None),
     _current_user: dict[str, Any] = Depends(get_current_user),
     repo: ReportRepository = Depends(get_repository),
 ):
     """Evolution data with selectable granularity (day, week, month).
 
-    - `day`: last `count` days (max 90)
-    - `week`: last `count` ISO weeks (max 90)
-    - `month`: last `count` months (max 24)
+    When `start_date`/`end_date` are provided, buckets are computed within that
+    range. Otherwise, the last `count` periods are used (backwards from today).
     """
     import asyncio
     from datetime import timedelta
@@ -510,55 +603,44 @@ async def get_evolution_granular(
     today = now.date()
     agg = _make_aggregator()
 
+    use_range = start_date is not None and end_date is not None
+    range_start: date | None = date.fromisoformat(start_date) if use_range else None
+    range_end: date | None = date.fromisoformat(end_date) if use_range else None
+
     if granularity == "month":
-        month_list: list[tuple[str, str, int, int, str]] = []
-        for i in range(count - 1, -1, -1):
-            m = now.month - i
+        if use_range and range_start and range_end:
+            month_list = _build_month_range(range_start, range_end)
+        else:
+            m = now.month - (count - 1)
             y = now.year
             while m <= 0:
                 m += 12
                 y -= 1
-            start = f"{y}-{m:02d}-01"
-            _, last_day = calendar.monthrange(y, m)
-            end = f"{y}-{m:02d}-{last_day}"
-            label = f"{MONTH_NAMES[m]}/{y}"
-            month_list.append((start, end, y, m, label))
+            month_list = _build_month_range(date(y, m, 1), today)
 
-        async def _process(start_s: str, end_s: str):
+        async def _process_month(start_s: str, end_s: str):
             _, processed = await _fetch_and_process(repo, start_s, end_s)
             if department:
                 processed = _filter_processed(processed, set(), None, department)
             return agg.aggregate_statistics(processed)
 
-        results = await asyncio.gather(*[_process(s, e) for s, e, _, _, _ in month_list])
+        results = await asyncio.gather(*[_process_month(s, e) for s, e, _, _, _ in month_list])
 
         buckets: list[EvolutionBucket] = []
         for (start, _, y, m, label), stats in zip(month_list, results, strict=True):
-            buckets.append(
-                EvolutionBucket(
-                    period_start=start,
-                    label=label,
-                    year=y,
-                    month=m,
-                    total_conversations=stats.get("total_chats", 0),
-                    nps_score=stats.get("real_nps"),
-                    art_avg_minutes=stats.get("avg_art"),
-                    sla_compliance_pct=stats.get("sla_compliance"),
-                    rating_avg=stats.get("avg_rating"),
-                    rated_chats=stats.get("rated_chats", 0),
-                    nps_rated_chats=stats.get("nps_rated_chats", 0),
-                    high_notes=stats.get("high_notes", 0),
-                    low_notes=stats.get("low_notes", 0),
-                )
-            )
+            buckets.append(_build_bucket(start, label, stats, year=y, month=m))
         return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
 
     if granularity == "day":
-        day_list: list[tuple[str, str, str]] = []
-        for i in range(count - 1, -1, -1):
-            d = today - timedelta(days=i)
-            iso = d.isoformat()
-            day_list.append((iso, iso, d.strftime("%d/%m")))
+        day_list = (
+            _build_day_range(range_start, range_end)
+            if use_range and range_start and range_end
+            else [
+                (d.isoformat(), d.isoformat(), d.strftime("%d/%m"))
+                for i in range(count - 1, -1, -1)
+                for d in [today - timedelta(days=i)]
+            ]
+        )
 
         async def _process_day(d_iso: str):
             _, processed = await _fetch_and_process(repo, d_iso, d_iso)
@@ -566,34 +648,19 @@ async def get_evolution_granular(
                 processed = _filter_processed(processed, set(), None, department)
             return agg.aggregate_statistics(processed)
 
-        results = await asyncio.gather(*[_process_day(d) for d, _, _ in day_list])
+        results = await asyncio.gather(*[_process_day(start) for start, _, _ in day_list])
 
         buckets = []
         for (start, _, label), stats in zip(day_list, results, strict=True):
-            buckets.append(
-                EvolutionBucket(
-                    period_start=start,
-                    label=label,
-                    total_conversations=stats.get("total_chats", 0),
-                    nps_score=stats.get("real_nps"),
-                    art_avg_minutes=stats.get("avg_art"),
-                    sla_compliance_pct=stats.get("sla_compliance"),
-                    rating_avg=stats.get("avg_rating"),
-                    rated_chats=stats.get("rated_chats", 0),
-                    nps_rated_chats=stats.get("nps_rated_chats", 0),
-                    high_notes=stats.get("high_notes", 0),
-                    low_notes=stats.get("low_notes", 0),
-                )
-            )
+            buckets.append(_build_bucket(start, label, stats))
         return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
 
     # week
-    week_list: list[tuple[date, date, str]] = []
-    for i in range(count - 1, -1, -1):
-        week_end = today - timedelta(days=i * 7)
-        week_start = week_end - timedelta(days=6)
-        label = f"{week_start.strftime('%d/%m')}–{week_end.strftime('%d/%m')}"
-        week_list.append((week_start, week_end, label))
+    week_list = (
+        _build_week_range(range_start, range_end)
+        if use_range and range_start and range_end
+        else _build_week_range(today - timedelta(days=count * 7 - 1), today)
+    )
 
     async def _process_week(start_d: date, end_d: date):
         start = start_d.isoformat()
@@ -607,21 +674,7 @@ async def get_evolution_granular(
 
     buckets = []
     for (start_d, _, label), stats in zip(week_list, results, strict=True):
-        buckets.append(
-            EvolutionBucket(
-                period_start=start_d.isoformat(),
-                label=label,
-                total_conversations=stats.get("total_chats", 0),
-                nps_score=stats.get("real_nps"),
-                art_avg_minutes=stats.get("avg_art"),
-                sla_compliance_pct=stats.get("sla_compliance"),
-                rating_avg=stats.get("avg_rating"),
-                rated_chats=stats.get("rated_chats", 0),
-                nps_rated_chats=stats.get("nps_rated_chats", 0),
-                high_notes=stats.get("high_notes", 0),
-                low_notes=stats.get("low_notes", 0),
-            )
-        )
+        buckets.append(_build_bucket(start_d.isoformat(), label, stats))
     return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
 
 

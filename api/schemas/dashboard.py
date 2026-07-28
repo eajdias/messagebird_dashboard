@@ -73,8 +73,15 @@ class EvolutionBucket(BaseModel):
     rating_avg: float | None = None
     rated_chats: int = 0
     nps_rated_chats: int = 0
+    both_rated_chats: int = 0
     high_notes: int = 0
     low_notes: int = 0
+    art_bucket_0_5: int = 0
+    art_bucket_5_10: int = 0
+    art_bucket_10_30: int = 0
+    art_bucket_30_60: int = 0
+    art_bucket_60_120: int = 0
+    art_bucket_120_plus: int = 0
 
 
 class GranularEvolutionResponse(BaseModel):

@@ -10,7 +10,7 @@ function getApiBaseURL(): string {
   if (hostname === "localhost" || hostname === "127.0.0.1") {
     return "http://localhost:8050";
   }
-  return `https://${hostname.replace("zsc-sac.", "zsc-sac-api.")}`;
+  return `https://${hostname.replace("-sac.", "-sac-api.")}`;
 }
 
 const api = axios.create({
