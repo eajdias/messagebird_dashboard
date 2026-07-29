@@ -104,18 +104,23 @@ export default function SettingsPage() {
     const [year, month] = selectedMonth.split("-").map(Number);
     setSyncMonth(true);
     try {
-      await api.post("/api/v1/admin/sync/trigger", {
+      // Step 1: Sync conversations for the month
+      toast.loading("Sincronizando conversations...", { id: "sync-month" });
+      await api.post("/api/v1/admin/sync/conversations", { year, month });
+
+      // Step 2: Sync messages for conversations in DB
+      toast.loading("Sincronizando mensagens...", { id: "sync-month" });
+      await api.post("/api/v1/admin/sync/messages", {
         year,
         month,
-        full_sync: true,
-        sync_messages: true,
         backfill_surveys: true,
       });
-      toast.success(`Sincronização de ${MONTHS[month - 1]} ${year} concluída!`);
+
+      toast.success(`Sincronização de ${MONTHS[month - 1]} ${year} concluída!`, { id: "sync-month" });
       await fetchStatus();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      toast.error(msg || "Erro ao sincronizar mês");
+      toast.error(msg || "Erro ao sincronizar mês", { id: "sync-month" });
     } finally {
       setSyncMonth(false);
     }

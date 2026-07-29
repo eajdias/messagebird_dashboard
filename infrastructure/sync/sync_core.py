@@ -93,6 +93,27 @@ class PgSyncManager:
             return row["agnt_id"]
         return None
 
+    async def batch_resolve_agents(self, conn: PostgresSyncConnection, agents: dict[str, str]) -> None:
+        """Batch resolve agents: INSERT many + SELECT many (2 round-trips total)."""
+        if not agents:
+            return
+        # Filter out already-cached agents
+        new_agents = {bid: name for bid, name in agents.items() if bid not in self._agent_cache}
+        if not new_agents:
+            return
+        agents_data = [(name.strip() if name else name, "OUTROS", bid) for bid, name in new_agents.items()]
+        await conn.execute_many(
+            "INSERT INTO agents (agnt_name, agnt_grp, agnt_bird) VALUES ($1, $2, $3) "
+            "ON CONFLICT (agnt_bird) DO NOTHING",
+            agents_data,
+        )
+        rows = await conn.fetch_all(
+            "SELECT agnt_id, agnt_bird FROM agents WHERE agnt_bird = ANY($1::varchar[])",
+            (list(new_agents.keys()),),
+        )
+        for r in rows:
+            self._agent_cache[r["agnt_bird"]] = r["agnt_id"]
+
     async def get_last_sync_time(self, conn: PostgresSyncConnection, resource: str):
         row = await conn.fetch_one(
             "SELECT sync_created, sync_cursor, sync_offset "

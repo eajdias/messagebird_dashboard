@@ -17,6 +17,8 @@ from api.schemas.admin import (
     HealthResponse,
     JobInfo,
     SchedulerStatusResponse,
+    SyncConversationsRequest,
+    SyncMessagesRequest,
     SyncProfileResponse,
     SyncRangeRequest,
     SyncStatusResponse,
@@ -126,6 +128,80 @@ async def trigger_sync(
     await refresh_materialized_view()
     logger.info("Manual sync completed")
     return SyncTriggerResponse(status="completed", message="Sync and MV refresh completed")
+
+
+@router.post("/sync/conversations", response_model=SyncTriggerResponse)
+async def sync_conversations_endpoint(
+    request: SyncConversationsRequest | None = Body(default=None),
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Sync conversations from Bird API.
+
+    - Empty body: fetch ALL conversations (slow, ~15-25min)
+    - With year+month: fetch conversations for that month (~2-5min)
+    """
+    from api.sync_utils import refresh_materialized_view
+    from infrastructure.sync.pg_sync_engine import sync_conversations_full, sync_conversations_month
+
+    body = request or SyncConversationsRequest()
+    logger.info("Conversations sync triggered: year=%s, month=%s", body.year, body.month)
+
+    try:
+        if body.year is not None and body.month is not None:
+            msg = await sync_conversations_month(await _get_pool(), body.year, body.month)
+        else:
+            msg = await sync_conversations_full(await _get_pool())
+        await refresh_materialized_view()
+    except Exception as e:
+        logger.exception("Conversations sync failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    logger.info("Conversations sync completed")
+    return SyncTriggerResponse(status="completed", message=msg)
+
+
+@router.post("/sync/messages", response_model=SyncTriggerResponse)
+async def sync_messages_endpoint(
+    request: SyncMessagesRequest,
+    _current_user: dict[str, Any] = Depends(get_current_user),
+):
+    """Sync messages for conversations already in DB.
+
+    - With year+month: sync messages for conversations created in that month
+    - With start_date+end_date: sync messages for conversations in that range
+    """
+    from api.sync_utils import refresh_materialized_view
+    from infrastructure.sync.pg_sync_engine import sync_messages_month, sync_messages_range
+
+    logger.info(
+        "Messages sync triggered: year=%s, month=%s, start=%s, end=%s, surveys=%s",
+        request.year,
+        request.month,
+        request.start_date,
+        request.end_date,
+        request.backfill_surveys,
+    )
+
+    try:
+        if request.year is not None and request.month is not None:
+            msg = await sync_messages_month(await _get_pool(), request.year, request.month, request.backfill_surveys)
+        else:
+            msg = await sync_messages_range(
+                await _get_pool(), request.start_date, request.end_date, request.backfill_surveys
+            )
+        await refresh_materialized_view()
+    except Exception as e:
+        logger.exception("Messages sync failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    logger.info("Messages sync completed")
+    return SyncTriggerResponse(status="completed", message=msg)
+
+
+async def _get_pool():
+    from api.dependencies import get_pool
+
+    return await get_pool()
 
 
 @router.get("/agents", response_model=AgentListResponse)

@@ -9,7 +9,16 @@ from infrastructure.sync.sync_core import PgSyncManager
 logger = logging.getLogger("m_bird.sync_pg")
 
 
-async def update_conversation_surveys(manager: PgSyncManager, conn: PostgresSyncConnection, conversation_bird_id: str):
+async def update_conversation_surveys(
+    manager: PgSyncManager,
+    conn: PostgresSyncConnection,
+    conversation_bird_id: str,
+    raw_messages: list[dict] | None = None,
+):
+    """Update survey data for a conversation.
+
+    If raw_messages is provided, use it directly instead of re-fetching from DB.
+    """
     from domain import constants
 
     cnvs_row = await conn.fetch_one(
@@ -31,11 +40,31 @@ async def update_conversation_surveys(manager: PgSyncManager, conn: PostgresSync
         "rating_nps": r"Avalie.*(?:nosso atendimento|a nossa Empresa)",
     }
 
-    messages = await conn.fetch_all(
-        "SELECT msgs_id, msgs_content, msgs_direction, msgs_created "
-        "FROM messages WHERE msgs_cnvs = $1 ORDER BY msgs_created ASC",
-        (cnvs_id,),
-    )
+    if raw_messages is not None:
+        # Convert API raw messages to the format expected by the survey processor
+        messages = []
+        for rm in raw_messages:
+            content_obj = rm.get("content")
+            content_text = ""
+            if isinstance(content_obj, dict):
+                content_text = content_obj.get("text", "") or content_obj.get("hsm", {}).get("elementName", "")
+            else:
+                content_text = str(content_obj) if content_obj else ""
+            messages.append(
+                {
+                    "msgs_id": rm.get("id"),
+                    "msgs_content": content_text,
+                    "msgs_direction": rm.get("direction"),
+                    "msgs_created": rm.get("createdDatetime"),
+                }
+            )
+    else:
+        # Fallback: fetch from DB (used by backfill_surveys)
+        messages = await conn.fetch_all(
+            "SELECT msgs_id, msgs_content, msgs_direction, msgs_created "
+            "FROM messages WHERE msgs_cnvs = $1 ORDER BY msgs_created ASC",
+            (cnvs_id,),
+        )
 
     updates: dict[str, int | str] = {}
     for i, msg in enumerate(messages):
@@ -138,17 +167,18 @@ async def update_conversation_surveys(manager: PgSyncManager, conn: PostgresSync
                 break
 
     if updates:
-        values = []
-        for k, v in updates.items():
-            if isinstance(v, int):
-                values.append(f"{k} = {v}")
-            elif isinstance(v, str):
-                safe = v.replace("'", "''")
-                values.append(f"{k} = E'{safe}'")
-            else:
-                values.append(f"{k} = {v!r}")
-        set_clause = ", ".join(values)
-        await conn.execute_raw(f"UPDATE conversations SET {set_clause} WHERE cnvs_id = {cnvs_id}")
+        # Use parameterized query to prevent SQL injection
+        set_parts = []
+        params = []
+        for idx, (k, v) in enumerate(updates.items(), 1):
+            set_parts.append(f"{k} = ${idx}")
+            params.append(v)
+        params.append(cnvs_id)
+        set_clause = ", ".join(set_parts)
+        await conn.execute_query(
+            f"UPDATE conversations SET {set_clause} WHERE cnvs_id = ${len(params)}",
+            tuple(params),
+        )
 
 
 async def backfill_surveys(manager: PgSyncManager, conn: PostgresSyncConnection) -> int:

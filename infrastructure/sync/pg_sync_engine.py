@@ -1,11 +1,17 @@
 """PostgreSQL sync engine — orchestrator.
 
-Delegates to specialized modules:
-  - sync_core.py: PgSyncManager class + helpers
-  - sync_contacts.py: contact sync
-  - sync_conversations.py: conversation sync
-  - sync_messages.py: message sync
-  - sync_surveys.py: survey extraction
+Sync pipeline with clear separation of responsibilities:
+
+  1. sync_conversations_full    — Fetch ALL conversations from Bird API
+  2. sync_conversations_month   — Fetch conversations for a specific month
+  3. sync_messages_month        — Fetch messages for conversations already in DB (by month)
+  4. sync_messages_range        — Fetch messages for conversations already in DB (by date range)
+
+Usage:
+  - Backfill month:   sync_conversations_month + sync_messages_month
+  - Backfill range:   (conversations must exist in DB) + sync_messages_range
+  - Full initial:     sync_conversations_full + sync_messages_month/range
+  - Daily incremental: handled by APScheduler (sync_today path)
 """
 
 import logging
@@ -27,6 +33,120 @@ from infrastructure.sync.sync_surveys import backfill_surveys as survey_backfill
 logger = logging.getLogger("m_bird.sync_pg")
 
 
+# ── 1. Sync ALL conversations from Bird API ──────────────────────────────
+
+
+async def sync_conversations_full(pool) -> str:
+    """Fetch ALL conversations from Bird API (no date/status filter).
+
+    This is the slowest operation (~15-25min for 60k+ conversations).
+    Run once for initial setup, then use monthly sync for backfill.
+    """
+    raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
+    manager = PgSyncManager()
+    conn = PostgresSyncConnection(raw_pool)
+    await manager.load_caches(conn)
+    await manager.seed_known_agents(conn)
+
+    await sync_contacts(manager, conn)
+    await sync_conversations(manager, conn)
+
+    return "Full conversations sync completed (all conversations from Bird API)."
+
+
+# ── 2. Sync conversations for a specific month ───────────────────────────
+
+
+async def sync_conversations_month(pool, year: int, month: int) -> str:
+    """Fetch conversations for a specific month from Bird API.
+
+    Duration: ~2-5min depending on volume (~1000 conversations/month).
+    """
+    raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
+    manager = PgSyncManager()
+    conn = PostgresSyncConnection(raw_pool)
+    await manager.load_caches(conn)
+    await manager.seed_known_agents(conn)
+
+    month_start, next_month_start = month_bounds_utc(year, month)
+    start_iso = to_bird_iso(month_start)
+    end_iso = to_bird_iso(next_month_start)
+
+    await sync_conversations(manager, conn, min_date=start_iso, max_date=end_iso)
+
+    return f"Conversations sync completed for {year:04d}-{month:02d}."
+
+
+# ── 3. Sync messages for conversations in DB (by month) ──────────────────
+
+
+async def sync_messages_month(pool, year: int, month: int, backfill_surveys: bool = False) -> str:
+    """Fetch messages for conversations already in DB for a specific month.
+
+    This does NOT fetch conversations from Bird API — it only syncs messages
+    for conversations that already exist in the database.
+
+    Duration: ~3-5min (depends on number of conversations and messages).
+    """
+    raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
+    manager = PgSyncManager()
+    conn = PostgresSyncConnection(raw_pool)
+    await manager.load_caches(conn)
+
+    msg_count = await sync_messages_for_month(manager, conn, year, month)
+
+    result = f"Messages sync completed for {year:04d}-{month:02d}: {msg_count} messages."
+
+    if backfill_surveys:
+        count = await survey_backfill_fn(manager, conn)
+        result += f" Survey backfill: {count} conversations processed."
+
+    return result
+
+
+# ── 4. Sync messages for conversations in DB (by date range) ─────────────
+
+
+async def sync_messages_range(pool, start_date: str, end_date: str, backfill_surveys: bool = False) -> str:
+    """Fetch messages for conversations already in DB for a date range.
+
+    This does NOT fetch conversations from Bird API — it only syncs messages
+    for conversations that already exist in the database.
+
+    Duration: ~1-3min (depends on date range and conversation count).
+    """
+    raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
+    manager = PgSyncManager()
+    conn = PostgresSyncConnection(raw_pool)
+    await manager.load_caches(conn)
+
+    try:
+        start_dt = datetime.fromisoformat(start_date)
+        end_dt = datetime.fromisoformat(end_date)
+    except ValueError as e:
+        raise ValueError(f"Invalid date format (use ISO 8601 YYYY-MM-DD): {e}") from e
+
+    if start_dt.tzinfo is None:
+        start_dt = start_dt.replace(tzinfo=UTC)
+    if end_dt.tzinfo is None:
+        end_dt = end_dt.replace(tzinfo=UTC)
+
+    end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    msg_count = await sync_messages_for_range(manager, conn, start_dt, end_dt)
+
+    result = f"Messages sync completed for {start_date} → {end_date}: {msg_count} messages."
+
+    if backfill_surveys:
+        count = await survey_backfill_fn(manager, conn)
+        result += f" Survey backfill: {count} conversations processed."
+
+    return result
+
+
+# ── Legacy / Daily sync (used by scheduler) ──────────────────────────────
+
+
 async def trigger_sync_pg(
     pool,
     full_sync: bool = False,
@@ -39,6 +159,7 @@ async def trigger_sync_pg(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> str:
+    """Legacy sync trigger — kept for backward compatibility with scheduler."""
     raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
     manager = PgSyncManager()
     conn = PostgresSyncConnection(raw_pool)
@@ -78,6 +199,7 @@ async def trigger_sync_pg(
         raise ValueError("Use year and month together for monthly sync.")
 
     if year is not None and month is not None:
+        # Monthly: sync conversations for month + messages for month
         month_start, next_month_start = month_bounds_utc(year, month)
         start_iso = to_bird_iso(month_start)
         end_iso = to_bird_iso(next_month_start)
@@ -111,7 +233,8 @@ async def trigger_sync_pg(
         for row in rows:
             from infrastructure.sync.sync_messages import sync_messages as sync_msgs
 
-            msg_count += await sync_msgs(manager, conn, row["cnvs_bird"], date_from=today_start_iso)
+            count, _ = await sync_msgs(manager, conn, row["cnvs_bird"], date_from=today_start_iso)
+            msg_count += count
 
         if backfill_surveys:
             count = await survey_backfill_fn(manager, conn)

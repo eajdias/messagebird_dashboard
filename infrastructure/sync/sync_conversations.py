@@ -13,17 +13,25 @@ async def sync_conversations(
     conn: PostgresSyncConnection,
     min_date=None,
     max_date=None,
+    skip_archived=False,
 ):
+    """Sync conversations from MessageBird API.
+
+    If skip_archived=True, only sync active conversations (faster for monthly backfill).
+    """
     logger.info(
-        "Starting conversations sync (min_date=%s, max_date=%s)...",
+        "Starting conversations sync (min_date=%s, max_date=%s, skip_archived=%s)...",
         min_date,
         max_date,
+        skip_archived,
     )
     start_time = time.time()
-    limit = 20
+    limit = 20  # MessageBird conversations API max is 20
     count = 0
 
-    for status in ["active", "archived"]:
+    statuses = ["active"] if skip_archived else ["active", "archived"]
+
+    for status in statuses:
         offset = 0
 
         page = 0

@@ -28,6 +28,55 @@ class SyncTriggerRequest(BaseModel):
 SyncTriggerResponse = StatusResponse
 
 
+class SyncConversationsRequest(BaseModel):
+    """Sync conversations from Bird API.
+
+    - Empty: fetch ALL conversations (slow, ~15-25min)
+    - With year+month: fetch conversations for that month only (~2-5min)
+    """
+
+    year: int | None = None
+    month: int | None = None
+
+    @model_validator(mode="after")
+    def _validate(self) -> SyncConversationsRequest:
+        if (self.year is None) != (self.month is None):
+            raise ValueError("year and month must be provided together.")
+        if self.month is not None and not (1 <= self.month <= 12):
+            raise ValueError("month must be between 1 and 12.")
+        return self
+
+
+class SyncMessagesRequest(BaseModel):
+    """Sync messages for conversations already in DB.
+
+    - With year+month: sync messages for conversations created in that month
+    - With start_date+end_date: sync messages for conversations in that range
+    """
+
+    year: int | None = None
+    month: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    backfill_surveys: bool = False
+
+    @model_validator(mode="after")
+    def _validate(self) -> SyncMessagesRequest:
+        has_month = self.year is not None or self.month is not None
+        has_range = self.start_date is not None or self.end_date is not None
+        if has_month and has_range:
+            raise ValueError("Use either year+month OR start_date+end_date, not both.")
+        if not has_month and not has_range:
+            raise ValueError("Provide either year+month or start_date+end_date.")
+        if (self.year is None) != (self.month is None):
+            raise ValueError("year and month must be provided together.")
+        if self.month is not None and not (1 <= self.month <= 12):
+            raise ValueError("month must be between 1 and 12.")
+        if has_range and (not self.start_date or not self.end_date):
+            raise ValueError("start_date and end_date must be provided together.")
+        return self
+
+
 class SyncRangeRequest(BaseModel):
     """Sync a date range of conversations + messages.
 

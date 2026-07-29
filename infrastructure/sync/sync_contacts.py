@@ -12,7 +12,7 @@ async def sync_contacts(manager: PgSyncManager, conn: PostgresSyncConnection):
     logger.info("Starting contacts sync...")
     start_time = time.time()
     offset = 0
-    limit = 20
+    limit = 20  # MessageBird contacts API max is 20
     processed_count = 0
     page = 0
     while True:
