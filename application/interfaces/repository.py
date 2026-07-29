@@ -12,6 +12,17 @@ class ReportRepository(ABC):
         pass
 
     @abstractmethod
+    async def fetch_raw_data_range_filtered(
+        self,
+        start_date: str,
+        end_date: str,
+        agent_group: str | None = None,
+        agent_ids: list[str] | None = None,
+    ) -> list[RawConversationData]:
+        """Fetch raw data with SQL-level filtering for department and/or agents."""
+        pass
+
+    @abstractmethod
     async def fetch_auditoria_contatos_raw(self, start_date: str, end_date: str) -> list[dict[str, Any]]:
         pass
 

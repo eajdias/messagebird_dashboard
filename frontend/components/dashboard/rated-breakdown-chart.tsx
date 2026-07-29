@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -90,7 +91,7 @@ function BreakdownTooltip({ active, payload, label }: Record<string, unknown>) {
   );
 }
 
-export function RatedBreakdownChart({ data, className }: RatedBreakdownChartProps) {
+export const RatedBreakdownChart = memo(function RatedBreakdownChart({ data, className }: RatedBreakdownChartProps) {
   const chartData = data.map((b) => ({
     label: b.label,
     Ambos: b.both_rated_chats,
@@ -137,4 +138,4 @@ export function RatedBreakdownChart({ data, className }: RatedBreakdownChartProp
       </CardContent>
     </Card>
   );
-}
+});

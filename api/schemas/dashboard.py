@@ -243,6 +243,7 @@ class ExecutiveMeta(BaseModel):
     group: str | None = None
     total_chats: int = 0
     total_messages: int = 0
+    pct_art_10min: float | None = None
 
 
 class ARTDistributionBucket(BaseModel):

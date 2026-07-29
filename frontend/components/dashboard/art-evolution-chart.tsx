@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -25,7 +26,7 @@ const BANDS = [
   { key: "30 min+", color: "var(--destructive)" },
 ] as const;
 
-export function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
+export const ARTEvolutionChart = memo(function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
   const chartData = data.map((b) => ({
     label: b.label,
     "0–5 min": b.art_bucket_0_5,
@@ -87,4 +88,4 @@ export function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

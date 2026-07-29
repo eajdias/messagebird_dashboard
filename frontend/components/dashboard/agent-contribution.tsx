@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AgentRow } from "@/types";
@@ -24,7 +24,7 @@ function pct(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
 
-export function AgentContribution({ agents, className }: AgentContributionProps) {
+export const AgentContribution = memo(function AgentContribution({ agents, className }: AgentContributionProps) {
   const rows = useMemo(() => {
     const totals = {
       chats: agents.reduce((s, a) => s + a.chats, 0),
@@ -112,4 +112,4 @@ export function AgentContribution({ agents, className }: AgentContributionProps)
       </CardContent>
     </Card>
   );
-}
+});

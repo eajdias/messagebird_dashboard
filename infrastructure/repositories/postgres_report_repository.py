@@ -5,7 +5,7 @@ from typing import Any
 from application.interfaces.repository import ReportRepository
 from domain import constants, logic
 from domain.entities.report_data import RawConversationData, RawMessageData
-from infrastructure.cache import repo_cache
+from infrastructure.cache import repo_cache, processed_cache
 from infrastructure.database import queries_pg
 from infrastructure.database.postgres_connection import PostgresPool
 
@@ -135,6 +135,35 @@ class PostgresReportRepository(ReportRepository):
                 e,
             )
             return _rows_to_conversations(rows, agent_group)
+
+        return await repo_cache.get_or_set(cache_key, _fetch)
+
+    async def fetch_raw_data_range_filtered(
+        self,
+        start_date: str,
+        end_date: str,
+        agent_group: str | None = None,
+        agent_ids: list[str] | None = None,
+    ) -> list[RawConversationData]:
+        """Fetch raw data with SQL-level filtering for department."""
+        cache_key = f"raw_range_f:{start_date}:{end_date}:{agent_group or ''}"
+        s, e = _utc_range(start_date, end_date)
+
+        async def _fetch():
+            if agent_group:
+                rows = await self._pool.fetch_all(
+                    queries_pg.SURVEY_MV_RANGE_FILTERED,
+                    s,
+                    e,
+                    agent_group,
+                )
+            else:
+                rows = await self._pool.fetch_all(
+                    queries_pg.SURVEY_MV_RANGE_COLUMNS,
+                    s,
+                    e,
+                )
+            return _rows_to_conversations(rows)
 
         return await repo_cache.get_or_set(cache_key, _fetch)
 

@@ -343,6 +343,7 @@ export interface ExecutiveMeta {
   group: string | null;
   total_chats: number;
   total_messages: number;
+  pct_art_10min: number | null;
 }
 
 export interface ARTDistributionBucket {

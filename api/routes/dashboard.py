@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import calendar
 import logging
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
 from api.auth import get_current_user
 from api.dependencies import get_repository
+from domain import logic
 from api.schemas.dashboard import (
     AgentRankingItem,
     AgentRankingResponse,
@@ -460,13 +462,6 @@ async def get_evolution(
     now = datetime.now()
     agg = _make_aggregator()
 
-    async def _month_stats(m: int, y: int):
-        _, last_day = calendar.monthrange(y, m)
-        start = f"{y}-{m:02d}-01"
-        end = f"{y}-{m:02d}-{last_day}"
-        _, processed = await _fetch_and_process(repo, start, end)
-        return agg.aggregate_statistics(processed)
-
     # Build month list (oldest to newest)
     month_list: list[tuple[int, int]] = []
     for i in range(months - 1, -1, -1):
@@ -477,11 +472,45 @@ async def get_evolution(
             y -= 1
         month_list.append((m, y))
 
-    # Fetch all months in parallel (cache hits are instant)
-    results = await asyncio.gather(*[_month_stats(m, y) for m, y in month_list])
+    # Compute the full date range spanning all months
+    first_m, first_y = month_list[0]
+    last_m, last_y = month_list[-1]
+    _, last_day = calendar.monthrange(last_y, last_m)
+    range_start = f"{first_y}-{first_m:02d}-01"
+    range_end = f"{last_y}-{last_m:02d}-{last_day}"
+
+    # Fetch entire range once, process in Python
+    from infrastructure.cache import processed_cache
+
+    cache_key = f"evo_monthly:{range_start}:{range_end}"
+    processed_cache_entry = await processed_cache.get_or_set(
+        cache_key,
+        lambda: asyncio.ensure_future(_fetch_and_process(repo, range_start, range_end)),
+    )
+    _, processed = await processed_cache_entry
+
+    # Split processed data by month
+    def _month_key(p: Any) -> tuple[int, int]:
+        raw_str = getattr(p, "raw_created", None) or ""
+        if raw_str:
+            try:
+                dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")
+                return (dt.month, dt.year)
+            except ValueError, TypeError:
+                pass
+        return (0, 0)
+
+    from collections import defaultdict
+
+    month_buckets: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    for p in processed:
+        mk = _month_key(p)
+        month_buckets[mk].append(p)
 
     evolution: list[EvolutionMonth] = []
-    for (m, y), stats in zip(month_list, results, strict=True):
+    for m, y in month_list:
+        bucket = month_buckets.get((m, y), [])
+        stats = agg.aggregate_statistics(bucket) if bucket else {}
         evolution.append(
             EvolutionMonth(
                 year=y,
@@ -593,10 +622,9 @@ async def get_evolution_granular(
 ):
     """Evolution data with selectable granularity (day, week, month).
 
-    When `start_date`/`end_date` are provided, buckets are computed within that
-    range. Otherwise, the last `count` periods are used (backwards from today).
+    Fetches the entire range once and splits into buckets in Python,
+    instead of N separate DB queries per bucket.
     """
-    import asyncio
     from datetime import timedelta
 
     now = datetime.now()
@@ -604,77 +632,121 @@ async def get_evolution_granular(
     agg = _make_aggregator()
 
     use_range = start_date is not None and end_date is not None
-    range_start: date | None = date.fromisoformat(start_date) if use_range else None
-    range_end: date | None = date.fromisoformat(end_date) if use_range else None
+    range_start: date | None = date.fromisoformat(start_date) if use_range and start_date else None
+    range_end: date | None = date.fromisoformat(end_date) if use_range and end_date else None
+
+    # Determine the full date range to fetch and build bucket lists
+    fetch_start = ""
+    fetch_end = ""
+    month_list_data: list[tuple[str, str, int, int, str]] = []
+    day_list_data: list[tuple[str, str, str]] = []
+    week_list_data: list[tuple[date, date, str]] = []
 
     if granularity == "month":
         if use_range and range_start and range_end:
-            month_list = _build_month_range(range_start, range_end)
+            month_list_data = _build_month_range(range_start, range_end)
         else:
             m = now.month - (count - 1)
             y = now.year
             while m <= 0:
                 m += 12
                 y -= 1
-            month_list = _build_month_range(date(y, m, 1), today)
-
-        async def _process_month(start_s: str, end_s: str):
-            _, processed = await _fetch_and_process(repo, start_s, end_s)
-            if department:
-                processed = _filter_processed(processed, set(), None, department)
-            return agg.aggregate_statistics(processed)
-
-        results = await asyncio.gather(*[_process_month(s, e) for s, e, _, _, _ in month_list])
-
-        buckets: list[EvolutionBucket] = []
-        for (start, _, y, m, label), stats in zip(month_list, results, strict=True):
-            buckets.append(_build_bucket(start, label, stats, year=y, month=m))
-        return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
-
-    if granularity == "day":
-        day_list = (
-            _build_day_range(range_start, range_end)
-            if use_range and range_start and range_end
-            else [
+            month_list_data = _build_month_range(date(y, m, 1), today)
+        fetch_start = month_list_data[0][0]
+        fetch_end_date = date.fromisoformat(month_list_data[-1][0])
+        _, last_day = calendar.monthrange(fetch_end_date.year, fetch_end_date.month)
+        fetch_end = f"{fetch_end_date.year}-{fetch_end_date.month:02d}-{last_day}"
+    elif granularity == "day":
+        if use_range and range_start and range_end:
+            day_list_data = _build_day_range(range_start, range_end)
+        else:
+            day_list_data = [
                 (d.isoformat(), d.isoformat(), d.strftime("%d/%m"))
                 for i in range(count - 1, -1, -1)
                 for d in [today - timedelta(days=i)]
             ]
+        fetch_start = day_list_data[0][0]
+        fetch_end = day_list_data[-1][0]
+    else:  # week
+        if use_range and range_start and range_end:
+            week_list_data = _build_week_range(range_start, range_end)
+        else:
+            week_list_data = _build_week_range(today - timedelta(days=count * 7 - 1), today)
+        fetch_start = week_list_data[0][0].isoformat()
+        fetch_end = week_list_data[-1][1].isoformat()  # end of last bucket, not start
+
+    # Fetch entire range once using SQL-level filtering
+    # Use cache to avoid re-processing for repeated calls
+    from infrastructure.cache import processed_cache as _pc
+
+    proc_cache_key = f"evo_proc:{fetch_start}:{fetch_end}:{department or ''}"
+    processed = await _pc.get(proc_cache_key)
+    if processed is None:
+        raw_data = await repo.fetch_raw_data_range_filtered(
+            fetch_start,
+            fetch_end,
+            agent_group=department,
         )
+        processed = agg.process_all(raw_data)
+        await _pc.set(proc_cache_key, processed)
 
-        async def _process_day(d_iso: str):
-            _, processed = await _fetch_and_process(repo, d_iso, d_iso)
-            if department:
-                processed = _filter_processed(processed, set(), None, department)
-            return agg.aggregate_statistics(processed)
+    # Build date-range lookup for week buckets to avoid ISO week mismatch
+    week_date_to_key: dict[str, str] = {}
+    if granularity == "week":
+        for i, (ws, we, _label) in enumerate(week_list_data):
+            d = ws
+            while d <= we:
+                week_date_to_key[d.isoformat()] = str(i)
+                d += timedelta(days=1)
 
-        results = await asyncio.gather(*[_process_day(start) for start, _, _ in day_list])
+    # Split into buckets by granularity
+    def _bucket_key(p: Any) -> str:
+        raw_str = getattr(p, "raw_created", None) or ""
+        if not raw_str:
+            return ""
+        # raw_created already has timezone offset applied by _format_dt_direct
+        try:
+            dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError, TypeError:
+            return ""
+        if granularity == "day":
+            return dt.strftime("%Y-%m-%d")
+        elif granularity == "week":
+            # Use the pre-computed date-to-bucket mapping
+            return week_date_to_key.get(dt.strftime("%Y-%m-%d"), "")
+        else:  # month
+            return f"{dt.year}-{dt.month:02d}"
 
+    from collections import defaultdict
+
+    buckets_map: dict[str, list[Any]] = defaultdict(list)
+    for p in processed:
+        bk = _bucket_key(p)
+        if bk:
+            buckets_map[bk].append(p)
+
+    # Build bucket list in order
+    if granularity == "month":
         buckets = []
-        for (start, _, label), stats in zip(day_list, results, strict=True):
+        for start, _, y, m, label in month_list_data:
+            key = f"{y}-{m:02d}"
+            bucket = buckets_map.get(key, [])
+            stats = agg.aggregate_statistics(bucket) if bucket else {}
+            buckets.append(_build_bucket(start, label, stats, year=y, month=m))
+    elif granularity == "day":
+        buckets = []
+        for start, _, label in day_list_data:
+            bucket = buckets_map.get(start, [])
+            stats = agg.aggregate_statistics(bucket) if bucket else {}
             buckets.append(_build_bucket(start, label, stats))
-        return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
+    else:  # week
+        buckets = []
+        for i, (start_d, _, label) in enumerate(week_list_data):
+            key = str(i)
+            bucket = buckets_map.get(key, [])
+            stats = agg.aggregate_statistics(bucket) if bucket else {}
+            buckets.append(_build_bucket(start_d.isoformat(), label, stats))
 
-    # week
-    week_list = (
-        _build_week_range(range_start, range_end)
-        if use_range and range_start and range_end
-        else _build_week_range(today - timedelta(days=count * 7 - 1), today)
-    )
-
-    async def _process_week(start_d: date, end_d: date):
-        start = start_d.isoformat()
-        end = end_d.isoformat()
-        _, processed = await _fetch_and_process(repo, start, end)
-        if department:
-            processed = _filter_processed(processed, set(), None, department)
-        return agg.aggregate_statistics(processed)
-
-    results = await asyncio.gather(*[_process_week(s, e) for s, e, _ in week_list])
-
-    buckets = []
-    for (start_d, _, label), stats in zip(week_list, results, strict=True):
-        buckets.append(_build_bucket(start_d.isoformat(), label, stats))
     return GranularEvolutionResponse(granularity=granularity, buckets=buckets)
 
 
@@ -833,6 +905,9 @@ def _safe_div(a: float | None, b: float | None) -> float | None:
     return a / b
 
 
+_exec_pending: dict[str, asyncio.Task] = {}
+
+
 async def _load_executive_processed(
     repo: ReportRepository,
     start_date: str,
@@ -841,9 +916,40 @@ async def _load_executive_processed(
     group: str | None,
     department: str | None = None,
 ) -> list[Any]:
-    """Fetch + process + filter for executive endpoints."""
-    raw, processed = await _fetch_and_process(repo, start_date, end_date)
-    return _filter_processed(processed, agent_ids, group, department)
+    """Fetch + process + filter for executive endpoints.
+
+    Uses request coalescing: when multiple endpoints request the same data
+    simultaneously, only one computes it and the others await the result.
+    """
+    from infrastructure.cache import processed_cache as _pc
+
+    cache_key = f"exec:{start_date}:{end_date}:{department or ''}:{group or ''}:{','.join(sorted(agent_ids))}"
+
+    # Check cache first
+    cached = await _pc.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # If another request is already computing this key, wait for it
+    if cache_key in _exec_pending:
+        try:
+            return await _exec_pending[cache_key]
+        except Exception:
+            pass  # If it failed, we'll recompute
+
+    # We are the first — compute and store as a Task
+    async def _compute():
+        try:
+            raw, processed = await _fetch_and_process(repo, start_date, end_date)
+            result = _filter_processed(processed, agent_ids, group, department)
+            await _pc.set(cache_key, result)
+            return result
+        finally:
+            _exec_pending.pop(cache_key, None)
+
+    task = asyncio.ensure_future(_compute())
+    _exec_pending[cache_key] = task
+    return await task
 
 
 @router.get("/executive/quality", response_model=QualityResponse)
@@ -1184,14 +1290,19 @@ async def get_executive_meta(
     s, e = _granularity_window(granularity, start_date, end_date)
     aid = _parse_agent_ids(agent_ids)
     processed = await _load_executive_processed(repo, s, e, aid, None, department)
+    total_chats = len(processed)
+    art_qualified = sum(1 for p in processed if isinstance(p.art_min, (int, float)) and 0 < p.art_min <= 10)
+    total_with_art = sum(1 for p in processed if isinstance(p.art_min, (int, float)) and p.art_min > 0)
+    pct_art_10min = round(art_qualified / total_with_art * 100, 1) if total_with_art > 0 else None
     return ExecutiveMeta(
         start_date=s,
         end_date=e,
         granularity=granularity,
         agent_ids=sorted(aid),
         group=group,
-        total_chats=len(processed),
+        total_chats=total_chats,
         total_messages=sum(p.msg_count for p in processed),
+        pct_art_10min=pct_art_10min,
     )
 
 

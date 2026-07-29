@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -19,7 +20,7 @@ interface NPSEvolutionChartProps {
   className?: string;
 }
 
-export function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
+export const NPSEvolutionChart = memo(function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
   const chartData = data.map((b) => ({
     label: b.label,
     "Avaliados NPS": b.nps_rated_chats,
@@ -77,4 +78,4 @@ export function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

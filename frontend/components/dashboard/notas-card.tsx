@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { safeNum } from "@/lib/utils";
 import type { QualityDistribution } from "@/types";
@@ -17,7 +18,7 @@ const COLORS = [
   "var(--chart-2)",
 ];
 
-export function NotasCard({ rating, className }: NotasCardProps) {
+export const NotasCard = memo(function NotasCard({ rating, className }: NotasCardProps) {
   const rows = [1, 2, 3, 4, 5].map((n) => ({
     label: `Nota ${n}`,
     value: safeNum(rating?.counts?.[String(n)] ?? 0),
@@ -66,4 +67,4 @@ export function NotasCard({ rating, className }: NotasCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { HeatmapResponse } from "@/types";
@@ -23,7 +23,7 @@ interface DemandHeatmapProps {
   title?: string;
 }
 
-export function DemandHeatmap({ data, className, title = "Mapa de Calor — Chats por Dia/Hora" }: DemandHeatmapProps) {
+export const DemandHeatmap = memo(function DemandHeatmap({ data, className, title = "Mapa de Calor — Chats por Dia/Hora" }: DemandHeatmapProps) {
   const [hover, setHover] = useState<{ day: number; hour: number; value: number; x: number; y: number } | null>(null);
 
   const grid = useMemo(() => {
@@ -153,4 +153,4 @@ export function DemandHeatmap({ data, className, title = "Mapa de Calor — Chat
       </CardContent>
     </Card>
   );
-}
+});

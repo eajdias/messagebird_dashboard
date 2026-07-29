@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -18,7 +19,7 @@ interface RatingEvolutionChartProps {
   className?: string;
 }
 
-export function RatingEvolutionChart({ data, className }: RatingEvolutionChartProps) {
+export const RatingEvolutionChart = memo(function RatingEvolutionChart({ data, className }: RatingEvolutionChartProps) {
   const chartData = data.map((b) => ({
     label: b.label,
     Avaliados: b.rated_chats,
@@ -85,4 +86,4 @@ export function RatingEvolutionChart({ data, className }: RatingEvolutionChartPr
       </CardContent>
     </Card>
   );
-}
+});

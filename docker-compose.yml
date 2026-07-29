@@ -10,6 +10,14 @@ services:
       POSTGRES_DB: mbird_reports
       POSTGRES_USER: mbird
       POSTGRES_PASSWORD: ${DB_PASSWORD:-mbird_dev_2024}
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=512MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     volumes:
       - pgdata:/var/lib/postgresql
     ports:

@@ -16,11 +16,14 @@ import type {
   ReturnersResponse,
 } from "@/types";
 
+type ExecutiveView = "overview" | "executive";
+
 interface ExecutiveParams {
   startDate: string;
   endDate: string;
   selectedDept?: string;
   group?: string;
+  view?: ExecutiveView;
 }
 
 interface ExecutiveState {
@@ -68,8 +71,30 @@ function buildQuery(params: ExecutiveParams, includeDept = true): string {
   return `?${qs.toString()}`;
 }
 
+const OVERVIEW_ENDPOINTS = [
+  { key: "meta", url: "/api/v1/dashboard/executive/meta" },
+  { key: "quality", url: "/api/v1/dashboard/executive/quality" },
+  { key: "agents", url: "/api/v1/dashboard/executive/agents" },
+  { key: "returners", url: "/api/v1/dashboard/executive/returners" },
+];
+
+const EXECUTIVE_ENDPOINTS = [
+  { key: "meta", url: "/api/v1/dashboard/executive/meta" },
+  { key: "quality", url: "/api/v1/dashboard/executive/quality" },
+  { key: "heatmap", url: "/api/v1/dashboard/executive/heatmap" },
+  { key: "motives", url: "/api/v1/dashboard/executive/motives" },
+  { key: "occurrences", url: "/api/v1/dashboard/executive/occurrences" },
+  { key: "dow", url: "/api/v1/dashboard/executive/dow" },
+  { key: "departments", url: "/api/v1/dashboard/executive/departments" },
+  { key: "agents", url: "/api/v1/dashboard/executive/agents" },
+  { key: "bsc", url: "/api/v1/dashboard/executive/bsc" },
+  { key: "artDistribution", url: "/api/v1/dashboard/executive/art-distribution" },
+  { key: "returners", url: "/api/v1/dashboard/executive/returners" },
+];
+
 export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
   const enabled = params.enabled ?? true;
+  const view: ExecutiveView = params.view ?? "overview";
   const [state, setState] = useState<ExecutiveState>(INITIAL_STATE);
 
   const fetchData = useCallback(
@@ -79,19 +104,11 @@ export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
       const q = buildQuery(params);
       const qBsc = buildQuery(params, false);
 
-      const endpoints = [
-        { key: "meta", url: `/api/v1/dashboard/executive/meta${q}` },
-        { key: "quality", url: `/api/v1/dashboard/executive/quality${q}` },
-        { key: "heatmap", url: `/api/v1/dashboard/executive/heatmap${q}` },
-        { key: "motives", url: `/api/v1/dashboard/executive/motives${q}` },
-        { key: "occurrences", url: `/api/v1/dashboard/executive/occurrences${q}` },
-        { key: "dow", url: `/api/v1/dashboard/executive/dow${q}` },
-        { key: "departments", url: `/api/v1/dashboard/executive/departments${q}` },
-        { key: "agents", url: `/api/v1/dashboard/executive/agents${q}` },
-        { key: "bsc", url: `/api/v1/dashboard/executive/bsc${qBsc}` },
-        { key: "artDistribution", url: `/api/v1/dashboard/executive/art-distribution${q}` },
-        { key: "returners", url: `/api/v1/dashboard/executive/returners${q}` },
-      ];
+      const endpointDefs = view === "executive" ? EXECUTIVE_ENDPOINTS : OVERVIEW_ENDPOINTS;
+      const endpoints = endpointDefs.map((ep) => ({
+        key: ep.key,
+        url: ep.key === "bsc" ? `${ep.url}${qBsc}` : `${ep.url}${q}`,
+      }));
 
       const results = await Promise.allSettled(
         endpoints.map((e) => api.get(e.url, { signal })),
@@ -130,7 +147,7 @@ export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [params.startDate, params.endDate, params.selectedDept, params.group, enabled],
+    [params.startDate, params.endDate, params.selectedDept, params.group, view, enabled],
   );
 
   useEffect(() => {

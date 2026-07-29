@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { safeNum } from "@/lib/utils";
 import type { NPSBreakdown } from "@/types";
@@ -9,7 +10,7 @@ interface NPSCardProps {
   className?: string;
 }
 
-export function NPSCard({ breakdown, className }: NPSCardProps) {
+export const NPSCard = memo(function NPSCard({ breakdown, className }: NPSCardProps) {
   const promoters = safeNum(breakdown?.promoters);
   const neutrals = safeNum(breakdown?.neutrals);
   const detractors = safeNum(breakdown?.detractors);
@@ -71,4 +72,4 @@ export function NPSCard({ breakdown, className }: NPSCardProps) {
       </CardContent>
     </Card>
   );
-}
+});

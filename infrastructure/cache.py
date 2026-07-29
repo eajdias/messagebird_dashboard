@@ -13,6 +13,10 @@ logger = logging.getLogger("m_bird.cache")
 class TTLCache:
     """Thread-safe in-memory cache with per-key TTL expiration.
 
+    Uses asyncio locks for thread safety. For request coalescing at the
+    application level, the ``_load_executive_processed`` function handles
+    deduplication via ``processed_cache.get_or_set``.
+
     Usage:
         cache = TTLCache(default_ttl=300)  # 5 min default
         result = await cache.get_or_set("key", async_factory)
@@ -58,6 +62,25 @@ class TTLCache:
 
         return value
 
+    async def get(self, key: str) -> Any | None:
+        """Return cached value if present and not expired, else None."""
+        now = time.monotonic()
+        async with self._lock:
+            if key in self._store:
+                expires, value = self._store[key]
+                if now < expires:
+                    logger.debug("cache GET hit: %s", key)
+                    return value
+                del self._store[key]
+        return None
+
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
+        """Store a value in the cache."""
+        now = time.monotonic()
+        effective_ttl = ttl if ttl is not None else self._default_ttl
+        async with self._lock:
+            self._store[key] = (now + effective_ttl, value)
+
     async def invalidate(self, key: str) -> None:
         async with self._lock:
             self._store.pop(key, None)
@@ -77,3 +100,6 @@ class TTLCache:
 
 # Module-level singleton
 repo_cache = TTLCache(default_ttl=300)
+
+# Cache for processed (aggregated) results — avoids re-running aggregator pipeline
+processed_cache = TTLCache(default_ttl=300)

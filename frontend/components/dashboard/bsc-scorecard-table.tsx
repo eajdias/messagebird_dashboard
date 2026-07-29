@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { BSCMetricRow, BSCScorecardResponse } from "@/types";
@@ -10,7 +11,7 @@ interface Props {
   data: BSCScorecardResponse;
 }
 
-export function BSCScorecardTable({ data }: Props) {
+export const BSCScorecardTable = memo(function BSCScorecardTable({ data }: Props) {
   if (!data.has_config) return null;
 
   const allMetrics: BSCMetricRow[] = [
@@ -116,7 +117,7 @@ export function BSCScorecardTable({ data }: Props) {
       </Card>
     </div>
   );
-}
+});
 
 function BSCCategorySection({
   categoryName,

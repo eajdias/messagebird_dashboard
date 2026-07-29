@@ -383,3 +383,18 @@ SURVEY_MV_ALL = """
 """
 
 REFRESH_MV = "REFRESH MATERIALIZED VIEW CONCURRENTLY vw_survey_data"
+
+# ── Optimized batch queries ────────────────────────────────────────────
+
+SURVEY_MV_RANGE_COLUMNS = """
+    SELECT * FROM vw_survey_data
+    WHERE cnvs_created BETWEEN $1::timestamp AND $2::timestamp
+    ORDER BY cnvs_id, msgs_created ASC
+"""
+
+SURVEY_MV_RANGE_FILTERED = """
+    SELECT * FROM vw_survey_data
+    WHERE cnvs_created BETWEEN $1::timestamp AND $2::timestamp
+      AND ($3::text IS NULL OR agent_group = $3)
+    ORDER BY cnvs_id, msgs_created ASC
+"""

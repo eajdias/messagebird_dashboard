@@ -4,7 +4,7 @@ import asyncpg
 
 
 class PostgresPool:
-    def __init__(self, dsn: str | None = None, min_size: int = 2, max_size: int = 10):
+    def __init__(self, dsn: str | None = None, min_size: int = 2, max_size: int = 20):
         self._dsn = dsn or os.getenv(
             "DATABASE_URL",
             "postgresql://mbird:mbird_dev_2024@localhost:5432/mbird_reports",

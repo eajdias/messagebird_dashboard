@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
-  RefreshCw,
 } from "lucide-react";
 import api from "@/lib/api";
 import { defaultPeriod } from "@/lib/utils";
@@ -108,22 +107,6 @@ const BSCScorecardTable = dynamic(
 
 // ── Skeletons ──────────────────────────────────────────────────────────────
 
-function KPIGridSkeleton() {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i} variant="glass">
-          <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
-          <CardContent>
-            <Skeleton className="h-8 w-20" />
-            <Skeleton className="mt-2 h-3 w-32" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 function ChartSkeleton() {
   return (
     <Card variant="glass">
@@ -153,18 +136,33 @@ function PageLoader() {
   return (
     <div className="space-y-6">
       <Skeleton className="h-8 w-36" />
-      <KPIGridSkeleton />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} variant="glass">
+            <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+            <CardContent>
+              <Skeleton className="h-8 w-20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ── Simple stat card ───────────────────────────────────────────────────────
+// ── Simple stat card with loading state ────────────────────────────────────
 
-function StatCard({ title, value }: { title: string; value: string | number }) {
+function StatCard({ title, value, loading }: { title: string; value?: string | number; loading?: boolean }) {
   return (
     <Card variant="glass">
       <CardHeader className="pb-1"><CardTitle className="text-xs font-medium text-muted-foreground">{title}</CardTitle></CardHeader>
-      <CardContent><span className="text-2xl font-bold tabular-nums">{value}</span></CardContent>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-8 w-20" />
+        ) : (
+          <span className="text-2xl font-bold tabular-nums">{value ?? "—"}</span>
+        )}
+      </CardContent>
     </Card>
   );
 }
@@ -184,8 +182,10 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
 
   const { start: defaultStart, end: defaultEnd } = useMemo(() => defaultPeriod(), []);
 
-  const [startDate, setStartDate] = useState<string>(defaultStart);
-  const [endDate, setEndDate] = useState<string>(defaultEnd);
+  const [pendingStart, setPendingStart] = useState<string>(defaultStart);
+  const [pendingEnd, setPendingEnd] = useState<string>(defaultEnd);
+  const [appliedStart, setAppliedStart] = useState<string>(defaultStart);
+  const [appliedEnd, setAppliedEnd] = useState<string>(defaultEnd);
 
   const setTab = useCallback(
     (next: DashboardTab) => {
@@ -208,26 +208,27 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   const overviewActive = tab === "overview";
   const executiveActive = tab === "executive";
 
-  const { granularEvolution, loading, error, granularLoading } = useDashboard({
+  const { granularEvolution, granularLoading } = useDashboard({
     granularity,
-    start_date: startDate,
-    end_date: endDate,
+    start_date: appliedStart,
+    end_date: appliedEnd,
     department: selectedDept || undefined,
     enabled: overviewActive,
   });
 
   const executive = useExecutive({
-    startDate,
-    endDate,
+    startDate: appliedStart,
+    endDate: appliedEnd,
     selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
+    view: tab === "executive" ? "executive" : "overview",
     enabled: overviewActive || executiveActive,
   });
 
   const bscScorecard = useBscScorecard({
     department: selectedDept || "",
-    startDate,
-    endDate,
+    startDate: appliedStart,
+    endDate: appliedEnd,
     enabled: tab === "bsc",
   });
 
@@ -264,6 +265,10 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
 
   const { dowItems, dowMax, dowTotal } = dowMemo;
 
+  // KPI data — derived from whatever has loaded so far
+  const nps = executive.quality?.nps_breakdown?.real_nps;
+  const pctReturning = executive.returners?.pct_returning;
+
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex items-center gap-4">
@@ -279,175 +284,191 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}
         />
         <div suppressHydrationWarning>
-          <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+          <DateRangePicker
+            startDate={pendingStart}
+            endDate={pendingEnd}
+            onChange={(s, e) => { setPendingStart(s); setPendingEnd(e); }}
+            onConfirm={(s, e) => { setAppliedStart(s); setAppliedEnd(e); setPendingStart(s); setPendingEnd(e); }}
+          />
         </div>
       </div>
     </div>
   );
 
-  const showFirstLoad =
-    !mounted || (overviewActive && loading && granularLoading) || (executiveActive && executive.loading && !executive.meta) || (tab === "bsc" && bscScorecard.loading && !bscScorecard.scorecard);
-
-  if (showFirstLoad && !error) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <KPIGridSkeleton />
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ChartSkeleton />
-          <ChartSkeleton />
-        </div>
-        <TableSkeleton rows={5} />
-      </div>
-    );
-  }
-
+  // ── Overview tab ────────────────────────────────────────────────────────
   if (tab === "overview") {
-    const nps = executive.quality?.nps_breakdown?.real_nps;
-    const pctReturning = executive.returners?.pct_returning;
-
     return (
       <div className="space-y-6">
         {header}
 
+        {/* KPIs — each loads independently */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="Chats" value={(executive.meta?.total_chats ?? 0).toLocaleString("pt-BR")} />
-          <StatCard title="Mensagens" value={(executive.meta?.total_messages ?? 0).toLocaleString("pt-BR")} />
-          <StatCard title="NPS" value={nps != null && Number.isFinite(nps) ? nps.toFixed(1) : "—"} />
-          <StatCard title="Retornantes" value={pctReturning != null ? `${pctReturning.toFixed(1)}%` : "—"} />
+          <StatCard title="Chats" value={executive.meta?.total_chats?.toLocaleString("pt-BR")} loading={executive.loading && !executive.meta} />
+          <StatCard title="ART ≤ 10min" value={executive.meta?.pct_art_10min != null ? `${executive.meta.pct_art_10min}%` : undefined} loading={executive.loading && !executive.meta} />
+          <StatCard title="NPS" value={nps != null && Number.isFinite(nps) ? nps.toFixed(1) : undefined} loading={executive.loading && !executive.quality} />
+          <StatCard title="Retornantes" value={pctReturning != null ? `${pctReturning.toFixed(1)}%` : undefined} loading={executive.loading && !executive.returners} />
         </div>
 
-        {granularLoading && !granularEvolution ? (
-          <>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ChartSkeleton />
-              <ChartSkeleton />
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ChartSkeleton />
-              <ChartSkeleton />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="grid gap-4 lg:grid-cols-2">
+        {/* Evolution charts — each shows own skeleton while loading */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {granularLoading && !granularEvolution ? (
+            <><ChartSkeleton /><ChartSkeleton /></>
+          ) : (
+            <>
               <Suspense fallback={<ChartSkeleton />}>
                 <RatingEvolutionChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
               <Suspense fallback={<ChartSkeleton />}>
                 <NPSEvolutionChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
+            </>
+          )}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {granularLoading && !granularEvolution ? (
+            <><ChartSkeleton /><ChartSkeleton /></>
+          ) : (
+            <>
               <Suspense fallback={<ChartSkeleton />}>
                 <RatedBreakdownChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
               <Suspense fallback={<ChartSkeleton />}>
                 <ARTEvolutionChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
 
-        <Suspense fallback={<ChartSkeleton />}>
-          <AgentContribution agents={executive.agents?.items ?? []} />
-        </Suspense>
+        {/* Agent contribution — shows skeleton while loading */}
+        {executive.loading && !executive.agents ? (
+          <ChartSkeleton />
+        ) : (
+          <Suspense fallback={<ChartSkeleton />}>
+            <AgentContribution agents={executive.agents?.items ?? []} />
+          </Suspense>
+        )}
       </div>
     );
   }
 
+  // ── Executive tab ───────────────────────────────────────────────────────
   if (tab === "executive") {
-    const execLoading = executive.loading && !executive.meta;
-
     return (
       <div className="space-y-6">
         {header}
-        {execLoading ? (
-          <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2"><ChartSkeleton /><ChartSkeleton /></div>
-            <ChartSkeleton />
-            <div className="grid gap-4 lg:grid-cols-2"><ChartSkeleton /><ChartSkeleton /></div>
-            <ChartSkeleton />
-          </div>
+
+        {/* DepartmentAgents always renders */}
+        <DepartmentAgents
+          department={selectedDept}
+          agents={agentList}
+          activeNames={executive.agents?.items?.map((a) => a.name)}
+        />
+
+        {/* Hourly chart — independent skeleton */}
+        {executive.loading && !executive.heatmap ? (
+          <ChartSkeleton />
         ) : (
-          <>
-            <DepartmentAgents
-              department={selectedDept}
-              agents={agentList}
-              activeNames={executive.agents?.items?.map((a) => a.name)}
-            />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Suspense fallback={<ChartSkeleton />}>
-                <HourlyChart heatmap={executive.heatmap} />
-              </Suspense>
-              <Card variant="glass">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">Por Dia da Semana</CardTitle>
-                    <span className="text-xs text-muted-foreground">Total: {dowTotal}</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {dowItems.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Sem dados no período</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {dowItems.map((d, i) => (
-                        <div key={i} className="space-y-0.5" title={d.peakHour ? `Pico: ${d.peakHour}` : ""}>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">{d.label}</span>
-                            <span className="font-medium tabular-nums">
-                              {d.value}{" "}
-                              <span className="text-muted-foreground">({d.pct.toFixed(0)}%)</span>
-                            </span>
-                          </div>
-                          <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                            <div
-                              className="h-full rounded-full bg-chart-3 transition-all"
-                              style={{ width: `${(d.value / dowMax) * 100}%` }}
-                            />
-                          </div>
-                          {d.peakHour && (
-                            <p className="text-[10px] text-muted-foreground/60">Pico: {d.peakHour}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+          <Suspense fallback={<ChartSkeleton />}>
+            <HourlyChart heatmap={executive.heatmap} />
+          </Suspense>
+        )}
+
+        {/* Day of week — inline, renders with whatever data is available */}
+        <Card variant="glass">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium">Por Dia da Semana</CardTitle>
+              {executive.loading && !executive.dow ? (
+                <Skeleton className="h-3 w-16" />
+              ) : (
+                <span className="text-xs text-muted-foreground">Total: {dowTotal}</span>
+              )}
             </div>
-            <div className="grid gap-4 lg:grid-cols-2">
+          </CardHeader>
+          <CardContent>
+            {executive.loading && !executive.dow ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
+              </div>
+            ) : dowItems.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sem dados no período</p>
+            ) : (
+              <div className="space-y-1.5">
+                {dowItems.map((d, i) => (
+                  <div key={i} className="space-y-0.5" title={d.peakHour ? `Pico: ${d.peakHour}` : ""}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{d.label}</span>
+                      <span className="font-medium tabular-nums">
+                        {d.value}{" "}
+                        <span className="text-muted-foreground">({d.pct.toFixed(0)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                      <div
+                        className="h-full rounded-full bg-chart-3 transition-all"
+                        style={{ width: `${(d.value / dowMax) * 100}%` }}
+                      />
+                    </div>
+                    {d.peakHour && (
+                      <p className="text-[10px] text-muted-foreground/60">Pico: {d.peakHour}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* NPS + Notas — independent skeletons */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {executive.loading && !executive.quality ? (
+            <><ChartSkeleton /><ChartSkeleton /></>
+          ) : (
+            <>
               <Suspense fallback={<ChartSkeleton />}>
                 <NPSCard breakdown={executive.quality?.nps_breakdown ?? null} />
               </Suspense>
               <Suspense fallback={<ChartSkeleton />}>
                 <NotasCard rating={executive.quality?.rating ?? null} />
               </Suspense>
-            </div>
-            <Suspense fallback={<ChartSkeleton />}>
-              <DemandBars
-                motives={executive.motives}
-                occurrences={executive.occurrences}
-                dow={executive.dow}
-                hideDOW
-              />
-            </Suspense>
-            <div className="grid gap-4 lg:grid-cols-2">
+            </>
+          )}
+        </div>
+
+        {/* Demand bars — independent skeleton */}
+        {executive.loading && !executive.motives ? (
+          <ChartSkeleton />
+        ) : (
+          <Suspense fallback={<ChartSkeleton />}>
+            <DemandBars
+              motives={executive.motives}
+              occurrences={executive.occurrences}
+              dow={executive.dow}
+              hideDOW
+            />
+          </Suspense>
+        )}
+
+        {/* ART Distribution + Returners — independent skeletons */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {executive.loading && !executive.artDistribution ? (
+            <><ChartSkeleton /><ChartSkeleton /></>
+          ) : (
+            <>
               <Suspense fallback={<ChartSkeleton />}>
                 <ARTDistribution data={executive.artDistribution} />
               </Suspense>
               <Suspense fallback={<ChartSkeleton />}>
                 <ReturnersCard data={executive.returners} />
               </Suspense>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
     );
   }
 
-  // tab === "bsc"
+  // ── BSC tab ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {header}

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import {
   Bar,
   BarChart,
@@ -103,7 +104,7 @@ const MOTIVE_COLOR = "var(--chart-1)";
 const OCCURRENCE_COLOR = "var(--chart-4)";
 const DOW_COLOR = "var(--chart-3)";
 
-export function DemandBars({ motives, occurrences, dow, hideDOW, className }: DemandBarsProps) {
+export const DemandBars = memo(function DemandBars({ motives, occurrences, dow, hideDOW, className }: DemandBarsProps) {
   const motiveItems = (motives?.items ?? []).map((m) => ({
     label: m.label,
     value: safeNum(m.value),
@@ -151,4 +152,4 @@ export function DemandBars({ motives, occurrences, dow, hideDOW, className }: De
       </div>
     </div>
   );
-}
+});

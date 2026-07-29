@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -52,7 +52,7 @@ function Tooltip({ active, payload }: { active?: boolean; payload?: Array<{ payl
   );
 }
 
-export function HourlyChart({ heatmap, className }: HourlyChartProps) {
+export const HourlyChart = memo(function HourlyChart({ heatmap, className }: HourlyChartProps) {
   const data = useMemo(() => {
     const byHour = new Map<number, number>();
     for (let h = 7; h <= 19; h++) byHour.set(h, 0);
@@ -124,4 +124,4 @@ export function HourlyChart({ heatmap, className }: HourlyChartProps) {
       </CardContent>
     </Card>
   );
-}
+});

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ARTDistributionResponse } from "@/types";
 
@@ -25,7 +25,7 @@ function safeNum(v: unknown, fallback = 0): number {
 
 const EMPTY_BUCKETS: never[] = [];
 
-export function ARTDistribution({ data, className }: ARTDistributionProps) {
+export const ARTDistribution = memo(function ARTDistribution({ data, className }: ARTDistributionProps) {
   const buckets = data?.buckets ?? EMPTY_BUCKETS;
   const total = safeNum(data?.total);
   const maxCount = useMemo(() => Math.max(...buckets.map((b) => b.count), 1), [buckets]);
@@ -80,4 +80,4 @@ export function ARTDistribution({ data, className }: ARTDistributionProps) {
       </CardContent>
     </Card>
   );
-}
+});

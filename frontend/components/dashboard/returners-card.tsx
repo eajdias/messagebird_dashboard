@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ReturnersResponse } from "@/types";
@@ -16,7 +17,7 @@ function safeNum(v: unknown, fallback = 0): number {
 
 const FREQ_COLORS = ["var(--chart-2)", "var(--chart-3)", "var(--chart-4)"] as const;
 
-export function ReturnersCard({ data, className }: ReturnersCardProps) {
+export const ReturnersCard = memo(function ReturnersCard({ data, className }: ReturnersCardProps) {
   const totalChats = safeNum(data?.total_chats);
   const totalUnique = safeNum(data?.total_unique);
   const totalReturners = safeNum(data?.total_returners);
@@ -75,4 +76,4 @@ export function ReturnersCard({ data, className }: ReturnersCardProps) {
       </CardContent>
     </Card>
   );
-}
+});
