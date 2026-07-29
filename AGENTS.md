@@ -37,5 +37,6 @@ Dashboard omnichannel para monitoramento de atendimento via MessageBird (Bird) A
 ## Regras Importantes
 - CRITICAL: Nunca edite `.env` ou arquivos `business_config.yaml`/`business_bsc.yaml` reais
 - CRITICAL: Use Conventional Commits (feat:, fix:, docs:, refactor:, etc.)
+- **CRITICAL: NUNCA execute sync SEM data específica (year+month OU start_date+end_date).** A API MessageBird tem milhões de registros. Sempre use `/sync/trigger` com `year`+`month` para sync mensal, ou `/sync/range` com `start_date`+`end_date` para sync por range. O sync automático (scheduler) já cuida do sync diário.
 - Sempre rode lint + typecheck + tests antes de finalizar uma tarefa
 - Código novo precisa de testes correspondentes

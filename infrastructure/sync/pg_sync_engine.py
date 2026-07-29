@@ -46,10 +46,6 @@ async def trigger_sync_pg(
     await manager.load_caches(conn)
     await manager.seed_known_agents(conn)
 
-    if backfill_surveys:
-        count = await survey_backfill_fn(manager, conn)
-        return f"Survey backfill concluído: {count} conversas processadas."
-
     if start_date is not None or end_date is not None:
         if not start_date or not end_date:
             raise ValueError("start_date and end_date must be provided together.")
@@ -116,6 +112,11 @@ async def trigger_sync_pg(
             from infrastructure.sync.sync_messages import sync_messages as sync_msgs
 
             msg_count += await sync_msgs(manager, conn, row["cnvs_bird"], date_from=today_start_iso)
+
+        if backfill_surveys:
+            count = await survey_backfill_fn(manager, conn)
+            return f"Today sync + survey backfill completed: {len(rows)} conversations, {msg_count} messages, {count} surveys."
+
         return f"Today sync completed: {len(rows)} conversations, {msg_count} messages."
 
     # Full structural sync always — only messages_days varies
@@ -127,10 +128,20 @@ async def trigger_sync_pg(
 
     if full_sync and sync_messages:
         await sync_all_messages(manager, conn)
+        if backfill_surveys:
+            count = await survey_backfill_fn(manager, conn)
+            return f"Full sync + survey backfill completed: {count} surveys processed."
         return "Full sync with all messages completed."
 
     if messages_days is not None:
         msg_count = await sync_messages_for_recent(manager, conn, days=messages_days)
+        if backfill_surveys:
+            count = await survey_backfill_fn(manager, conn)
+            return f"Sync + survey backfill completed: {msg_count} messages for last {messages_days} days, {count} surveys."
         return f"Sync completed ({msg_count} messages for last {messages_days} days)."
+
+    if backfill_surveys:
+        count = await survey_backfill_fn(manager, conn)
+        return f"Structural sync + survey backfill completed: {count} surveys."
 
     return "Structural sync completed (no messages)."

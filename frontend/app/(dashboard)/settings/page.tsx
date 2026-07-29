@@ -6,9 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SchedulerControl from "@/components/settings/scheduler-control";
 import { UserManagementCard } from "@/components/settings/user-management-card";
-import { RefreshCw, Activity, User, Palette, Shield, Clock } from "lucide-react";
+import { RefreshCw, Activity, User, Palette, Download, Calendar } from "lucide-react";
+import { toast } from "sonner";
 
 interface HealthInfo {
   status: string;
@@ -24,13 +26,38 @@ interface SyncInfo {
   error: string | null;
 }
 
+const MONTHS = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+function getAvailableMonths(): { value: string; label: string }[] {
+  const now = new Date();
+  const months: { value: string; label: string }[] = [];
+  // Go back 12 months
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    months.push({
+      value: `${year}-${String(month).padStart(2, "0")}`,
+      label: `${MONTHS[d.getMonth()]} ${year}`,
+    });
+  }
+  return months;
+}
+
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [sync, setSync] = useState<SyncInfo | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncMonth, setSyncMonth] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [userManagementKey, setUserManagementKey] = useState(0);
+
+  const availableMonths = getAvailableMonths();
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -51,13 +78,46 @@ export default function SettingsPage() {
     fetchStatus();
   }, [fetchStatus]);
 
-  const triggerSync = async () => {
+  const triggerFullSyncToday = async () => {
     setSyncing(true);
     try {
-      await api.post("/api/v1/admin/sync/trigger", { action: "sync_today" });
+      await api.post("/api/v1/admin/sync/trigger", {
+        full_sync: true,
+        sync_messages: true,
+        backfill_surveys: true,
+      });
+      toast.success("Full sync de hoje concluído!");
       await fetchStatus();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || "Erro ao sincronizar hoje");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const triggerMonthSync = async () => {
+    if (!selectedMonth) {
+      toast.error("Selecione um mês");
+      return;
+    }
+    const [year, month] = selectedMonth.split("-").map(Number);
+    setSyncMonth(true);
+    try {
+      await api.post("/api/v1/admin/sync/trigger", {
+        year,
+        month,
+        full_sync: true,
+        sync_messages: true,
+        backfill_surveys: true,
+      });
+      toast.success(`Sincronização de ${MONTHS[month - 1]} ${year} concluída!`);
+      await fetchStatus();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || "Erro ao sincronizar mês");
+    } finally {
+      setSyncMonth(false);
     }
   };
 
@@ -138,18 +198,81 @@ export default function SettingsPage() {
                     </div>
                   </>
                 )}
-                <div className="pt-2">
-                  <Button variant="outline" size="sm" onClick={triggerSync} disabled={syncing}>
-                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-                    {syncing ? "Sincronizando..." : "Sincronizar Agora"}
-                  </Button>
-                </div>
               </>
             )}
           </CardContent>
         </Card>
       </div>
 
+      {/* Sync Controls */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Full Sync Hoje */}
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <RefreshCw className="h-4 w-4" />
+              Sincronização Diária
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Executa um full sync de hoje: contatos, conversas, mensagens e métricas.
+              Use quando precisar atualizar os dados do dia atual imediatamente.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={triggerFullSyncToday}
+              disabled={syncing}
+              className="w-full"
+            >
+              <RefreshCw className={`mr-1 h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sincronizando..." : "Full Sync Hoje"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Sincronizar Mês Anterior */}
+        <Card variant="glass">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Calendar className="h-4 w-4" />
+              Dados Anteriores
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              Sincronize meses específicos para backfill de dados históricos.
+              Útil para completar dados de meses anteriores que estão incompletos.
+            </p>
+            <div className="flex gap-2">
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="h-8 flex-1">
+                  <SelectValue placeholder="Selecionar mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map((m) => (
+                    <SelectItem key={m.value} value={m.value} className="text-xs">
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={triggerMonthSync}
+                disabled={syncMonth || !selectedMonth}
+              >
+                <Download className={`mr-1 h-3.5 w-3.5 ${syncMonth ? "animate-spin" : ""}`} />
+                {syncMonth ? "Sincronizando..." : "Sincronizar"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Scheduler + User Management */}
       <div className="grid gap-6 lg:grid-cols-2">
         <SchedulerControl />
 

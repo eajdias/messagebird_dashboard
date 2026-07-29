@@ -155,6 +155,7 @@ async def _init_schema():
         "005_bsc_manual_values.sql",
         "006_agent_manual_entries.sql",
         "007_users.sql",
+        "008_performance_indexes.sql",
     ):
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):

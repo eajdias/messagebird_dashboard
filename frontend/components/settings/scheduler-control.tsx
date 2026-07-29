@@ -105,10 +105,10 @@ export default function SchedulerControl() {
   return (
     <Card variant="glass">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm">
-          <CalendarClock className="h-4 w-4" />
-          Sincronização Agendada
-        </CardTitle>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <CalendarClock className="h-4 w-4" />
+            Sincronização Automática
+          </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         {loading ? (
