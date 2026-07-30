@@ -36,7 +36,13 @@ async def _sync_messages_internal(
     date_from: str | None = None,
     cnvs_id: int | None = None,
 ) -> tuple[int, list[dict[str, Any]]]:
-    """Sync messages. Returns (count, raw_messages_list)."""
+    """Sync messages. Returns (count, raw_messages_list).
+
+    The MessageBird messages API returns messages in reverse chronological order
+    (newest first) and paginates with limit=20. The dateFrom parameter is accepted
+    but does NOT filter results — totalCount remains the same regardless.
+    We rely on ON CONFLICT DO UPDATE for idempotency.
+    """
     if cnvs_id is None:
         cnvs_row = await conn.fetch_one(
             "SELECT cnvs_id FROM conversations WHERE cnvs_bird = $1",
@@ -46,19 +52,6 @@ async def _sync_messages_internal(
             logger.error("Conversation %s not found in DB", conversation_bird_id)
             return 0, []
         cnvs_id = cnvs_row["cnvs_id"]
-
-    if date_from is None:
-        last_msg = await conn.fetch_one(
-            "SELECT msgs_created FROM messages WHERE msgs_cnvs = $1 ORDER BY msgs_created DESC LIMIT 1",
-            (cnvs_id,),
-        )
-        if last_msg and last_msg["msgs_created"]:
-            df = last_msg["msgs_created"]
-            date_from = df.isoformat() if isinstance(df, datetime) else str(df)
-            if "+" in date_from:
-                date_from = date_from.split("+")[0] + "Z"
-            elif not date_from.endswith("Z"):
-                date_from += "Z"
 
     offset = 0
     limit = 20  # MessageBird messages API max is 20
@@ -354,3 +347,83 @@ async def sync_messages_for_recent(manager: PgSyncManager, conn: PostgresSyncCon
         logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
 
     logger.info("Recent messages sync completed: %d conversations, %d messages.", total, msg_count)
+
+
+async def sync_incomplete_conversations(
+    manager: PgSyncManager,
+    conn: PostgresSyncConnection,
+    *,
+    batch_limit: int = 5000,
+    max_conversations: int | None = None,
+) -> int:
+    """Re-sync conversations where local message count < remote count.
+
+    Finds conversations with incomplete message syncs (typically caused by
+    interrupted syncs where pagination stopped mid-way) and re-fetches all
+    messages. The ON CONFLICT DO UPDATE in _sync_messages_internal handles
+    already-stored messages idempotently.
+
+    Returns total new messages synced.
+    """
+    raw_pool = conn._pool  # noqa: SLF001
+
+    rows = await conn.fetch_all(
+        """
+        SELECT c.cnvs_id, c.cnvs_bird, c.cnvs_msgcount,
+               COUNT(m.msgs_id) AS local_count
+        FROM conversations c
+        LEFT JOIN messages m ON m.msgs_cnvs = c.cnvs_id
+        WHERE c.cnvs_msgcount IS NOT NULL
+          AND c.cnvs_msgcount > 0
+        GROUP BY c.cnvs_id, c.cnvs_bird, c.cnvs_msgcount
+        HAVING COUNT(m.msgs_id) < c.cnvs_msgcount
+        ORDER BY (c.cnvs_msgcount - COUNT(m.msgs_id)) DESC
+        LIMIT $1
+        """,
+        (batch_limit if max_conversations is None else min(batch_limit, max_conversations),),
+    )
+    total = len(rows)
+    if total == 0:
+        logger.info("No incomplete conversations found.")
+        return 0
+
+    logger.info("Found %d incomplete conversations, re-syncing messages...", total)
+    semaphore = asyncio.Semaphore(5)
+    msg_count = 0
+    chunk_size = 50
+
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+        chunk_tasks = [_sync_one_incomplete(manager, raw_pool, row, semaphore) for row in chunk]
+        results = await asyncio.gather(*chunk_tasks)
+        msg_count += sum(results)
+        logger.info(
+            "  incomplete sync: %d/%d conversations done (%d msgs)",
+            min(i + chunk_size, total),
+            total,
+            msg_count,
+        )
+
+    logger.info("Incomplete conversations sync completed: %d conversations, %d messages.", total, msg_count)
+    return msg_count
+
+
+async def _sync_one_incomplete(
+    manager: PgSyncManager,
+    raw_pool: Any,
+    row: Any,
+    semaphore: asyncio.Semaphore,
+) -> int:
+    async with semaphore:
+        task_conn = PostgresSyncConnection(raw_pool)
+        try:
+            count, _ = await sync_messages(
+                manager,
+                task_conn,
+                row["cnvs_bird"],
+                cnvs_id=row["cnvs_id"],
+            )
+            return count
+        except Exception as e:
+            logger.error("Error re-syncing %s: %s", row["cnvs_bird"], e)
+            return 0

@@ -16,6 +16,7 @@ class SyncDatabaseUseCase:
         sync_today: bool = False,
         start_date: str | None = None,
         end_date: str | None = None,
+        backfill_incomplete: bool = False,
     ):
         pool = self._pool
         if pool is None:
@@ -33,4 +34,5 @@ class SyncDatabaseUseCase:
             sync_today=sync_today,
             start_date=start_date,
             end_date=end_date,
+            backfill_incomplete=backfill_incomplete,
         )

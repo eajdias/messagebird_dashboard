@@ -24,6 +24,7 @@ from infrastructure.sync.sync_conversations import sync_conversations
 from infrastructure.sync.sync_core import PgSyncManager, month_bounds_utc, to_bird_iso
 from infrastructure.sync.sync_messages import (
     sync_all_messages,
+    sync_incomplete_conversations,
     sync_messages_for_month,
     sync_messages_for_range,
     sync_messages_for_recent,
@@ -170,6 +171,7 @@ async def trigger_sync_pg(
     sync_today: bool = False,
     start_date: str | None = None,
     end_date: str | None = None,
+    backfill_incomplete: bool = False,
 ) -> str:
     """Legacy sync trigger — kept for backward compatibility with scheduler."""
     raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
@@ -218,7 +220,18 @@ async def trigger_sync_pg(
             end_iso = to_bird_iso(next_month_start)
             await sync_conversations(manager, conn, min_date=start_iso, max_date=end_iso)
             synced_messages = await sync_messages_for_month(manager, conn, year, month)
+            if backfill_incomplete:
+                incomplete_count = await sync_incomplete_conversations(manager, conn)
+                return (
+                    f"Monthly sync completed for {year:04d}-{month:02d} "
+                    f"({synced_messages} messages). "
+                    f"Incomplete backfill: {incomplete_count} messages."
+                )
             return f"Monthly sync completed for {year:04d}-{month:02d} ({synced_messages} messages)."
+
+        if backfill_incomplete:
+            inc_count = await sync_incomplete_conversations(manager, conn)
+            return f"Incomplete backfill completed: {inc_count} new messages."
 
         if sync_today:
             now = datetime.now(UTC)

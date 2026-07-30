@@ -134,6 +134,7 @@ async def trigger_sync(
             year=request.year,
             month=request.month,
             sync_today=request.sync_today,
+            backfill_incomplete=request.backfill_incomplete,
         )
         await refresh_materialized_view()
         logger.info("Manual sync completed")

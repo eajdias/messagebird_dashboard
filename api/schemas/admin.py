@@ -23,6 +23,7 @@ class SyncTriggerRequest(BaseModel):
     month: int | None = None
     backfill_surveys: bool = False
     sync_today: bool = False
+    backfill_incomplete: bool = False
 
 
 SyncTriggerResponse = StatusResponse

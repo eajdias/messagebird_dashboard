@@ -16,7 +16,7 @@ from infrastructure.config.config_loader import load_and_configure_business, loa
 logger = logging.getLogger("m_bird.scheduler")
 
 
-def _make_incremental_handler(messages_days: int | None):
+def _make_incremental_handler(messages_days: int | None, backfill_incomplete: bool = False):
     """Create an incremental sync handler bound to profile parameters."""
 
     async def _run():
@@ -28,18 +28,19 @@ def _make_incremental_handler(messages_days: int | None):
                 full_sync=False,
                 sync_messages=messages_days is not None,
                 messages_days=messages_days,
+                backfill_incomplete=backfill_incomplete,
             )
             from api.sync_utils import refresh_materialized_view
 
             await refresh_materialized_view()
-            logger.info("Sync completed (messages_days=%s)", messages_days)
+            logger.info("Sync completed (messages_days=%s, backfill=%s)", messages_days, backfill_incomplete)
         except Exception:
             logger.exception("Sync failed")
 
     return _run
 
 
-def _make_full_handler(messages_days: int | None, backfill_surveys: bool):
+def _make_full_handler(messages_days: int | None, backfill_surveys: bool, backfill_incomplete: bool = False):
     """Create a full sync handler bound to profile parameters."""
 
     async def _run():
@@ -52,11 +53,17 @@ def _make_full_handler(messages_days: int | None, backfill_surveys: bool):
                 sync_messages=True,
                 messages_days=messages_days,
                 backfill_surveys=backfill_surveys,
+                backfill_incomplete=backfill_incomplete,
             )
             from api.sync_utils import refresh_materialized_view
 
             await refresh_materialized_view()
-            logger.info("Full sync completed (messages_days=%s, surveys=%s)", messages_days, backfill_surveys)
+            logger.info(
+                "Full sync completed (messages_days=%s, surveys=%s, backfill=%s)",
+                messages_days,
+                backfill_surveys,
+                backfill_incomplete,
+            )
         except Exception:
             logger.exception("Full sync failed")
 
@@ -92,7 +99,7 @@ def _configure_scheduler_jobs() -> int:
 
     if profile.has_incremental:
         assert profile.incremental_minutes is not None
-        handler = _make_incremental_handler(messages_days=profile.messages_days)
+        handler = _make_incremental_handler(messages_days=profile.messages_days, backfill_incomplete=True)
         scheduler.add_job(
             handler,
             trigger=IntervalTrigger(minutes=profile.incremental_minutes),
@@ -107,6 +114,7 @@ def _configure_scheduler_jobs() -> int:
         handler = _make_full_handler(
             messages_days=profile.messages_days,
             backfill_surveys=profile.backfill_surveys,
+            backfill_incomplete=True,
         )
         full_hour = f"{profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}"
         scheduler.add_job(

@@ -45,6 +45,9 @@ async def main():
     sync_parser.add_argument("--year", type=int, default=None, help="Ano para backfill mensal")
     sync_parser.add_argument("--month", type=int, default=None, help="Mês para backfill mensal")
     sync_parser.add_argument("--backfill-surveys", action="store_true", help="Re-extrair NPS e avaliações")
+    sync_parser.add_argument(
+        "--backfill-incomplete", action="store_true", help="Re-sincronizar conversas com mensagens incompletas"
+    )
     sync_parser.add_argument("--config-path", default="business_config.yaml", help="Caminho para business_config.yaml")
     sync_parser.add_argument("--bsc-config-path", default="business_bsc.yaml", help="Caminho para business_bsc.yaml")
 
@@ -77,6 +80,7 @@ async def main():
             year=args.year,
             month=args.month,
             backfill_surveys=args.backfill_surveys,
+            backfill_incomplete=args.backfill_incomplete,
         )
         _print(f"[bold green]Resultado:[/] {result}")
 
