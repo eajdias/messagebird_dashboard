@@ -542,7 +542,7 @@ async def get_evolution(
             try:
                 dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")
                 return (dt.month, dt.year)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
         return (0, 0)
 
@@ -748,7 +748,7 @@ async def get_evolution_granular(
         # raw_created already has timezone offset applied by _format_dt_direct
         try:
             dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return ""
         if granularity == "day":
             return dt.strftime("%Y-%m-%d")

@@ -89,7 +89,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             score = max(0.0, p * (1 - raw_value / m))
             return round(score, 1)
 
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return None
 
     return None
