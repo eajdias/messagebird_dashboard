@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { EvolutionGranularity } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -43,6 +44,16 @@ export function defaultPeriod(): { start: string; end: string } {
     start: ymd(new Date(startYear, startMonth, 25)),
     end: ymd(new Date(endYear, endMonth, 25)),
   };
+}
+
+/** Auto-select granularity based on date range size. */
+export function selectGranularity(startDate: string, endDate: string): EvolutionGranularity {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  if (days > 730) return "month";
+  if (days > 14) return "week";
+  return "day";
 }
 
 export function downloadCsv<T extends Record<string, unknown>>(

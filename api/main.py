@@ -10,7 +10,7 @@ from fastapi import FastAPI
 
 from api.dependencies import stop_pool
 from api.middleware import setup_middleware
-from api.routes import admin, auth, conversations, dashboard, reports
+from api.routes import admin, auth, conversations, dashboard, dashboard_rollup, reports
 from infrastructure.config.config_loader import load_and_configure_business, load_bsc_config
 
 logger = logging.getLogger("m_bird.scheduler")
@@ -156,6 +156,7 @@ async def _init_schema():
         "006_agent_manual_entries.sql",
         "007_users.sql",
         "008_performance_indexes.sql",
+        "009_stats_rollups.sql",
     ):
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):
@@ -166,13 +167,64 @@ async def _init_schema():
 
         pool = await get_pool()
         try:
-            for statement in sql.split(";"):
+            for statement in _split_sql(sql):
                 stmt = statement.strip()
                 if stmt:
                     await pool.execute(stmt)
             logger.info("Applied %s", sql_file)
         except Exception:
             logger.exception("Failed to apply %s", sql_file)
+
+
+def _split_sql(sql: str) -> list[str]:
+    """Split SQL by semicolons, respecting dollar-quoted strings."""
+    statements: list[str] = []
+    current: list[str] = []
+    in_dollar_quote = False
+    dollar_tag = ""
+    i = 0
+    n = len(sql)
+
+    while i < n:
+        ch = sql[i]
+
+        if in_dollar_quote:
+            current.append(ch)
+            if ch == "$":
+                end_tag = "$" + dollar_tag + "$"
+                tail = "".join(current[-(len(end_tag)) :])
+                if tail == end_tag:
+                    in_dollar_quote = False
+                    dollar_tag = ""
+            i += 1
+            continue
+
+        if ch == "$":
+            j = i + 1
+            tag_chars: list[str] = []
+            while j < n and sql[j] != "$" and sql[j] != ";":
+                tag_chars.append(sql[j])
+                j += 1
+            if j < n and sql[j] == "$":
+                dollar_tag = "".join(tag_chars)
+                in_dollar_quote = True
+                current.append(sql[i : j + 1])
+                i = j + 1
+                continue
+
+        if ch == ";":
+            statements.append("".join(current))
+            current = []
+            i += 1
+            continue
+
+        current.append(ch)
+        i += 1
+
+    remainder = "".join(current).strip()
+    if remainder:
+        statements.append(remainder)
+    return statements
 
 
 @asynccontextmanager
@@ -220,6 +272,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+    app.include_router(dashboard_rollup.router, prefix="/api/v1/dashboard", tags=["dashboard-rollup"])
     app.include_router(conversations.router, prefix="/api/v1/conversations", tags=["conversations"])
     app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
     app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])

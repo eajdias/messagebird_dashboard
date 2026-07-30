@@ -7,15 +7,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api from "@/lib/api";
-import { defaultPeriod } from "@/lib/utils";
+import { defaultPeriod, selectGranularity } from "@/lib/utils";
 import { useDashboard } from "@/hooks/useDashboard";
 import { useExecutive } from "@/hooks/useExecutive";
 import { useBscScorecard } from "@/hooks/useBscScorecard";
-import type { EvolutionGranularity, AgentItem } from "@/types";
+import type { AgentItem } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { SegmentedToggle } from "@/components/ui/segmented-toggle";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
@@ -32,11 +31,7 @@ const TAB_OPTIONS: TabOption<DashboardTab>[] = [
   { value: "bsc", label: "BSC" },
 ];
 
-const GRANULARITY_OPTIONS: { value: EvolutionGranularity; label: string }[] = [
-  { value: "day", label: "Diário" },
-  { value: "week", label: "Semanal" },
-  { value: "month", label: "Mensal" },
-];
+
 
 const DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
@@ -183,7 +178,6 @@ function DashboardContent() {
   const [tab, setTabState] = useState<DashboardTab>(
     () => readTabFromQuery(searchParams, "tab", TAB_OPTIONS, "overview")
   );
-  const [granularity, setGranularity] = useState<EvolutionGranularity>("week");
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [agentList, setAgentList] = useState<AgentItem[]>([]);
 
@@ -215,6 +209,8 @@ function DashboardContent() {
   const overviewActive = tab === "overview";
   const executiveActive = tab === "executive";
   const heatmapActive = tab === "heatmap";
+
+  const granularity = useMemo(() => selectGranularity(appliedStart, appliedEnd), [appliedStart, appliedEnd]);
 
   const { granularEvolution, granularLoading } = useDashboard({
     granularity,
@@ -284,9 +280,6 @@ function DashboardContent() {
         <Tabs value={tab} onChange={setTab} options={TAB_OPTIONS} paramName="tab" />
       </div>
       <div className="flex items-center gap-3">
-        {tab === "overview" && (
-          <SegmentedToggle value={granularity} onChange={setGranularity} options={GRANULARITY_OPTIONS} />
-        )}
         <DepartmentMultiSelect
           selected={selectedDept ? [selectedDept] : []}
           onChange={(v) => setSelectedDept(v.length > 0 ? v[0] : "")}

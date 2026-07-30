@@ -27,6 +27,11 @@ function ymd(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
+function todayYmd(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function startOfMonth(): string {
   const now = new Date();
   return ymd(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -34,7 +39,10 @@ function startOfMonth(): string {
 
 function endOfMonth(): string {
   const now = new Date();
-  return ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const today = todayYmd();
+  const end = ymd(last);
+  return end > today ? today : end;
 }
 
 function startOfLastMonth(): string {
@@ -47,19 +55,13 @@ function endOfLastMonth(): string {
   return ymd(new Date(now.getFullYear(), now.getMonth(), 0));
 }
 
-function daysAgo(n: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return ymd(d);
-}
-
-const MAX_RANGE_DAYS = 365;
+const MAX_RANGE_DAYS = 3650;
 
 const DATE_PRESETS: DatePreset[] = [
   { label: "Mês atual", getRange: () => ({ start: startOfMonth(), end: endOfMonth() }) },
   { label: "Mês anterior", getRange: () => ({ start: startOfLastMonth(), end: endOfLastMonth() }) },
-  { label: "Últimos 30 dias", getRange: () => ({ start: daysAgo(30), end: ymd(new Date()) }) },
-  { label: "Últimos 90 dias", getRange: () => ({ start: daysAgo(90), end: ymd(new Date()) }) },
+  { label: "Ano atual", getRange: () => ({ start: `${new Date().getFullYear()}-01-01`, end: todayYmd() }) },
+  { label: "Últimos 2 anos", getRange: () => ({ start: `${new Date().getFullYear() - 1}-01-01`, end: todayYmd() }) },
 ];
 
 export function DateRangePicker({
@@ -89,6 +91,7 @@ export function DateRangePicker({
 
   const handleStartChange = (value: string) => {
     if (!isValidDate(value)) return;
+    if (value > today) return;
     if (isValidDate(localEnd) && value > localEnd) {
       setLocalStart(value);
       setLocalEnd(value);
@@ -99,6 +102,7 @@ export function DateRangePicker({
 
   const handleEndChange = (value: string) => {
     if (!isValidDate(value)) return;
+    if (value > today) return;
     if (isValidDate(localStart) && value < localStart) {
       setLocalEnd(localStart);
       setLocalStart(value);
@@ -111,7 +115,7 @@ export function DateRangePicker({
     const range = preset.getRange();
     const diff = (new Date(range.end).getTime() - new Date(range.start).getTime()) / (1000 * 60 * 60 * 24);
     if (diff > MAX_RANGE_DAYS) {
-      window.alert("Período máximo permitido é de 12 meses");
+      window.alert("Período máximo permitido é de 10 anos");
       return;
     }
     setLocalStart(range.start);
@@ -122,7 +126,7 @@ export function DateRangePicker({
   const handleConfirm = () => {
     const diff = (new Date(localEnd).getTime() - new Date(localStart).getTime()) / (1000 * 60 * 60 * 24);
     if (diff > MAX_RANGE_DAYS) {
-      window.alert("Período máximo permitido é de 12 meses");
+      window.alert("Período máximo permitido é de 10 anos");
       return;
     }
     (onConfirm ?? onChange)(localStart, localEnd);

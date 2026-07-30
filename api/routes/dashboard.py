@@ -106,6 +106,9 @@ def _make_aggregator() -> ReportAggregator:
     return ReportAggregator(strategies=[FRTCalculator(), DurationCalculator(), ARTCalculator()])
 
 
+_fetch_pending: dict[str, asyncio.Task] = {}
+
+
 async def _fetch_and_process(
     repo: ReportRepository,
     start_date: str,
@@ -113,7 +116,8 @@ async def _fetch_and_process(
 ) -> tuple[list[RawConversationData], list[Any]]:
     """Fetch raw data for a date range and process it through the aggregator.
 
-    Uses cache to avoid re-processing the same date range across multiple endpoints.
+    Uses request coalescing: when multiple endpoints request the same data
+    simultaneously, only one computes it and the others await the result.
     """
     from infrastructure.cache import processed_cache as _pc
 
@@ -122,11 +126,26 @@ async def _fetch_and_process(
     if cached is not None:
         return cached
 
-    raw = await repo.fetch_raw_data_range(start_date, end_date)
-    agg = _make_aggregator()
-    processed = await asyncio.to_thread(agg.process_all, raw)
-    await _pc.set(cache_key, (raw, processed))
-    return raw, processed
+    if cache_key in _fetch_pending:
+        try:
+            return await _fetch_pending[cache_key]
+        except Exception:
+            pass
+
+    async def _compute():
+        try:
+            raw = await repo.fetch_raw_data_range(start_date, end_date)
+            agg = _make_aggregator()
+            processed = await asyncio.to_thread(agg.process_all, raw)
+            result = (raw, processed)
+            await _pc.set(cache_key, result)
+            return result
+        finally:
+            _fetch_pending.pop(cache_key, None)
+
+    task = asyncio.ensure_future(_compute())
+    _fetch_pending[cache_key] = task
+    return await task
 
 
 # ── GET /dashboard/summary ──────────────────────────────────────────────

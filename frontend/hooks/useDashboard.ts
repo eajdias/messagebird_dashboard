@@ -24,12 +24,6 @@ interface DashboardState {
   granularLoading: boolean;
 }
 
-const GRANULARITY_COUNT: Record<EvolutionGranularity, number> = {
-  day: 30,
-  week: 12,
-  month: 12,
-};
-
 export function useDashboard(params: {
   start_date?: string;
   end_date?: string;
@@ -37,8 +31,6 @@ export function useDashboard(params: {
   granularity?: EvolutionGranularity;
   enabled?: boolean;
 }) {
-  const granularity: EvolutionGranularity = params.granularity ?? "month";
-  const granularCount = GRANULARITY_COUNT[granularity];
   const enabled = params.enabled ?? true;
 
   const [state, setState] = useState<DashboardState>({
@@ -114,7 +106,7 @@ export function useDashboard(params: {
         const deptParams = qs.toString();
 
         const granularEvoRes = await api.get<GranularEvolutionResponse>(
-          `/api/v1/dashboard/evolution/granular?granularity=${granularity}&count=${granularCount}${deptParams ? `&${deptParams}` : ""}`,
+          `/api/v1/dashboard/evolution/rollup${deptParams ? `?${deptParams}` : ""}`,
           { signal },
         );
 
@@ -128,7 +120,7 @@ export function useDashboard(params: {
         setState((prev) => ({ ...prev, granularLoading: false }));
       }
     },
-    [params.start_date, params.end_date, params.department, granularity, granularCount, enabled],
+    [params.start_date, params.end_date, params.department, enabled],
   );
 
   useEffect(() => {
