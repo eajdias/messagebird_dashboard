@@ -19,6 +19,7 @@ class PostgresPool:
                 dsn=self._dsn,
                 min_size=self._min_size,
                 max_size=self._max_size,
+                command_timeout=30,
             )
 
     async def stop(self):
@@ -33,11 +34,11 @@ class PostgresPool:
         return self._pool
 
     async def fetch_all(self, query: str, *params) -> list[asyncpg.Record]:
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire(timeout=10) as conn:
             return await conn.fetch(query, *params)
 
     async def fetch_one(self, query: str, *params) -> asyncpg.Record | None:
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire(timeout=10) as conn:
             return await conn.fetchrow(query, *params)
 
     async def fetch_val(self, query: str, *params):
@@ -45,10 +46,10 @@ class PostgresPool:
         return row[0] if row else None
 
     async def execute(self, query: str, *params) -> str:
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire(timeout=10) as conn:
             result = await conn.execute(query, *params)
             return result or ""
 
     async def executemany(self, query: str, params_list: list[tuple]):
-        async with self.pool.acquire() as conn:
+        async with self.pool.acquire(timeout=10) as conn:
             await conn.executemany(query, params_list)

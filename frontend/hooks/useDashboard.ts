@@ -79,12 +79,13 @@ export function useDashboard(params: {
       }
 
       const failures: string[] = [];
+      const results: Record<string, unknown> = {};
 
       await Promise.allSettled(
         baseEndpoints.map(async (ep) => {
           try {
             const res = await api.get(ep.url, { signal });
-            setState((prev) => ({ ...prev, [ep.key]: res.data }));
+            results[ep.key] = res.data;
           } catch (err) {
             if (err instanceof DOMException && err.name === "AbortError") return;
             const msg = err instanceof Error ? err.message : String(err);
@@ -96,9 +97,8 @@ export function useDashboard(params: {
       const error =
         failures.length > 0 ? `Falha ao carregar: ${failures.join(", ")}` : null;
 
-      setState((prev) => ({ ...prev, loading: false, error }));
+      setState((prev) => ({ ...prev, ...results, loading: false, error }));
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [params.start_date, params.end_date, params.department, enabled],
   );
 
@@ -128,21 +128,22 @@ export function useDashboard(params: {
         setState((prev) => ({ ...prev, granularLoading: false }));
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [params.start_date, params.end_date, params.department, granularity, granularCount, enabled],
   );
 
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    fetchBaseData(controller.signal);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchBaseData(controller.signal);
     return () => controller.abort();
   }, [fetchBaseData, enabled]);
 
   useEffect(() => {
     if (!enabled) return;
     const controller = new AbortController();
-    fetchGranular(controller.signal);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchGranular(controller.signal);
     return () => controller.abort();
   }, [fetchGranular, enabled]);
 

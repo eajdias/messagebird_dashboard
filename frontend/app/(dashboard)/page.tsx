@@ -176,7 +176,7 @@ function StatCard({ title, value, loading }: { title: string; value?: string | n
 
 // ── Inner component (uses useSearchParams, requires Suspense) ───────────────
 
-function DashboardContent({ mounted }: { mounted: boolean }) {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -496,16 +496,9 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
 // ── Outer page component (Suspense wrapper for useSearchParams) ─────────────
 
 export default function DashboardPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
-
   return (
     <Suspense fallback={<PageLoader />}>
-      <DashboardContent mounted={mounted} />
+      <DashboardContent />
     </Suspense>
   );
 }

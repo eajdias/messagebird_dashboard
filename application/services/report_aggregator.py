@@ -63,67 +63,131 @@ class ReportAggregator:
 
     def aggregate_statistics(self, processed_data: list[ProcessedReportData]) -> dict[str, Any]:
         """
-        Orchestrates the aggregation of statistics for a set of conversations.
-        Delegates all math to MetricsCalculator.
+        Single-pass aggregation of statistics for a set of conversations.
+        Collects all metrics in one iteration to avoid redundant list traversals.
         """
-        ratings = [p.rating for p in processed_data if p.rating is not None]
-        nps_scores = [p.nps for p in processed_data if p.nps is not None]
-        arts = [
-            p.art_min
-            for p in processed_data
-            if isinstance(p.art_min, (int, float)) and 0 < p.art_min <= constants.MAX_ART_MINUTES
-        ]
-        durations = [
-            p.duration_min
-            for p in processed_data
-            if isinstance(p.duration_min, (int, float)) and 0 < p.duration_min <= constants.MAX_DURATION_MINUTES
-        ]
+        if not processed_data:
+            return {
+                "avg_rating": None,
+                "avg_nps": None,
+                "real_nps": None,
+                "avg_art": None,
+                "avg_duration": None,
+                "sla_compliance": None,
+                "total_chats": 0,
+                "total_msgs": 0,
+                "compliments": 0,
+                "negatives": 0,
+                "rated_chats": 0,
+                "nps_rated_chats": 0,
+                "both_rated_chats": 0,
+                "high_notes": 0,
+                "low_notes": 0,
+                "neutral_notes": 0,
+                "art_bucket_0_5": 0,
+                "art_bucket_5_10": 0,
+                "art_bucket_10_30": 0,
+                "art_bucket_30_60": 0,
+                "art_bucket_60_120": 0,
+                "art_bucket_120_plus": 0,
+                "pct_compliments": "N/A",
+                "pct_negatives": "N/A",
+                "unique_clients": 0,
+                "returners": 0,
+                "rating_coverage": 0,
+            }
 
-        compliments = sum(1 for p in processed_data if p.is_compliment)
-        negatives = sum(1 for p in processed_data if p.is_negative)
-        neutrals = sum(1 for p in processed_data if p.rating is not None and not p.is_compliment and not p.is_negative)
-        total_ratings = len(ratings)
-
-        # Count contacts where BOTH rating and NPS exist
-        both_rated = sum(1 for p in processed_data if p.rating is not None and p.nps is not None)
-
-        # ART distribution buckets (6 bands)
+        ratings_sum = 0.0
+        ratings_count = 0
+        nps_sum = 0.0
+        nps_count = 0
+        nps_promoters = 0
+        nps_detractors = 0
+        arts_sum = 0.0
+        arts_count = 0
+        sla_hits = 0
+        durations_sum = 0.0
+        durations_count = 0
+        total_msgs = 0
+        compliments = 0
+        negatives = 0
+        neutrals = 0
+        both_rated = 0
         art_buckets = [0, 0, 0, 0, 0, 0]
-        for p in processed_data:
-            a = p.art_min
-            if a is None or not isinstance(a, (int, float)) or a <= 0:
-                continue
-            if a <= 5:
-                art_buckets[0] += 1
-            elif a <= 10:
-                art_buckets[1] += 1
-            elif a <= 30:
-                art_buckets[2] += 1
-            elif a <= 60:
-                art_buckets[3] += 1
-            elif a <= 120:
-                art_buckets[4] += 1
-            else:
-                art_buckets[5] += 1
+        contacts: dict[int, int] = {}
 
-        # Count unique contacts and returners (contacts with >1 chat)
-        contacts = Counter(p.contact_id for p in processed_data if p.contact_id)
+        for p in processed_data:
+            total_msgs += p.msg_count
+
+            if p.rating is not None:
+                ratings_count += 1
+                ratings_sum += p.rating
+                if p.is_compliment:
+                    compliments += 1
+                elif p.is_negative:
+                    negatives += 1
+                else:
+                    neutrals += 1
+                if p.nps is not None:
+                    both_rated += 1
+
+            if p.nps is not None:
+                nps_count += 1
+                nps_sum += p.nps
+                if p.nps >= MetricsCalculator.nps_promoter_min:
+                    nps_promoters += 1
+                elif p.nps < MetricsCalculator.nps_passive_min:
+                    nps_detractors += 1
+
+            if isinstance(p.art_min, (int, float)) and 0 < p.art_min <= constants.MAX_ART_MINUTES:
+                arts_count += 1
+                arts_sum += p.art_min
+                if p.art_min <= constants.SLA_FRT_THRESHOLD_MINUTES:
+                    sla_hits += 1
+                if p.art_min <= 5:
+                    art_buckets[0] += 1
+                elif p.art_min <= 10:
+                    art_buckets[1] += 1
+                elif p.art_min <= 30:
+                    art_buckets[2] += 1
+                elif p.art_min <= 60:
+                    art_buckets[3] += 1
+                elif p.art_min <= 120:
+                    art_buckets[4] += 1
+                else:
+                    art_buckets[5] += 1
+
+            if isinstance(p.duration_min, (int, float)) and 0 < p.duration_min <= constants.MAX_DURATION_MINUTES:
+                durations_count += 1
+                durations_sum += p.duration_min
+
+            if p.contact_id:
+                contacts[p.contact_id] = contacts.get(p.contact_id, 0) + 1
+
         unique_clients = len(contacts)
         returners = sum(1 for count in contacts.values() if count > 1)
 
+        avg_rating = round(ratings_sum / ratings_count, 2) if ratings_count > 0 else None
+        avg_nps = round(nps_sum / nps_count, 2) if nps_count > 0 else None
+        real_nps = round((nps_promoters - nps_detractors) / nps_count * 100, 2) if nps_count > 0 else None
+        avg_art = round(arts_sum / arts_count, 2) if arts_count > 0 else None
+        avg_duration = round(durations_sum / durations_count, 2) if durations_count > 0 else None
+        sla_compliance = round(sla_hits / arts_count * 100, 2) if arts_count > 0 else None
+        total_chats = len(processed_data)
+
         return {
-            "avg_rating": MetricsCalculator.calculate_rating_average(ratings),
-            "avg_nps": MetricsCalculator.calculate_average(nps_scores),
-            "real_nps": MetricsCalculator.calculate_nps(nps_scores),
-            "avg_art": MetricsCalculator.calculate_average(arts),
-            "avg_duration": MetricsCalculator.calculate_average(durations),
-            "sla_compliance": MetricsCalculator.calculate_sla_rate(arts, threshold=constants.SLA_FRT_THRESHOLD_MINUTES),
-            "total_chats": len(processed_data),
-            "total_msgs": sum(p.msg_count for p in processed_data),
+            "avg_rating": avg_rating,
+            "avg_nps": avg_nps,
+            "real_nps": real_nps,
+            "avg_art": avg_art,
+            "avg_duration": avg_duration,
+            "sla_compliance": sla_compliance,
+            "total_chats": total_chats,
+            "total_msgs": total_msgs,
             "compliments": compliments,
             "negatives": negatives,
-            "rated_chats": total_ratings,
-            "nps_rated_chats": len(nps_scores),
+            "rated_chats": ratings_count,
+            "nps_rated_chats": nps_count,
             "both_rated_chats": both_rated,
             "high_notes": compliments,
             "low_notes": negatives,
@@ -134,11 +198,11 @@ class ReportAggregator:
             "art_bucket_30_60": art_buckets[3],
             "art_bucket_60_120": art_buckets[4],
             "art_bucket_120_plus": art_buckets[5],
-            "pct_compliments": round(compliments / total_ratings * 100, 2) if total_ratings > 0 else "N/A",
-            "pct_negatives": round(negatives / total_ratings * 100, 2) if total_ratings > 0 else "N/A",
+            "pct_compliments": round(compliments / ratings_count * 100, 2) if ratings_count > 0 else "N/A",
+            "pct_negatives": round(negatives / ratings_count * 100, 2) if ratings_count > 0 else "N/A",
             "unique_clients": unique_clients,
             "returners": returners,
-            "rating_coverage": round(total_ratings / len(processed_data) * 100, 2) if len(processed_data) > 0 else 0,
+            "rating_coverage": round(ratings_count / total_chats * 100, 2) if total_chats > 0 else 0,
         }
 
     def aggregate_dashboard(
@@ -149,18 +213,19 @@ class ReportAggregator:
         end_date: str,
         prev_month_metrics: dict[str, Any] = None,
     ) -> DashboardDTO:
+        # Build agent_map once for reuse
+        agent_map: dict[str, list[ProcessedReportData]] = {}
+        for p in data:
+            agent_map.setdefault(p.agent, []).append(p)
+
         general = self.aggregate_statistics(data)
         dist_data = self._rating.aggregate_distributions(data)
         topic_reasons = self._topic.aggregate_reasons(data)
         topic_occurrences = self._topic.aggregate_occurrences(data)
-        tabular_rows = self.build_excel_rows(data, report_type="agents")
+        tabular_rows = self.build_excel_rows(data, report_type="agents", agent_map=agent_map)
         dept_rows = self._build_departments_rows(data)
         dow_data = self._temporal.aggregate_dow(data)
-        agent_detail = self._rating.aggregate_agent_ratings(data)
-
-        agent_map: dict[str, list[ProcessedReportData]] = {}
-        for p in data:
-            agent_map.setdefault(p.agent, []).append(p)
+        agent_detail = self._rating.aggregate_agent_ratings(data, agent_map=agent_map)
 
         agents = sorted(agent_map.keys())
         bsc_header = ["Métrica"] + agents
@@ -271,14 +336,17 @@ class ReportAggregator:
         return months
 
     def build_excel_rows(
-        self, processed_data: list[ProcessedReportData], report_type: str = "agents"
+        self,
+        processed_data: list[ProcessedReportData],
+        report_type: str = "agents",
+        agent_map: dict[str, list[ProcessedReportData]] | None = None,
     ) -> list[list[Any]]:
         """
         Transforms processed entities into Excel-ready rows based on report type.
         Supports: 'agents', 'groups', 'departments'.
         """
         if report_type == "agents":
-            return self._build_agents_rows(processed_data)
+            return self._build_agents_rows(processed_data, agent_map)
         elif report_type == "groups":
             return self._build_groups_rows(processed_data)
         elif report_type == "departments":
@@ -308,13 +376,16 @@ class ReportAggregator:
             stats["returners"],
         ]
 
-    def _build_agents_rows(self, data: list[ProcessedReportData]) -> list[list[Any]]:
-        # Group by agent
-        agent_map: dict[str, list[ProcessedReportData]] = {}
-        for p in data:
-            if p.agent not in agent_map:
-                agent_map[p.agent] = []
-            agent_map[p.agent].append(p)
+    def _build_agents_rows(
+        self, data: list[ProcessedReportData], agent_map: dict[str, list[ProcessedReportData]] | None = None
+    ) -> list[list[Any]]:
+        # Group by agent (use provided map or build new one)
+        if agent_map is None:
+            agent_map = {}
+            for p in data:
+                if p.agent not in agent_map:
+                    agent_map[p.agent] = []
+                agent_map[p.agent].append(p)
 
         rows = []
         for agent, p_list in agent_map.items():

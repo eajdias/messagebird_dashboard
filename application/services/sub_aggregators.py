@@ -54,13 +54,16 @@ class RatingAggregator:
             "rating_distribution": MetricsCalculator.calculate_rating_distribution(ratings),
         }
 
-    def aggregate_agent_ratings(self, data: list[ProcessedReportData]) -> dict[str, Any]:
+    def aggregate_agent_ratings(
+        self, data: list[ProcessedReportData], agent_map: dict[str, list[ProcessedReportData]] | None = None
+    ) -> dict[str, Any]:
         """Calcula distribuição de notas técnicas (1-5) por agente."""
-        agent_map: dict[str, list[ProcessedReportData]] = {}
-        for p in data:
-            if p.agent not in agent_map:
-                agent_map[p.agent] = []
-            agent_map[p.agent].append(p)
+        if agent_map is None:
+            agent_map = {}
+            for p in data:
+                if p.agent not in agent_map:
+                    agent_map[p.agent] = []
+                agent_map[p.agent].append(p)
 
         agents = sorted(agent_map.keys())
         rating_rows = []

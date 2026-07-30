@@ -75,7 +75,8 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    fetchStatus();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchStatus();
   }, [fetchStatus]);
 
   const triggerFullSyncToday = async () => {

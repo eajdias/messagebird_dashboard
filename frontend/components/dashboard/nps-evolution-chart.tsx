@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -52,11 +52,11 @@ function NPSTooltip({ active, payload, label }: Record<string, unknown>) {
 }
 
 export const NPSEvolutionChart = memo(function NPSEvolutionChart({ data, className }: NPSEvolutionChartProps) {
-  const chartData = data.map((b) => ({
+  const chartData = useMemo(() => data.map((b) => ({
     label: b.label,
     "Avaliados NPS": b.nps_rated_chats,
     "NPS Médio": b.nps_score,
-  }));
+  })), [data]);
 
   const hasData = data.some((b) => b.nps_rated_chats > 0);
   const npsMin = Math.min(...data.map((b) => b.nps_score ?? 100).filter((v) => v !== 100), 0);

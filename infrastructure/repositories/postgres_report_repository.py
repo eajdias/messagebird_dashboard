@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -134,7 +135,7 @@ class PostgresReportRepository(ReportRepository):
                 s,
                 e,
             )
-            return _rows_to_conversations(rows, agent_group)
+            return await asyncio.to_thread(_rows_to_conversations, rows, agent_group)
 
         return await repo_cache.get_or_set(cache_key, _fetch)
 
@@ -163,7 +164,7 @@ class PostgresReportRepository(ReportRepository):
                     s,
                     e,
                 )
-            return _rows_to_conversations(rows)
+            return await asyncio.to_thread(_rows_to_conversations, rows)
 
         return await repo_cache.get_or_set(cache_key, _fetch)
 

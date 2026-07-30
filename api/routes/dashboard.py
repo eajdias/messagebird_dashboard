@@ -111,10 +111,22 @@ async def _fetch_and_process(
     start_date: str,
     end_date: str,
 ) -> tuple[list[RawConversationData], list[Any]]:
-    """Fetch raw data for a date range and process it through the aggregator."""
+    """Fetch raw data for a date range and process it through the aggregator.
+
+    Uses cache to avoid re-processing the same date range across multiple endpoints.
+    """
+    from infrastructure.cache import processed_cache as _pc
+
+    cache_key = f"proc:{start_date}:{end_date}"
+    cached = await _pc.get(cache_key)
+    if cached is not None:
+        return cached
+
     raw = await repo.fetch_raw_data_range(start_date, end_date)
     agg = _make_aggregator()
-    return raw, agg.process_all(raw)
+    processed = await asyncio.to_thread(agg.process_all, raw)
+    await _pc.set(cache_key, (raw, processed))
+    return raw, processed
 
 
 # ── GET /dashboard/summary ──────────────────────────────────────────────

@@ -15,6 +15,18 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+async def clear_cache():
+    """Clear application caches before each test to prevent stale data."""
+    from infrastructure.cache import processed_cache, repo_cache
+
+    await processed_cache.clear()
+    await repo_cache.clear()
+    yield
+    await processed_cache.clear()
+    await repo_cache.clear()
+
+
 @pytest.fixture
 async def mock_db():
     """Mock database session for unit tests."""

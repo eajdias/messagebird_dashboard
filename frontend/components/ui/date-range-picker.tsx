@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,8 @@ function daysAgo(n: number): string {
   return ymd(d);
 }
 
+const MAX_RANGE_DAYS = 365;
+
 const DATE_PRESETS: DatePreset[] = [
   { label: "Mês atual", getRange: () => ({ start: startOfMonth(), end: endOfMonth() }) },
   { label: "Mês anterior", getRange: () => ({ start: startOfLastMonth(), end: endOfLastMonth() }) },
@@ -74,12 +76,14 @@ export function DateRangePicker({
   // Sync local state when props change from outside (e.g. preset applied in parent)
   const prevStartRef = useRef(startDate);
   const prevEndRef = useRef(endDate);
-  if (prevStartRef.current !== startDate || prevEndRef.current !== endDate) {
-    prevStartRef.current = startDate;
-    prevEndRef.current = endDate;
-    setLocalStart(startDate);
-    setLocalEnd(endDate);
-  }
+  useEffect(() => {
+    if (prevStartRef.current !== startDate || prevEndRef.current !== endDate) {
+      prevStartRef.current = startDate;
+      prevEndRef.current = endDate;
+      setLocalStart(startDate);
+      setLocalEnd(endDate);
+    }
+  }, [startDate, endDate]);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -105,12 +109,22 @@ export function DateRangePicker({
 
   const handlePreset = (preset: DatePreset) => {
     const range = preset.getRange();
+    const diff = (new Date(range.end).getTime() - new Date(range.start).getTime()) / (1000 * 60 * 60 * 24);
+    if (diff > MAX_RANGE_DAYS) {
+      window.alert("Período máximo permitido é de 12 meses");
+      return;
+    }
     setLocalStart(range.start);
     setLocalEnd(range.end);
     (onConfirm ?? onChange)(range.start, range.end);
   };
 
   const handleConfirm = () => {
+    const diff = (new Date(localEnd).getTime() - new Date(localStart).getTime()) / (1000 * 60 * 60 * 24);
+    if (diff > MAX_RANGE_DAYS) {
+      window.alert("Período máximo permitido é de 12 meses");
+      return;
+    }
     (onConfirm ?? onChange)(localStart, localEnd);
   };
 

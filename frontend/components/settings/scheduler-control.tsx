@@ -56,7 +56,8 @@ export default function SchedulerControl() {
   }, []);
 
   useEffect(() => {
-    fetchStatus();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchStatus();
   }, [fetchStatus]);
 
   const startScheduler = async () => {

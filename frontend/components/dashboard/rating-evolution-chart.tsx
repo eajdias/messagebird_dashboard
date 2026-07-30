@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -52,13 +52,13 @@ function RatingTooltip({ active, payload, label }: Record<string, unknown>) {
 }
 
 export const RatingEvolutionChart = memo(function RatingEvolutionChart({ data, className }: RatingEvolutionChartProps) {
-  const chartData = data.map((b) => ({
+  const chartData = useMemo(() => data.map((b) => ({
     label: b.label,
     Avaliados: b.rated_chats,
     "Altas (4-5)": b.high_notes,
     Neutros: b.neutral_notes ?? 0,
     "Baixas (1-2)": b.low_notes,
-  }));
+  })), [data]);
 
   const hasData = data.some((b) => b.rated_chats > 0);
   const maxNotes = Math.max(

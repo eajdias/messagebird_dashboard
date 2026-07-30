@@ -34,6 +34,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: mbird_api
+    profiles:
+      - dev
     command: >
       uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
     env_file: .env
@@ -64,6 +66,42 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mbird_api_prod
+    profiles:
+      - prod
+    command: >
+      uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 2
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://mbird:${DB_PASSWORD:-mbird_dev_2024}@postgres:5432/mbird_reports
+      CORS_ORIGINS: https://zscan-sac.eajdias.com,https://zsc-sac.eajdias.com,http://localhost:3050
+      SYNC_PROFILE: ${SYNC_PROFILE:-daily}
+      SYNC_ENABLED: ${SYNC_ENABLED:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      APP_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8050:8000"
+    mem_limit: 2g
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import httpx; httpx.get('http://127.0.0.1:8000/api/v1/admin/health').raise_for_status()\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
       retries: 3
     logging:
       driver: json-file

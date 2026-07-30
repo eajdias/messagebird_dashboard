@@ -8,32 +8,36 @@ TIMEZONE_OFFSET = float(os.getenv("MESSAGEBIRD_TIMEZONE_OFFSET", "-3"))
 
 
 def parse_datetime(dt_string: str | None, apply_offset: bool = False) -> datetime | None:
+    """Parse datetime string without try/except loops for better performance.
+
+    Detects format by string inspection instead of exception handling.
+    """
     if not dt_string:
         return None
-    try:
-        # Try different formats
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"):
-            try:
-                # Handle ISO-like formats with 'T' and optional fractional seconds
-                if "T" in dt_string:
-                    clean_str = dt_string.replace("Z", "").split(".")[0]
-                    dt = datetime.strptime(clean_str, "%Y-%m-%dT%H:%M:%S")
-                else:
-                    dt = datetime.strptime(dt_string, fmt)
 
-                if apply_offset:
-                    dt += timedelta(hours=TIMEZONE_OFFSET)
-                return dt.replace(tzinfo=None)
-            except ValueError:
-                continue
+    dt = None
+    s = str(dt_string)
 
-        # Last resort for ISO format
-        dt = datetime.fromisoformat(dt_string.replace("Z", "+00:00"))
-        if apply_offset:
-            dt += timedelta(hours=TIMEZONE_OFFSET)
-        return dt.replace(tzinfo=None)
-    except Exception:
+    if "T" in s:
+        clean = s.replace("Z", "").split(".")[0]
+        dt = datetime.strptime(clean, "%Y-%m-%dT%H:%M:%S")
+    elif len(s) >= 19 and s[4] == "-" and s[10] == " " and s[13] == ":" and s[16] == ":":
+        dt = datetime.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+    elif len(s) >= 10 and s[4] == "-" and s[7] == "-":
+        dt = datetime.strptime(s[:10], "%Y-%m-%d")
+        dt = dt.replace(hour=23, minute=59, second=59)
+    else:
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except ValueError, TypeError:
+            return None
+
+    if dt is None:
         return None
+
+    if apply_offset:
+        dt += timedelta(hours=TIMEZONE_OFFSET)
+    return dt.replace(tzinfo=None)
 
 
 def local_date_bounds(start_date_str: str, end_date_str: str) -> tuple[datetime, datetime]:

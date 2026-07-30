@@ -111,13 +111,13 @@ export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
       }));
 
       const failures: string[] = [];
+      const results: Record<string, unknown> = {};
 
       await Promise.allSettled(
         endpoints.map(async (ep) => {
           try {
             const res = await api.get(ep.url, { signal });
-            const value = res.data;
-            setState((prev) => ({ ...prev, [ep.key]: value }));
+            results[ep.key] = res.data;
           } catch (err) {
             if (err instanceof DOMException && err.name === "AbortError") return;
             const msg = _errorReason(err);
@@ -129,7 +129,7 @@ export function useExecutive(params: ExecutiveParams & { enabled?: boolean }) {
       const error =
         failures.length > 0 ? `Falha ao carregar: ${failures.join(", ")}` : null;
 
-      setState((prev) => ({ ...prev, loading: false, error }));
+      setState((prev) => ({ ...prev, ...results, loading: false, error }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [params.startDate, params.endDate, params.selectedDept, params.group, view, enabled],

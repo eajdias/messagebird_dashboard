@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -47,13 +47,13 @@ function ARTTooltip({ active, payload, label }: Record<string, unknown>) {
 }
 
 export const ARTEvolutionChart = memo(function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
-  const chartData = data.map((b) => ({
+  const chartData = useMemo(() => data.map((b) => ({
     label: b.label,
     "0–5 min": b.art_bucket_0_5,
     "5–10 min": b.art_bucket_5_10,
     "10–30 min": b.art_bucket_10_30,
     "30 min+": b.art_bucket_30_60 + b.art_bucket_60_120 + b.art_bucket_120_plus,
-  }));
+  })), [data]);
 
   const hasData = data.some(
     (b) =>

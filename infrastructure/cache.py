@@ -5,13 +5,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from typing import Any
 
 logger = logging.getLogger("m_bird.cache")
 
 
 class TTLCache:
-    """Thread-safe in-memory cache with per-key TTL expiration.
+    """Thread-safe in-memory cache with per-key TTL expiration and LRU eviction.
 
     Uses asyncio locks for thread safety. For request coalescing at the
     application level, the ``_load_executive_processed`` function handles
@@ -24,9 +25,10 @@ class TTLCache:
         cache.clear()
     """
 
-    def __init__(self, default_ttl: int = 300):
+    def __init__(self, default_ttl: int = 300, maxsize: int = 1000):
         self._default_ttl = default_ttl
-        self._store: dict[str, tuple[float, Any]] = {}
+        self._maxsize = maxsize
+        self._store: OrderedDict[str, tuple[float, Any]] = OrderedDict()
         self._lock = asyncio.Lock()
 
     async def get_or_set(
@@ -75,11 +77,15 @@ class TTLCache:
         return None
 
     async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
-        """Store a value in the cache."""
+        """Store a value in the cache with LRU eviction when maxsize is reached."""
         now = time.monotonic()
         effective_ttl = ttl if ttl is not None else self._default_ttl
         async with self._lock:
+            if key in self._store:
+                self._store.move_to_end(key)
             self._store[key] = (now + effective_ttl, value)
+            while len(self._store) > self._maxsize:
+                self._store.popitem(last=False)
 
     async def invalidate(self, key: str) -> None:
         async with self._lock:
@@ -99,7 +105,7 @@ class TTLCache:
 
 
 # Module-level singleton
-repo_cache = TTLCache(default_ttl=300)
+repo_cache = TTLCache(default_ttl=300, maxsize=1000)
 
 # Cache for processed (aggregated) results — avoids re-running aggregator pipeline
-processed_cache = TTLCache(default_ttl=300)
+processed_cache = TTLCache(default_ttl=300, maxsize=500)

@@ -63,7 +63,8 @@ export function UserManagementCard() {
   }, []);
 
   useEffect(() => {
-    fetchUsers();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchUsers();
   }, [fetchUsers]);
 
   const createUser = async () => {
