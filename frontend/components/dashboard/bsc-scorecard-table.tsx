@@ -132,7 +132,7 @@ function BSCCategorySection({
 }) {
   const t2Label = "Tarefas";
   const isT2 = categoryName === t2Label;
-  const isSetorial = isPenalidade && metrics.some((m) => m.name.includes("Setor")) && metrics.length === 1;
+  const isSetorial = isPenalidade && metrics.every((m) => m.tipo === "penalidade") && metrics.length >= 1;
 
   return (
     <Card>

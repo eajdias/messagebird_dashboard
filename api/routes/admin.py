@@ -2,6 +2,8 @@
 Admin Routes
 """
 
+import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -41,6 +43,8 @@ logger = logging.getLogger("m_bird.admin")
 
 router = APIRouter()
 
+_sync_lock = asyncio.Lock()
+
 
 @router.post("/sync/range", response_model=SyncTriggerResponse)
 async def trigger_sync_range(
@@ -62,14 +66,17 @@ async def trigger_sync_range(
         body.start_date,
         body.end_date,
     )
-    try:
-        use_case = SyncDatabaseUseCase()
-        await use_case.execute(start_date=body.start_date, end_date=body.end_date)
-        await refresh_materialized_view()
-    except ValueError as e:
-        logger.warning("Range sync rejected: %s", e)
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    logger.info("Range sync completed for %s → %s", body.start_date, body.end_date)
+    if _sync_lock.locked():
+        raise HTTPException(status_code=409, detail="Another sync is already in progress")
+    async with _sync_lock:
+        try:
+            use_case = SyncDatabaseUseCase()
+            await use_case.execute(start_date=body.start_date, end_date=body.end_date)
+            await refresh_materialized_view()
+        except ValueError as e:
+            logger.warning("Range sync rejected: %s", e)
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        logger.info("Range sync completed for %s → %s", body.start_date, body.end_date)
     return SyncTriggerResponse(
         status="completed",
         message=f"Range sync completed for {body.start_date} → {body.end_date}",
@@ -115,18 +122,21 @@ async def trigger_sync(
         request.backfill_surveys,
         request.sync_today,
     )
-    use_case = SyncDatabaseUseCase()
-    await use_case.execute(
-        full_sync=request.full_sync,
-        sync_messages=request.sync_messages,
-        messages_days=request.messages_days,
-        backfill_surveys=request.backfill_surveys,
-        year=request.year,
-        month=request.month,
-        sync_today=request.sync_today,
-    )
-    await refresh_materialized_view()
-    logger.info("Manual sync completed")
+    if _sync_lock.locked():
+        raise HTTPException(status_code=409, detail="Another sync is already in progress")
+    async with _sync_lock:
+        use_case = SyncDatabaseUseCase()
+        await use_case.execute(
+            full_sync=request.full_sync,
+            sync_messages=request.sync_messages,
+            messages_days=request.messages_days,
+            backfill_surveys=request.backfill_surveys,
+            year=request.year,
+            month=request.month,
+            sync_today=request.sync_today,
+        )
+        await refresh_materialized_view()
+        logger.info("Manual sync completed")
     return SyncTriggerResponse(status="completed", message="Sync and MV refresh completed")
 
 
@@ -146,17 +156,20 @@ async def sync_conversations_endpoint(
     body = request or SyncConversationsRequest()
     logger.info("Conversations sync triggered: year=%s, month=%s", body.year, body.month)
 
-    try:
-        if body.year is not None and body.month is not None:
-            msg = await sync_conversations_month(await _get_pool(), body.year, body.month)
-        else:
-            msg = await sync_conversations_full(await _get_pool())
-        await refresh_materialized_view()
-    except Exception as e:
-        logger.exception("Conversations sync failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    if _sync_lock.locked():
+        raise HTTPException(status_code=409, detail="Another sync is already in progress")
+    async with _sync_lock:
+        try:
+            if body.year is not None and body.month is not None:
+                msg = await sync_conversations_month(await _get_pool(), body.year, body.month)
+            else:
+                msg = await sync_conversations_full(await _get_pool())
+            await refresh_materialized_view()
+        except Exception as e:
+            logger.exception("Conversations sync failed")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
-    logger.info("Conversations sync completed")
+        logger.info("Conversations sync completed")
     return SyncTriggerResponse(status="completed", message=msg)
 
 
@@ -182,19 +195,24 @@ async def sync_messages_endpoint(
         request.backfill_surveys,
     )
 
-    try:
-        if request.year is not None and request.month is not None:
-            msg = await sync_messages_month(await _get_pool(), request.year, request.month, request.backfill_surveys)
-        else:
-            msg = await sync_messages_range(
-                await _get_pool(), request.start_date, request.end_date, request.backfill_surveys
-            )
-        await refresh_materialized_view()
-    except Exception as e:
-        logger.exception("Messages sync failed")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    if _sync_lock.locked():
+        raise HTTPException(status_code=409, detail="Another sync is already in progress")
+    async with _sync_lock:
+        try:
+            if request.year is not None and request.month is not None:
+                msg = await sync_messages_month(
+                    await _get_pool(), request.year, request.month, request.backfill_surveys
+                )
+            else:
+                msg = await sync_messages_range(
+                    await _get_pool(), request.start_date, request.end_date, request.backfill_surveys
+                )
+            await refresh_materialized_view()
+        except Exception as e:
+            logger.exception("Messages sync failed")
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
-    logger.info("Messages sync completed")
+        logger.info("Messages sync completed")
     return SyncTriggerResponse(status="completed", message=msg)
 
 
@@ -507,10 +525,8 @@ async def update_scheduler_profile(
         raise HTTPException(status_code=400, detail=f"Perfil inválido. Opções: {', '.join(sorted(profiles))}")
 
     os.environ["SYNC_PROFILE"] = profile
-    try:
+    with contextlib.suppress(Exception):
         stop_scheduler()
-    except Exception:
-        pass
     try:
         _configure_scheduler_jobs()
         msg = start_scheduler()
@@ -564,7 +580,8 @@ async def create_user(
 
     password_hash = get_password_hash(password)
     row = await pool.fetch_one(
-        "INSERT INTO users (email, password_hash, role, name) VALUES ($1, $2, $3, $4) RETURNING id, email, role, name, active",
+        "INSERT INTO users (email, password_hash, role, name)"
+        " VALUES ($1, $2, $3, $4) RETURNING id, email, role, name, active",
         email,
         password_hash,
         role,

@@ -72,7 +72,7 @@ export function BSCAgentRadars({ agents, categories, penalidades }: Props) {
     if (penalidades.length > 0) {
       let pMax = 0;
       for (const p of penalidades) {
-        pMax += p.per_agent.reduce((best, a) => Math.max(best, a.kpi_score ?? 0), 0);
+        pMax += p.per_agent.reduce((best, a) => Math.max(best, Math.abs(a.kpi_score ?? 0)), 0);
       }
       maxVals.push(pMax || 1);
     }

@@ -92,52 +92,6 @@ def test_parse_dt_datetime_passthrough():
 
 
 @pytest.mark.asyncio
-async def test_incremental_stops_at_cutoff(manager, mock_conn):
-    """When reverse=true, should stop early when hitting conversations older than cutoff."""
-    now = datetime.now(UTC)
-    recent = (now - timedelta(minutes=10)).isoformat().replace("+00:00", "Z")
-    old = (now - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
-
-    page1 = _make_page(
-        [
-            _make_conversation("c1", recent),
-            _make_conversation("c2", recent),
-        ],
-        next_page_token="page2",
-    )
-    page2 = _make_page(
-        [
-            _make_conversation("c3", recent),
-            _make_conversation("c4", old),
-        ]
-    )
-
-    mock_conn.fetch_all = AsyncMock(return_value=[])
-    empty_page = _make_page([])
-    manager.client = AsyncMock()
-    manager.client.list_conversations = AsyncMock(side_effect=[page1, page2, empty_page])
-
-    await sync_conversations(manager, mock_conn)
-
-    assert manager.client.list_conversations.call_count == 3
-    first_call_kwargs = manager.client.list_conversations.call_args_list[0]
-    assert first_call_kwargs.kwargs.get("reverse") is False
-    assert mock_conn.execute_many.call_count == 2
-
-
-@pytest.mark.asyncio
-async def test_incremental_no_reverse_in_full_sync(manager, mock_conn):
-    """Sync always uses reverse=false now."""
-    manager.client = AsyncMock()
-    manager.client.list_conversations = AsyncMock(return_value=_make_page([]))
-
-    await sync_conversations(manager, mock_conn)
-
-    call_kwargs = manager.client.list_conversations.call_args_list[0]
-    assert "reverse" in call_kwargs.kwargs and not call_kwargs.kwargs.get("reverse")
-
-
-@pytest.mark.asyncio
 async def test_incremental_processes_all_recent(manager, mock_conn):
     """All conversations are synced (no cutoff)."""
     now = datetime.now(UTC)

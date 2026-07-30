@@ -3,7 +3,6 @@ import os
 
 import yaml
 
-SLA_FRT_THRESHOLD_SECONDS = 3600
 SLA_FRT_THRESHOLD_MINUTES = 60
 MAX_ART_MINUTES = 480  # 8 horas — máximo aceitável para Average Response Time
 MAX_DURATION_MINUTES = 630  # 10h30 — máximo aceitável para duração total de chat
@@ -109,23 +108,6 @@ OS_HEADER = [
     "Duração (min)",
     "ID BD",
     "Caminho PDF",
-]
-
-# ── Annual report headers ─────────────────────────────────────────────────────
-
-ANNUAL_HEADER = [
-    "Mês",
-    "Total de Chats",
-    "Total de Msgs",
-    "ART Médio (min)",
-    "SLA Compliance (%)",
-    "Duração Média (min)",
-    "NPS Real",
-    "Nota Técnica Média",
-    "Elogios",
-    "Feedback Negativo",
-    "Clientes Únicos",
-    "Retornantes",
 ]
 
 # ── Default Maps ─────────────────────────────────────────────────────────────
@@ -325,12 +307,6 @@ DEFAULT_KPI_CONFIG = {
     },
 }
 
-DEFAULT_METRIC_THRESHOLDS = {
-    "sla_frt_minutes": 60,
-    "max_art_minutes": 480,
-    "max_duration_minutes": 630,
-}
-
 # ── Dynamic Configuration ──────────────
 
 
@@ -406,8 +382,6 @@ def _load_business_yaml() -> tuple[dict, dict, dict, dict, dict, dict, dict, dic
     DEPT_ROUTING,
 ) = _load_business_yaml()
 
-METRIC_THRESHOLDS = DEFAULT_METRIC_THRESHOLDS
-
 # ── Helper functions ──────────────────────────────────────────────────────────
 
 
@@ -459,13 +433,6 @@ def resolve_channel(channel_id) -> str:
     if not channel_id:
         return "Desconhecido"
     return CHANNEL_MAP.get(str(channel_id), "Outro Canal")
-
-
-def resolve_lang(lang_id: int | None) -> str:
-    """Resolve language ID to human-readable label."""
-    if lang_id is None:
-        return "Não categorizado"
-    return LANG_MAP.get(lang_id, "Desconhecido")
 
 
 def resolve_reason(dept_id, reason_id, agent_name: str | None = None) -> str:

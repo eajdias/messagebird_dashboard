@@ -80,6 +80,7 @@ export interface EvolutionBucket {
   both_rated_chats: number;
   high_notes: number;
   low_notes: number;
+  neutral_notes: number;
   art_bucket_0_5: number;
   art_bucket_5_10: number;
   art_bucket_10_30: number;
@@ -180,10 +181,6 @@ export interface ReportRequest {
 export interface GenerateReportResponse {
   status: string;
   report_id: string;
-}
-
-export interface DownloadReportResponse {
-  download_url: string;
 }
 
 export interface AvailableReportItem {
@@ -377,23 +374,6 @@ export interface AvailableReportsResponse {
   reports: AvailableReportItem[];
 }
 
-export interface SyncStatus {
-  last_sync: string | null;
-  status: string;
-  records_synced: number;
-  duration_seconds: number | null;
-  error: string | null;
-}
-
-export interface SyncTriggerRequest {
-  full_sync?: boolean;
-  sync_messages?: boolean;
-  messages_days?: number;
-  year?: number;
-  month?: number;
-  backfill_surveys?: boolean;
-}
-
 export interface AgentItem {
   bird_id: string;
   name: string;
@@ -407,16 +387,6 @@ export interface AgentListResponse {
 export interface DepartmentItem {
   dept_id: number;
   label: string;
-}
-
-export interface DepartmentListResponse {
-  departments: DepartmentItem[];
-}
-
-export interface HealthResponse {
-  status: string;
-  version: string;
-  database: string;
 }
 
 // ── BSC Scorecard ──────────────────────────────────────────────────────

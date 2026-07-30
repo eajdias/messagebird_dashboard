@@ -15,7 +15,12 @@ function safeNum(v: unknown, fallback = 0): number {
   return fallback;
 }
 
-const FREQ_COLORS = ["var(--chart-2)", "var(--chart-3)", "var(--chart-4)"] as const;
+const FREQ_COLORS = ["var(--chart-2)", "var(--chart-3)", "var(--destructive)"] as const;
+
+function transformLabel(label: string): string {
+  if (label.includes("4") && label.includes("5")) return label.replace(/4.*5/, "4+");
+  return label;
+}
 
 export const ReturnersCard = memo(function ReturnersCard({ data, className }: ReturnersCardProps) {
   const totalChats = safeNum(data?.total_chats);
@@ -35,7 +40,7 @@ export const ReturnersCard = memo(function ReturnersCard({ data, className }: Re
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-2 flex items-baseline gap-2">
+        <div className="mb-3 flex items-baseline gap-2">
           <span className="text-3xl font-bold tabular-nums">{pctReturning.toFixed(1)}%</span>
           <span className="text-xs text-muted-foreground">
             {totalReturners} de {totalUnique} clientes retornaram
@@ -49,14 +54,14 @@ export const ReturnersCard = memo(function ReturnersCard({ data, className }: Re
             <p className="mb-3 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               Perfil dos {totalReturners} retornantes
             </p>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {buckets.map((b, i) => (
-                <div key={b.label} className="space-y-0.5">
+                <div key={b.label} className="group space-y-0.5">
                   <div className="flex items-center justify-between text-xs">
-                    <span>{b.label}</span>
+                    <span className="text-muted-foreground group-hover:text-foreground transition-colors">{transformLabel(b.label)}</span>
                     <span className="tabular-nums font-medium">
-                      {b.count}{" "}
-                      <span className="text-muted-foreground">({b.pct.toFixed(0)}%)</span>
+                      {b.count}
+                      <span className="ml-1 text-muted-foreground">({b.pct.toFixed(0)}%)</span>
                     </span>
                   </div>
                   <div className="h-2.5 overflow-hidden rounded-full bg-white/5">
@@ -64,7 +69,7 @@ export const ReturnersCard = memo(function ReturnersCard({ data, className }: Re
                       className="h-full rounded-full"
                       initial={{ width: 0 }}
                       animate={{ width: `${(b.count / maxFreq) * 100}%` }}
-                      transition={{ duration: 0.5, delay: 0.1 + i * 0.08, ease: "easeOut" }}
+                      transition={{ duration: 0.6, delay: 0.1 + i * 0.08, ease: "easeOut" }}
                       style={{ background: FREQ_COLORS[i] ?? FREQ_COLORS[2] }}
                     />
                   </div>

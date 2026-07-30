@@ -13,7 +13,7 @@ from api.schemas.admin import (
     SyncTriggerRequest,
     SyncTriggerResponse,
 )
-from api.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserResponse
+from api.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from api.schemas.conversations import (
     ConversationDetailResponse,
     ConversationItem,
@@ -36,7 +36,6 @@ from api.schemas.dashboard import (
 from api.schemas.reports import (
     AvailableReportItem,
     AvailableReportsResponse,
-    DownloadReportResponse,
     GenerateReportResponse,
     ReportRequest,
 )
@@ -44,7 +43,6 @@ from api.schemas.reports import (
 __all__ = [
     "LoginRequest",
     "RegisterRequest",
-    "RefreshRequest",
     "TokenResponse",
     "UserResponse",
     "DashboardSummaryResponse",
@@ -64,7 +62,6 @@ __all__ = [
     "ConversationMessagesResponse",
     "ReportRequest",
     "GenerateReportResponse",
-    "DownloadReportResponse",
     "AvailableReportItem",
     "AvailableReportsResponse",
     "SyncProfileResponse",

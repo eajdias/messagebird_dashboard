@@ -33,8 +33,8 @@ class TestAuthLogin:
 
 
 class TestAuthRegister:
-    def test_register_success(self, client: TestClient):
-        resp = client.post(
+    def test_register_success(self, authed_client: TestClient):
+        resp = authed_client.post(
             "/api/v1/auth/register",
             json={"email": "novo@empresa.com", "password": "nova123", "name": "Novo"},
         )
@@ -43,8 +43,8 @@ class TestAuthRegister:
         assert "access_token" in body
         assert body["token_type"] == "bearer"
 
-    def test_register_invalid_email(self, client: TestClient):
-        resp = client.post(
+    def test_register_invalid_email(self, authed_client: TestClient):
+        resp = authed_client.post(
             "/api/v1/auth/register",
             json={"email": "invalido", "password": "senha123", "name": "Test"},
         )

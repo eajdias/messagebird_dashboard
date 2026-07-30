@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ARTDistributionResponse } from "@/types";
 
@@ -9,13 +10,13 @@ interface ARTDistributionProps {
   className?: string;
 }
 
-const BUCKET_COLORS = [
-  "var(--chart-5)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-2)",
-  "var(--destructive)",
-  "var(--muted-foreground)",
+const BUCKET_SEMANTICS = [
+  { color: "#22c55e", label: "Ótimo" },
+  { color: "#4ade80", label: "Bom" },
+  { color: "#86efac", label: "Bom" },
+  { color: "var(--chart-3)", label: "Lento" },
+  { color: "var(--destructive)", label: "Crítico" },
+  { color: "var(--muted-foreground)", label: "N/A" },
 ] as const;
 
 function safeNum(v: unknown, fallback = 0): number {
@@ -52,29 +53,36 @@ export const ARTDistribution = memo(function ARTDistribution({ data, className }
           <p className="text-xs text-muted-foreground">Sem dados de ART no período</p>
         ) : (
           <div className="space-y-2">
-            {buckets.map((b, i) => (
-              <div key={b.label} className="space-y-0.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className={i === avgBucketIdx ? "font-medium" : "text-muted-foreground"}>
-                    {b.label}
-                    {i === avgBucketIdx && <span className="ml-1 text-muted-foreground">· mediana</span>}
-                  </span>
-                  <span className="font-medium tabular-nums">
-                    {b.count}{" "}
-                    <span className="text-muted-foreground">({b.pct.toFixed(0)}%)</span>
-                  </span>
+            {buckets.map((b, i) => {
+              const semantics = BUCKET_SEMANTICS[i] ?? BUCKET_SEMANTICS[5];
+              return (
+                <div key={b.label} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={`flex items-center gap-1.5 ${i === avgBucketIdx ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                      {b.label}
+                      {i === avgBucketIdx && (
+                        <span className="rounded bg-chart-2/20 px-1 py-0.5 text-[10px] font-medium text-chart-2">
+                          mediana
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      {b.count}
+                      <span className="ml-1 text-muted-foreground">({b.pct.toFixed(0)}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-3.5 overflow-hidden rounded-full bg-white/5">
+                    <motion.div
+                      className="h-full rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(b.count / maxCount) * 100}%` }}
+                      transition={{ duration: 0.8, delay: i * 0.1, ease: "easeOut" }}
+                      style={{ background: semantics.color }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 overflow-hidden rounded-full bg-white/5">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(b.count / maxCount) * 100}%`,
-                      background: BUCKET_COLORS[i] ?? BUCKET_COLORS[5],
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

@@ -57,48 +57,46 @@ export function useDashboard(params: {
     async (signal: AbortSignal) => {
       if (!enabled) return;
       setState((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const qs = new URLSearchParams();
-        if (params.start_date) qs.set("start_date", params.start_date);
-        if (params.end_date) qs.set("end_date", params.end_date);
-        if (params.department) qs.set("department", params.department);
-        const q = qs.toString();
-        const suffix = q ? `?${q}` : "";
+      const qs = new URLSearchParams();
+      if (params.start_date) qs.set("start_date", params.start_date);
+      if (params.end_date) qs.set("end_date", params.end_date);
+      if (params.department) qs.set("department", params.department);
+      const q = qs.toString();
+      const suffix = q ? `?${q}` : "";
 
-        const [summaryRes, bscRes, agentsRes, channelsRes] = await Promise.all([
-          api.get<DashboardSummary>(`/api/v1/dashboard/summary${suffix}`, { signal }),
-          api.get<BSCData>(`/api/v1/dashboard/bsc${suffix}`, { signal }),
-          api.get<AgentRankingResponse>(`/api/v1/dashboard/agents${suffix}`, { signal }),
-          api.get<ChannelResponse>(`/api/v1/dashboard/channels${suffix}`, { signal }),
-        ]);
+      const baseEndpoints: { key: string; url: string }[] = [
+        { key: "summary", url: `/api/v1/dashboard/summary${suffix}` },
+        { key: "bsc", url: `/api/v1/dashboard/bsc${suffix}` },
+        { key: "agents", url: `/api/v1/dashboard/agents${suffix}` },
+        { key: "channels", url: `/api/v1/dashboard/channels${suffix}` },
+      ];
 
-        let kpis: KPIResponse | null = null;
-        if (params.department) {
-          const kpiRes = await api.get<KPIResponse>(
-            `/api/v1/dashboard/kpis?department=${encodeURIComponent(params.department)}`,
-            { signal },
-          );
-          kpis = kpiRes.data;
-        }
-
-        setState((prev) => ({
-          ...prev,
-          summary: summaryRes.data,
-          bsc: bscRes.data,
-          kpis,
-          agents: agentsRes.data,
-          channels: channelsRes.data,
-          loading: false,
-          error: null,
-        }));
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: err instanceof Error ? err.message : "Erro ao carregar dados",
-        }));
+      if (params.department) {
+        baseEndpoints.push({
+          key: "kpis",
+          url: `/api/v1/dashboard/kpis?department=${encodeURIComponent(params.department)}`,
+        });
       }
+
+      const failures: string[] = [];
+
+      await Promise.allSettled(
+        baseEndpoints.map(async (ep) => {
+          try {
+            const res = await api.get(ep.url, { signal });
+            setState((prev) => ({ ...prev, [ep.key]: res.data }));
+          } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") return;
+            const msg = err instanceof Error ? err.message : String(err);
+            failures.push(`${ep.key}${msg ? ` (${msg})` : ""}`);
+          }
+        }),
+      );
+
+      const error =
+        failures.length > 0 ? `Falha ao carregar: ${failures.join(", ")}` : null;
+
+      setState((prev) => ({ ...prev, loading: false, error }));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [params.start_date, params.end_date, params.department, enabled],

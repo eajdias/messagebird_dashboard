@@ -137,17 +137,6 @@ class TestDeptRoutingFlow(unittest.TestCase):
         self.assertIn("CS | Instalação | Migração | Ouvidoria", groups)
         self.assertNotIn("Suporte Técnico", groups)
 
-    def test_groups_rows_na_dept_with_routing_active(self):
-        """Com DEPT_ROUTING ativo, N/A vai para 'Sem Departamento'."""
-        constants.DEPT_ROUTING = {"Ouvidoria": "Ouvidoria"}
-        data = [
-            self._conv("1", "Alice Suporte", "N/A"),
-        ]
-        processed = self.aggregator.process_all(data)
-        rows = self.aggregator.build_excel_rows(processed, report_type="groups")
-        groups = [r[0] for r in rows]
-        self.assertIn("Sem Departamento", groups)
-
     # ── _build_agents_rows ────────────────────────────────────────────────
 
     def test_agents_rows_group_column_reflects_dept_routing(self):

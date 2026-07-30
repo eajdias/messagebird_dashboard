@@ -130,12 +130,6 @@ class GenerateReportUseCase:
             group_path = os.path.join(report_subdir, safe_group)
             os.makedirs(group_path, exist_ok=True)
 
-            # Filter data for this group
-            [
-                r
-                for r in raw_data
-                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
-            ]
             group_processed = [
                 p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
             ]
@@ -271,11 +265,6 @@ class GenerateReportUseCase:
             group_path = os.path.join(report_subdir, safe_group)
             os.makedirs(group_path, exist_ok=True)
 
-            [
-                r
-                for r in raw_data
-                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
-            ]
             group_processed = [
                 p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
             ]
@@ -387,11 +376,6 @@ class GenerateReportUseCase:
             group_path = os.path.join(report_subdir, safe_group)
             os.makedirs(group_path, exist_ok=True)
 
-            [
-                r
-                for r in raw_data
-                if constants.resolve_conversation_group(r.metadata.get("agent_name"), r.dept_label) == group
-            ]
             group_processed = [
                 p for p in processed_data if constants.resolve_conversation_group(p.agent, p.dept_label) == group
             ]

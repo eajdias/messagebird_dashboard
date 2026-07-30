@@ -76,6 +76,7 @@ class EvolutionBucket(BaseModel):
     both_rated_chats: int = 0
     high_notes: int = 0
     low_notes: int = 0
+    neutral_notes: int = 0
     art_bucket_0_5: int = 0
     art_bucket_5_10: int = 0
     art_bucket_10_30: int = 0
@@ -307,22 +308,6 @@ class BSCScorecardResponse(BaseModel):
     has_config: bool = False
     categories: list[BSCScorecardCategory] = []
     penalidades: list[BSCMetricRow] = []
-
-
-class BSCManualValuePayload(BaseModel):
-    department: str
-    agent_name: str
-    metric_name: str
-    period_start: str
-    period_end: str
-    value: float
-
-
-class BSCManualValueResponse(BaseModel):
-    department: str
-    agent_name: str
-    metric_name: str
-    value: float
 
 
 # ── Agent Manual Entries ───────────────────────────────────────────────

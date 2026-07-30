@@ -61,10 +61,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             m = float(kpi_def.get("threshold", 10))
             extra_p = float(kpi_def.get("extra_peso", -1))
             base = abs(float(peso)) if peso is not None else 5
-            if raw_value >= m:
-                score = -base + (raw_value - m) * extra_p
-            else:
-                score = 0.0
+            score = -base + (raw_value - m) * extra_p if raw_value >= m else 0.0
             if cap is not None:
                 score = max(float(cap), score)
             return round(score, 1)
@@ -76,10 +73,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             extra = float(penal.get("extra_per_unit", -5))
             min_limit = penal.get("min_limit")
             value_pct = raw_value  # raw_value is already a percentage (0-100)
-            if value_pct <= base_thresh:
-                score = base_pts
-            else:
-                score = base_pts + ((value_pct - base_thresh) * extra)
+            score = base_pts if value_pct <= base_thresh else base_pts + ((value_pct - base_thresh) * extra)
             if min_limit is not None:
                 score = max(float(min_limit), score)
             return round(score, 1)

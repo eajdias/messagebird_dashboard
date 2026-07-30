@@ -206,13 +206,12 @@ async def sync_all_messages(manager: PgSyncManager, conn: PostgresSyncConnection
                 logger.error("Error syncing messages for %s: %s", row["cnvs_bird"], e)
                 return 0
 
-    tasks = [fetch_with_limit(row) for row in rows]
     msg_count = 0
     chunk_size = 1000
 
-    for i in range(0, len(tasks), chunk_size):
-        chunk = tasks[i : i + chunk_size]
-        results = await asyncio.gather(*chunk)
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+        results = await asyncio.gather(*[fetch_with_limit(row) for row in chunk])
         msg_count += sum(results)
         logger.info("  messages: %d/%d conversations done (%d msgs)...", min(i + chunk_size, total), total, msg_count)
 
@@ -263,13 +262,12 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
                 logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
                 return 0
 
-    tasks = [fetch_with_limit(row) for row in rows]
     msg_count = 0
     chunk_size = 1000
 
-    for i in range(0, len(tasks), chunk_size):
-        chunk = tasks[i : i + chunk_size]
-        results = await asyncio.gather(*chunk)
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+        results = await asyncio.gather(*[fetch_with_limit(row) for row in chunk])
         msg_count += sum(results)
         logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
 
@@ -313,13 +311,12 @@ async def sync_messages_for_range(
                 logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
                 return 0
 
-    tasks = [fetch_with_limit(row) for row in rows]
     msg_count = 0
     chunk_size = 1000
 
-    for i in range(0, len(tasks), chunk_size):
-        chunk = tasks[i : i + chunk_size]
-        results = await asyncio.gather(*chunk)
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+        results = await asyncio.gather(*[fetch_with_limit(row) for row in chunk])
         msg_count += sum(results)
         logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
 
@@ -347,13 +344,12 @@ async def sync_messages_for_recent(manager: PgSyncManager, conn: PostgresSyncCon
                 logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
                 return 0
 
-    tasks = [fetch_with_limit(row) for row in rows]
     msg_count = 0
     chunk_size = 1000
 
-    for i in range(0, len(tasks), chunk_size):
-        chunk = tasks[i : i + chunk_size]
-        results = await asyncio.gather(*chunk)
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i : i + chunk_size]
+        results = await asyncio.gather(*[fetch_with_limit(row) for row in chunk])
         msg_count += sum(results)
         logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
 

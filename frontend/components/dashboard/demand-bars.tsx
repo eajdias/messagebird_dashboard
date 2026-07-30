@@ -1,16 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DOWResponse, MotivesResponse, OccurrencesResponse } from "@/types";
 
@@ -29,26 +20,6 @@ function safeNum(v: unknown, fallback = 0): number {
     if (Number.isFinite(n)) return n;
   }
   return fallback;
-}
-
-interface ItemTooltipProps {
-  active?: boolean;
-  payload?: Array<{ value: number; payload?: { label: string; pct?: number } }>;
-  label?: string;
-}
-
-function ItemTooltip({ active, payload, label }: ItemTooltipProps) {
-  if (!active || !payload?.length) return null;
-  const v = payload[0]?.value ?? 0;
-  const pct = payload[0]?.payload?.pct ?? 0;
-  return (
-    <div className="glass-tooltip rounded-md px-2.5 py-1.5 text-xs">
-      <p className="font-semibold">{label ?? payload[0]?.payload?.label}</p>
-      <p className="text-muted-foreground">
-        {v} ({safeNum(pct).toFixed(1)}%)
-      </p>
-    </div>
-  );
 }
 
 interface HBarListProps {
@@ -74,25 +45,30 @@ function HBarList({ title, data, total, emptyMessage }: HBarListProps) {
         ) : (
           <div className="space-y-1.5">
             {data.slice(0, 8).map((d, i) => (
-              <div key={i} className="space-y-0.5">
+              <div key={i} className="group space-y-0.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="truncate text-muted-foreground">{d.label}</span>
+                  <span className="truncate text-muted-foreground group-hover:text-foreground transition-colors">{d.label}</span>
                   <span className="font-medium tabular-nums">
-                    {d.value}{" "}
-                    <span className="text-muted-foreground">({d.pct.toFixed(0)}%)</span>
+                    {d.value}
+                    <span className="ml-1 text-muted-foreground">({d.pct.toFixed(0)}%)</span>
                   </span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(d.value / max) * 100}%`,
-                      background: d.color,
-                    }}
+                <div className="h-2.5 overflow-hidden rounded-full bg-white/5">
+                  <motion.div
+                    className="h-full rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(d.value / max) * 100}%` }}
+                    transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
+                    style={{ background: d.color }}
                   />
                 </div>
               </div>
             ))}
+            {data.length > 8 && (
+              <p className="pt-1 text-center text-[10px] text-muted-foreground">
+                +{data.length - 8} outros
+              </p>
+            )}
           </div>
         )}
       </CardContent>

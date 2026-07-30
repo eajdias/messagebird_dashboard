@@ -23,10 +23,6 @@ def get_base_url_bird():
     return os.getenv("MESSAGEBIRD_BASE_URL_BIRD", "https://api.bird.com")
 
 
-def get_database_url():
-    return os.getenv("DATABASE_URL", "postgresql://mbird:mbird_dev_2024@localhost:5432/mbird_reports")
-
-
 HTTP_TIMEOUT = float(os.getenv("MESSAGEBIRD_HTTP_TIMEOUT", "60.0"))
 
 PHRASE_TICKET_HEADER = os.getenv("MESSAGEBIRD_PHRASE_TICKET_HEADER", "=== Informações Ticket ===")

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -25,6 +25,26 @@ const BANDS = [
   { key: "10–30 min", color: "var(--chart-3)" },
   { key: "30 min+", color: "var(--destructive)" },
 ] as const;
+
+function ARTTooltip({ active, payload, label }: Record<string, unknown>) {
+  if (!active || !Array.isArray(payload) || payload.length === 0) return null;
+  return (
+    <div className="glass-tooltip rounded-lg px-3 py-2 text-xs shadow-xl backdrop-blur-md">
+      <p className="mb-1.5 font-semibold text-foreground">{String(label ?? "")}</p>
+      {payload.map((p: Record<string, unknown>) => {
+        if (p.value == null || p.value === 0) return null;
+        const dk = String(p.dataKey ?? "");
+        return (
+          <div key={dk} className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full" style={{ background: String(p.color ?? "") }} />
+            <span className="text-muted-foreground">{dk}:</span>
+            <span className="font-medium tabular-nums">{String(p.value)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export const ARTEvolutionChart = memo(function ARTEvolutionChart({ data, className }: ARTEvolutionChartProps) {
   const chartData = data.map((b) => ({
@@ -54,22 +74,13 @@ export const ARTEvolutionChart = memo(function ARTEvolutionChart({ data, classNa
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem dados de ART no período</p>
         ) : (
-          <div className="h-[180px] sm:h-[220px] lg:h-[260px]">
+          <div className="h-[280px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
                 <XAxis dataKey="label" tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
                 <YAxis tick={{ fontSize: 9 }} stroke="var(--muted-foreground)" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(220 15% 12%)",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    color: "hsl(var(--foreground))",
-                  }}
-                  labelStyle={{ color: "hsl(var(--muted-foreground))", marginBottom: 4 }}
-                />
+                <Tooltip content={<ARTTooltip />} cursor={false} />
                 <Legend wrapperStyle={{ fontSize: 9 }} iconType="line" />
                 {BANDS.map((band) => (
                   <Line
@@ -77,8 +88,11 @@ export const ARTEvolutionChart = memo(function ARTEvolutionChart({ data, classNa
                     type="monotone"
                     dataKey={band.key}
                     stroke={band.color}
-                    strokeWidth={2}
-                    dot={{ r: 2, fill: band.color }}
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: band.color, strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                    activeDot={{ r: 5, stroke: band.color, strokeWidth: 2, fill: "hsl(var(--background))" }}
+                    animationDuration={1200}
+                    animationEasing="ease-out"
                   />
                 ))}
               </LineChart>

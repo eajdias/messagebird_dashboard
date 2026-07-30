@@ -49,6 +49,7 @@ services:
         condition: service_healthy
     ports:
       - "8050:8000"
+    mem_limit: 1g
     volumes:
       - ./api:/app/api
       - ./domain:/app/domain
@@ -58,6 +59,12 @@ services:
       - ./business_config.yaml:/app/business_config.yaml
       - ./business_bsc.yaml:/app/business_bsc.yaml
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import httpx; httpx.get('http://127.0.0.1:8000/api/v1/admin/health').raise_for_status()\""]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     logging:
       driver: json-file
       options:
@@ -73,10 +80,16 @@ services:
       NEXT_PUBLIC_API_URL: http://api:8000
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "3050:3000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     logging:
       driver: json-file
       options:

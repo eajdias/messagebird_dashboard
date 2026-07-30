@@ -34,10 +34,6 @@ class ExportConversationsResponse(StatusResponse):
     record_count: int = 0
 
 
-class DownloadReportResponse(BaseModel):
-    download_url: str
-
-
 class AvailableReportItem(BaseModel):
     report_id: str
     type: str

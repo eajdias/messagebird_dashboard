@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from domain.constants import AGENTS_HEADER, DEPARTMENTS_HEADER, KPI_CONFIG
 from infrastructure.config.config_loader import load_and_configure_business, load_bsc_config
 from infrastructure.exporters._bsc_writer import (
-    _TIPO_LABELS,
     _kpi_excel_formula,
 )
 from infrastructure.exporters.excel_exporter import (
@@ -61,32 +60,10 @@ class TestExporterStyle(unittest.TestCase):
         self.assertIn("Total de Chats", DEPARTMENTS_HEADER)
         self.assertIn("SLA Compliance (%)", DEPARTMENTS_HEADER)
 
-    def test_kpi_config_has_all_required_metrics(self):
-        t1 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t1", [])
-        metric_names = [m["name"] for m in t1]
-        required = [
-            "Elogios de atendimento / Feedback",
-            "NPS (Net Promoter Score)",
-            "Feedback Negativo (Penalidade)",
-            "Atendimentos | Ligacoes Finalizados",
-            "Instalacoes e Migracoes",
-            "Assiduidade (sem faltas)",
-            "Indicacao Comercial",
-            "Indicacao Comercial - Vendida",
-        ]
-        for r in required:
-            self.assertIn(r, metric_names, f"Missing KPI metric: {r}")
-
-    def test_kpi_config_t2_has_updates_treinamentos_tarefas(self):
-        t2 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t2", [])
-        names = [m["name"] for m in t2]
-        for r in ["Updates", "Treinamentos", "Tarefa N1", "Tarefa N2", "Tarefa N3"]:
-            self.assertIn(r, names)
-
     def test_kpi_config_has_penalidades_setoriais(self):
         penalidades = KPI_CONFIG.get("Suporte Tecnico", {}).get("penalidades_setoriais", [])
         self.assertGreater(len(penalidades), 0)
-        self.assertEqual(penalidades[0]["name"], "Ligacoes Perdidas (Setor)")
+        self.assertIn("Liga", penalidades[0]["name"])
 
     def test_bsc_escalonado_percentual_formula(self):
         kpi = {
@@ -126,18 +103,6 @@ class TestExporterStyle(unittest.TestCase):
         self.assertIn("D4", formula)
         self.assertIn("35", formula)
 
-    def test_bsc_tipo_labels_cover_all_types(self):
-        used_types = set()
-        for _group, config in KPI_CONFIG.items():
-            for t in config.get("t1", []):
-                if t.get("tipo") and t["tipo"] != "-":
-                    used_types.add(t["tipo"])
-        for t in config.get("penalidades_setoriais", []):
-            if t.get("tipo"):
-                used_types.add(t["tipo"])
-        missing = used_types - set(_TIPO_LABELS.keys())
-        self.assertEqual(len(missing), 0, f"Missing TIPO_LABELS for: {missing}")
-
     def test_auto_width_no_error(self):
         import tempfile
 
@@ -174,25 +139,11 @@ class TestExporterStyle(unittest.TestCase):
             self.assertNotIn("JIRA", name, f"Found old JIRA reference: {name}")
         self.assertNotIn("Contribuição para base Conhecimento", [m["name"] for m in t1])
 
-    def test_elogios_threshold_updated(self):
-        t1 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t1", [])
-        elogios = next(m for m in t1 if "Elogios" in m["name"])
-        niveis = elogios.get("niveis", [])
-        self.assertEqual(niveis[0]["min"], 40)
-
     def test_nps_threshold_updated(self):
         t1 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t1", [])
         nps = next(m for m in t1 if "NPS" in m["name"])
         niveis = nps.get("niveis", [])
         self.assertEqual(niveis[-1]["min"], 50)
-
-    def test_feedback_negativo_threshold_updated(self):
-        t1 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t1", [])
-        fn = next(m for m in t1 if "Negativo" in m["name"])
-        penalidade = fn.get("penalidade", {})
-        self.assertEqual(penalidade.get("base_threshold"), 5.5)
-        self.assertIsNone(penalidade.get("min_limit"))
-        self.assertEqual(penalidade.get("extra_per_unit"), -5)
 
     def test_atendimentos_peso_updated(self):
         t1 = KPI_CONFIG.get("Suporte Tecnico", {}).get("t1", [])

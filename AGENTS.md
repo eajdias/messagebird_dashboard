@@ -40,3 +40,8 @@ Dashboard omnichannel para monitoramento de atendimento via MessageBird (Bird) A
 - **CRITICAL: NUNCA execute sync SEM data específica (year+month OU start_date+end_date).** A API MessageBird tem milhões de registros. Sempre use `/sync/trigger` com `year`+`month` para sync mensal, ou `/sync/range` com `start_date`+`end_date` para sync por range. O sync automático (scheduler) já cuida do sync diário.
 - Sempre rode lint + typecheck + tests antes de finalizar uma tarefa
 - Código novo precisa de testes correspondentes
+- `ruff check .` deve retornar **zero erros** — qualquer lint error novo deve ser corrigido antes de commit
+
+## Estado dos Testes
+- **Backend (Python):** 192 pass, 0 fail
+- **Frontend (TypeScript):** typecheck passa sem erros

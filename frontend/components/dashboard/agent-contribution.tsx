@@ -16,6 +16,7 @@ const METRICS = [
   { key: "detractors" as const, label: "Detratores", pctOf: "detractors" as const },
   { key: "highNotes" as const, label: "Notas Altas", pctOf: "highNotes" as const },
   { key: "lowNotes" as const, label: "Notas Baixas", pctOf: "lowNotes" as const },
+  { key: "neutralNotes" as const, label: "Neutros", pctOf: "neutralNotes" as const },
   { key: "goodArt" as const, label: "ART Bom", pctOf: "goodArt" as const },
   { key: "badArt" as const, label: "ART Ruim", pctOf: "badArt" as const },
 ] as const;
@@ -36,6 +37,10 @@ export const AgentContribution = memo(function AgentContribution({ agents, class
       }, 0),
       highNotes: agents.reduce((s, a) => s + a.compliments, 0),
       lowNotes: agents.reduce((s, a) => s + a.negatives, 0),
+      neutralNotes: agents.reduce((s, a) => {
+        const rated = (a.rating_distribution["3"] ?? 0);
+        return s + rated;
+      }, 0),
       goodArt: agents.reduce((s, a) => s + (a.good_art_chats ?? 0), 0),
       badArt: agents.reduce((s, a) => s + (a.bad_art_chats ?? 0), 0),
     };
@@ -57,6 +62,7 @@ export const AgentContribution = memo(function AgentContribution({ agents, class
       ),
       highNotes: pct(a.compliments, totals.highNotes),
       lowNotes: pct(a.negatives, totals.lowNotes),
+      neutralNotes: pct(a.rating_distribution["3"] ?? 0, totals.neutralNotes),
       goodArt: pct(a.good_art_chats, totals.goodArt),
       badArt: pct(a.bad_art_chats, totals.badArt),
     }));

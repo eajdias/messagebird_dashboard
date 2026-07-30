@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, Query
 
 from api.auth import get_current_user
 from api.dependencies import get_repository
-from domain import logic
 from api.schemas.dashboard import (
     AgentRankingItem,
     AgentRankingResponse,
@@ -308,7 +307,6 @@ async def get_bsc_scorecard(
     categories: list[BSCScorecardCategory] = []
 
     # Group T1 metrics by logical category
-    current_category = "Qualidade e Satisfação"
     cat_metrics: list[dict] = []
     cat_names = [
         "Qualidade e Satisfação",
@@ -415,23 +413,40 @@ def _build_metric_rows(
     rows = []
     for info in metric_infos:
         per_agent = []
-        for agent in agents:
-            if info["is_manual"] and info["auto_computer"] is None:
-                manual_val = manual_map.get(info["name"], {}).get(agent)
-                raw_value = manual_val
-            else:
-                raw_value = info["auto_computer"](agent) if info["auto_computer"] else 0.0
+        is_setorial = info.get("tipo") == "penalidade" and info["is_manual"] and info["auto_computer"] is None
 
-            kpi_score = compute_kpi_score(raw_value, info["m_def"]) if raw_value is not None else None
-
-            per_agent.append(
-                BSCAgentValue(
-                    agent_name=agent,
-                    raw_value=raw_value,
-                    kpi_score=kpi_score,
-                    is_manual=info["is_manual"] and info["auto_computer"] is None,
+        if is_setorial and info["is_manual"] and info["auto_computer"] is None:
+            agent_vals = manual_map.get(info["name"], {})
+            sector_val = sum(v for v in agent_vals.values() if v is not None) if agent_vals else None
+            for agent in agents:
+                raw_value = sector_val
+                kpi_score = compute_kpi_score(raw_value, info["m_def"]) if raw_value is not None else None
+                per_agent.append(
+                    BSCAgentValue(
+                        agent_name=agent,
+                        raw_value=raw_value,
+                        kpi_score=kpi_score,
+                        is_manual=True,
+                    )
                 )
-            )
+        else:
+            for agent in agents:
+                if info["is_manual"] and info["auto_computer"] is None:
+                    manual_val = manual_map.get(info["name"], {}).get(agent)
+                    raw_value = manual_val
+                else:
+                    raw_value = info["auto_computer"](agent) if info["auto_computer"] else 0.0
+
+                kpi_score = compute_kpi_score(raw_value, info["m_def"]) if raw_value is not None else None
+
+                per_agent.append(
+                    BSCAgentValue(
+                        agent_name=agent,
+                        raw_value=raw_value,
+                        kpi_score=kpi_score,
+                        is_manual=info["is_manual"] and info["auto_computer"] is None,
+                    )
+                )
 
         rows.append(
             BSCMetricRow(
@@ -550,8 +565,6 @@ def _build_month_range(start_date: date, end_date: date) -> list[tuple[str, str,
 
 def _build_day_range(start_date: date, end_date: date) -> list[tuple[str, str, str]]:
     """Build daily buckets between two dates (inclusive)."""
-    from datetime import timedelta
-
     days: list[tuple[str, str, str]] = []
     d = start_date
     while d <= end_date:
@@ -563,8 +576,6 @@ def _build_day_range(start_date: date, end_date: date) -> list[tuple[str, str, s
 
 def _build_week_range(start_date: date, end_date: date) -> list[tuple[date, date, str]]:
     """Build ISO week buckets covering the date range (inclusive)."""
-    from datetime import timedelta
-
     # Align start to Monday of that week
     ws = start_date - timedelta(days=start_date.weekday())
     weeks: list[tuple[date, date, str]] = []
@@ -601,6 +612,7 @@ def _build_bucket(
         both_rated_chats=stats.get("both_rated_chats", 0),
         high_notes=stats.get("high_notes", 0),
         low_notes=stats.get("low_notes", 0),
+        neutral_notes=stats.get("neutral_notes", 0),
         art_bucket_0_5=stats.get("art_bucket_0_5", 0),
         art_bucket_5_10=stats.get("art_bucket_5_10", 0),
         art_bucket_10_30=stats.get("art_bucket_10_30", 0),
@@ -625,8 +637,6 @@ async def get_evolution_granular(
     Fetches the entire range once and splits into buckets in Python,
     instead of N separate DB queries per bucket.
     """
-    from datetime import timedelta
-
     now = datetime.now()
     today = now.date()
     agg = _make_aggregator()
@@ -868,7 +878,6 @@ def _granularity_window(granularity: str, custom_start: str | None, custom_end: 
     """
     if custom_start and custom_end:
         return custom_start, custom_end
-    from datetime import date, timedelta
 
     today = date.today()
     if granularity == "day":
@@ -897,12 +906,6 @@ def _filter_processed(
 
 def _pct(part: int, total: int) -> float:
     return round(part / total * 100, 2) if total > 0 else 0.0
-
-
-def _safe_div(a: float | None, b: float | None) -> float | None:
-    if a is None or b is None or b == 0:
-        return None
-    return a / b
 
 
 _exec_pending: dict[str, asyncio.Task] = {}

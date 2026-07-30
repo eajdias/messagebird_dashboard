@@ -20,13 +20,15 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Tabs, readTabFromQuery, type TabOption } from "@/components/ui/tabs";
 import { DepartmentMultiSelect } from "@/components/dashboard/department-multi-select";
 import { DepartmentAgents } from "@/components/dashboard/department-agents";
+import { DowChart } from "@/components/dashboard/dow-chart";
 import { Button } from "@/components/ui/button";
 
-type DashboardTab = "overview" | "executive" | "bsc";
+type DashboardTab = "overview" | "executive" | "heatmap" | "bsc";
 
 const TAB_OPTIONS: TabOption<DashboardTab>[] = [
   { value: "overview", label: "Visão Geral" },
   { value: "executive", label: "Executivo" },
+  { value: "heatmap", label: "Mapa Geral" },
   { value: "bsc", label: "BSC" },
 ];
 
@@ -41,8 +43,13 @@ const DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", 
 // ── Dynamic imports ────────────────────────────────────────────────────────
 
 const HourlyChart = dynamic(
-  () => import("@/components/dashboard/hourly-chart").then((m) => ({ default: m.HourlyChart })),
+  () => import("@/components/dashboard/heatmap-grid").then((m) => ({ default: m.HeatmapGrid })),
   { ssr: false, loading: () => <ChartSkeleton /> }
+);
+
+const HourlyBarChart = dynamic(
+  () => import("@/components/dashboard/hourly-bar-chart").then((m) => ({ default: m.HourlyBarChart })),
+  { loading: () => <ChartSkeleton /> }
 );
 
 const NPSCard = dynamic(
@@ -207,6 +214,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
 
   const overviewActive = tab === "overview";
   const executiveActive = tab === "executive";
+  const heatmapActive = tab === "heatmap";
 
   const { granularEvolution, granularLoading } = useDashboard({
     granularity,
@@ -221,8 +229,8 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     endDate: appliedEnd,
     selectedDept: selectedDept || undefined,
     group: "Suporte Tecnico",
-    view: tab === "executive" ? "executive" : "overview",
-    enabled: overviewActive || executiveActive,
+    view: executiveActive || heatmapActive ? "executive" : "overview",
+    enabled: overviewActive || executiveActive || heatmapActive,
   });
 
   const bscScorecard = useBscScorecard({
@@ -298,21 +306,21 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   // ── Overview tab ────────────────────────────────────────────────────────
   if (tab === "overview") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {header}
 
-        {/* KPIs — each loads independently */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* KPIs */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Chats" value={executive.meta?.total_chats?.toLocaleString("pt-BR")} loading={executive.loading && !executive.meta} />
           <StatCard title="ART ≤ 10min" value={executive.meta?.pct_art_10min != null ? `${executive.meta.pct_art_10min}%` : undefined} loading={executive.loading && !executive.meta} />
           <StatCard title="NPS" value={nps != null && Number.isFinite(nps) ? nps.toFixed(1) : undefined} loading={executive.loading && !executive.quality} />
           <StatCard title="Retornantes" value={pctReturning != null ? `${pctReturning.toFixed(1)}%` : undefined} loading={executive.loading && !executive.returners} />
         </div>
 
-        {/* Evolution charts — each shows own skeleton while loading */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        {/* 4 charts in 2x2 grid */}
+        <div className="grid gap-3 lg:grid-cols-2">
           {granularLoading && !granularEvolution ? (
-            <><ChartSkeleton /><ChartSkeleton /></>
+            <><ChartSkeleton /><ChartSkeleton /><ChartSkeleton /><ChartSkeleton /></>
           ) : (
             <>
               <Suspense fallback={<ChartSkeleton />}>
@@ -321,14 +329,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
               <Suspense fallback={<ChartSkeleton />}>
                 <NPSEvolutionChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
-            </>
-          )}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {granularLoading && !granularEvolution ? (
-            <><ChartSkeleton /><ChartSkeleton /></>
-          ) : (
-            <>
               <Suspense fallback={<ChartSkeleton />}>
                 <RatedBreakdownChart data={granularEvolution?.buckets ?? []} />
               </Suspense>
@@ -339,7 +339,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           )}
         </div>
 
-        {/* Agent contribution — shows skeleton while loading */}
+        {/* Agent contribution */}
         {executive.loading && !executive.agents ? (
           <ChartSkeleton />
         ) : (
@@ -354,7 +354,7 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
   // ── Executive tab ───────────────────────────────────────────────────────
   if (tab === "executive") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {header}
 
         {/* DepartmentAgents always renders */}
@@ -364,60 +364,22 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
           activeNames={executive.agents?.items?.map((a) => a.name)}
         />
 
-        {/* Hourly chart — independent skeleton */}
-        {executive.loading && !executive.heatmap ? (
-          <ChartSkeleton />
-        ) : (
-          <Suspense fallback={<ChartSkeleton />}>
-            <HourlyChart heatmap={executive.heatmap} />
-          </Suspense>
-        )}
-
-        {/* Day of week — inline, renders with whatever data is available */}
-        <Card variant="glass">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium">Por Dia da Semana</CardTitle>
-              {executive.loading && !executive.dow ? (
-                <Skeleton className="h-3 w-16" />
-              ) : (
-                <span className="text-xs text-muted-foreground">Total: {dowTotal}</span>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {executive.loading && !executive.dow ? (
-              <div className="space-y-2">
-                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
-              </div>
-            ) : dowItems.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Sem dados no período</p>
-            ) : (
-              <div className="space-y-1.5">
-                {dowItems.map((d, i) => (
-                  <div key={i} className="space-y-0.5" title={d.peakHour ? `Pico: ${d.peakHour}` : ""}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{d.label}</span>
-                      <span className="font-medium tabular-nums">
-                        {d.value}{" "}
-                        <span className="text-muted-foreground">({d.pct.toFixed(0)}%)</span>
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                      <div
-                        className="h-full rounded-full bg-chart-3 transition-all"
-                        style={{ width: `${(d.value / dowMax) * 100}%` }}
-                      />
-                    </div>
-                    {d.peakHour && (
-                      <p className="text-[10px] text-muted-foreground/60">Pico: {d.peakHour}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* DOW + Hourly bar — side by side */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <DowChart
+            items={dowItems}
+            total={dowTotal}
+            maxValue={dowMax}
+            loading={executive.loading && !executive.dow}
+          />
+          {executive.loading && !executive.heatmap ? (
+            <ChartSkeleton />
+          ) : (
+            <Suspense fallback={<ChartSkeleton />}>
+              <HourlyBarChart data={executive.heatmap} />
+            </Suspense>
+          )}
+        </div>
 
         {/* NPS + Notas — independent skeletons */}
         <div className="grid gap-4 lg:grid-cols-2">
@@ -434,20 +396,6 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
             </>
           )}
         </div>
-
-        {/* Demand bars — independent skeleton */}
-        {executive.loading && !executive.motives ? (
-          <ChartSkeleton />
-        ) : (
-          <Suspense fallback={<ChartSkeleton />}>
-            <DemandBars
-              motives={executive.motives}
-              occurrences={executive.occurrences}
-              dow={executive.dow}
-              hideDOW
-            />
-          </Suspense>
-        )}
 
         {/* ART Distribution + Returners — independent skeletons */}
         <div className="grid gap-4 lg:grid-cols-2">
@@ -468,9 +416,41 @@ function DashboardContent({ mounted }: { mounted: boolean }) {
     );
   }
 
+  // ── Mapa Geral tab ──────────────────────────────────────────────────────
+  if (tab === "heatmap") {
+    return (
+      <div className="space-y-4">
+        {header}
+
+        {/* Motivos + Ocorrências — first row */}
+        {executive.loading && !executive.motives ? (
+          <ChartSkeleton />
+        ) : (
+          <Suspense fallback={<ChartSkeleton />}>
+            <DemandBars
+              motives={executive.motives}
+              occurrences={executive.occurrences}
+              dow={executive.dow}
+              hideDOW
+            />
+          </Suspense>
+        )}
+
+        {/* Heatmap — compact height */}
+        {executive.loading && !executive.heatmap ? (
+          <ChartSkeleton />
+        ) : (
+          <Suspense fallback={<ChartSkeleton />}>
+            <HourlyChart data={executive.heatmap} />
+          </Suspense>
+        )}
+      </div>
+    );
+  }
+
   // ── BSC tab ─────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {header}
       {(() => {
         if (!selectedDept) {

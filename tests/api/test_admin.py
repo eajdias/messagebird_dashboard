@@ -18,7 +18,23 @@ class TestHealthCheck:
 
 
 class TestSyncStatus:
-    def test_sync_status_success(self, authed_client: TestClient):
+    def test_sync_status_success(self, authed_client: TestClient, monkeypatch):
+        from datetime import datetime
+
+        mock_pool = AsyncMock()
+        mock_pool.fetch_one = AsyncMock(
+            return_value={
+                "last_sync": datetime(2026, 7, 29, 10, 0, 0),
+                "records_synced": 100,
+                "duration_seconds": 12.5,
+            }
+        )
+
+        async def _fake_get_pool():
+            return mock_pool
+
+        monkeypatch.setattr("api.dependencies.get_pool", _fake_get_pool)
+
         resp = authed_client.get("/api/v1/admin/sync/status")
         assert resp.status_code == status.HTTP_200_OK
         body = resp.json()

@@ -5,7 +5,7 @@ from typing import Any
 from application.interfaces.repository import ReportRepository
 from domain import constants, logic
 from domain.entities.report_data import RawConversationData, RawMessageData
-from infrastructure.cache import repo_cache, processed_cache
+from infrastructure.cache import repo_cache
 from infrastructure.database import queries_pg
 from infrastructure.database.postgres_connection import PostgresPool
 

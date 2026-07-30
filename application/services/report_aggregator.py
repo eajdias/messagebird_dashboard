@@ -81,6 +81,7 @@ class ReportAggregator:
 
         compliments = sum(1 for p in processed_data if p.is_compliment)
         negatives = sum(1 for p in processed_data if p.is_negative)
+        neutrals = sum(1 for p in processed_data if p.rating is not None and not p.is_compliment and not p.is_negative)
         total_ratings = len(ratings)
 
         # Count contacts where BOTH rating and NPS exist
@@ -126,6 +127,7 @@ class ReportAggregator:
             "both_rated_chats": both_rated,
             "high_notes": compliments,
             "low_notes": negatives,
+            "neutral_notes": neutrals,
             "art_bucket_0_5": art_buckets[0],
             "art_bucket_5_10": art_buckets[1],
             "art_bucket_10_30": art_buckets[2],

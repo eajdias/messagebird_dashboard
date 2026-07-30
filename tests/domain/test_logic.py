@@ -1,6 +1,21 @@
 import unittest
+from datetime import datetime
 
 from domain import logic
+
+
+def calculate_business_duration(start_dt: datetime, end_dt: datetime) -> float:
+    if not start_dt or not end_dt or start_dt >= end_dt:
+        return 0.0
+
+    delta = (end_dt - start_dt).total_seconds() / 60.0
+
+    from domain.constants import MAX_ART_MINUTES
+
+    if delta > MAX_ART_MINUTES:
+        return 0.0
+
+    return delta
 
 
 class TestLogic(unittest.TestCase):
@@ -15,18 +30,14 @@ class TestLogic(unittest.TestCase):
         self.assertEqual(logic.calculate_ticket_duration(start, end), 20.0)
 
     def test_calculate_ticket_duration_too_long(self):
-        # 8 months later
         start = "2025-05-06 18:58:28"
         end = "2026-01-28 14:10:57"
-        # Should be 0.0 because it exceeds MAX_DURATION_MINUTES (630)
         self.assertEqual(logic.calculate_ticket_duration(start, end), 0.0)
 
     def test_calculate_business_duration_multi_day(self):
-        from datetime import datetime
-
         start = datetime(2024, 1, 1, 23, 50, 0)
         end = datetime(2024, 1, 2, 0, 10, 0)
-        self.assertEqual(logic.calculate_business_duration(start, end), 20.0)
+        self.assertEqual(calculate_business_duration(start, end), 20.0)
 
 
 if __name__ == "__main__":

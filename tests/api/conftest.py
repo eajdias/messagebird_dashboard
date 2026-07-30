@@ -8,10 +8,19 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.auth import create_access_token
+from api.auth import create_access_token, get_password_hash
 from api.dependencies import get_repository
 from api.main import create_app
 from application.interfaces.repository import ReportRepository
+
+_TEST_USER = {
+    "id": 1,
+    "email": "admin@empresa.com",
+    "password_hash": get_password_hash("admin123"),
+    "role": "admin",
+    "name": "Admin",
+    "active": True,
+}
 
 
 @pytest.fixture(autouse=True)
@@ -19,7 +28,26 @@ def _patch_db(monkeypatch: pytest.MonkeyPatch):
     """Prevent the app from connecting to PostgreSQL during tests."""
 
     async def _fake_pool():
-        return AsyncMock()
+        pool = AsyncMock()
+
+        async def _fetch_one(query: str, *args):
+            if "FROM users WHERE email" in query:
+                for arg in args:
+                    if arg == _TEST_USER["email"]:
+                        return dict(_TEST_USER)
+                return None
+            return None
+
+        async def _fetch_all(query: str, *args):
+            return []
+
+        async def _execute(query: str, *args):
+            return None
+
+        pool.fetch_one = AsyncMock(side_effect=_fetch_one)
+        pool.fetch_all = AsyncMock(side_effect=_fetch_all)
+        pool.execute = AsyncMock(side_effect=_execute)
+        return pool
 
     monkeypatch.setattr("api.dependencies.get_pool", _fake_pool)
     monkeypatch.setattr("api.dependencies._pool", None, raising=False)

@@ -62,25 +62,6 @@ def format_local_dt(dt_string: str | None) -> str | None:
     return dt.strftime("%Y-%m-%d %H:%M:%S") if dt else None
 
 
-def calculate_business_duration(start_dt: datetime, end_dt: datetime) -> float:
-    """
-    Calculate duration in minutes between two datetimes.
-    Follows canonical formula: Raw wall-clock time.
-    """
-    if not start_dt or not end_dt or start_dt >= end_dt:
-        return 0.0
-
-    delta = (end_dt - start_dt).total_seconds() / 60.0
-
-    from domain.constants import MAX_ART_MINUTES
-
-    # Cap conforme limite de ART externalizado (METRIC_THRESHOLDS.max_art_minutes)
-    if delta > MAX_ART_MINUTES:
-        return 0.0
-
-    return delta
-
-
 def _get_val(obj, keys, default=None):
     if hasattr(obj, "keys"):
         for key in keys:

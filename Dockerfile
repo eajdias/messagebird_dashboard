@@ -1,31 +1,34 @@
 # ============================================================
-# Dockerfile - Backend API (Python 3.14)
+# Dockerfile - Backend API (Python 3.14 + uv)
+# Multi-stage build: deps → runner
 # ============================================================
 
-FROM python:3.14-slim AS base
+# --- Stage 1: Install dependencies (cached layer) ---
+FROM python:3.14-slim AS deps
 
-# System dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends gcc libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+# --- Stage 2: Production runner ---
+FROM python:3.14-slim AS runner
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Ensure Python output is unbuffered (logs appear in docker logs immediately)
+# Copy virtualenv from deps stage
+COPY --from=deps /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
-
-# Python dependencies
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || \
-    pip install --no-cache-dir \
-    fastapi>=0.139.0 uvicorn[standard]>=0.51.0 \
-    pydantic>=2.13.4 pydantic-settings>=2.13.0 \
-    "python-jose[cryptography]>=3.5.0" "passlib[bcrypt]>=1.7.4" "bcrypt==4.0.1" \
-    asyncpg>=0.31.0 "sqlalchemy[asyncio]>=2.0.51" alembic>=1.18.5 \
-    "pydantic[email]" python-dotenv pyyaml httpx apscheduler \
-    xlsxwriter fpdf2 openpyxl
 
 # Copy application code
 COPY . .
