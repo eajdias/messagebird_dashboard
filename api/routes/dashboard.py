@@ -1217,7 +1217,8 @@ async def get_executive_agents(
         arts = [p.art_min for p in plist if isinstance(p.art_min, (int, float)) and p.art_min > 0]
         total_arts = len(arts)
         good_art = sum(1 for a in arts if a <= 10)
-        bad_art = sum(1 for a in arts if a >= 15)
+        acceptable_art = sum(1 for a in arts if 10 < a <= 30)
+        bad_art = sum(1 for a in arts if a > 30)
 
         items.append(
             AgentRow(
@@ -1238,6 +1239,7 @@ async def get_executive_agents(
                 },
                 nps_score_distribution=nps_dist,
                 good_art_chats=good_art,
+                acceptable_art_chats=acceptable_art,
                 bad_art_chats=bad_art,
                 total_art_chats=total_arts,
             )

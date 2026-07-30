@@ -109,8 +109,8 @@ export const RatedBreakdownChart = memo(function RatedBreakdownChart({ data, cla
         {!hasData ? (
           <p className="text-xs text-muted-foreground">Sem dados no período</p>
         ) : (
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-2 text-xs shrink-0 w-[140px]">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1.5 text-xs shrink-0 w-[130px]">
               {chartData.map((d) => (
                 <div key={d.name} className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
@@ -131,8 +131,8 @@ export const RatedBreakdownChart = memo(function RatedBreakdownChart({ data, cla
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius="45%"
-                    outerRadius="80%"
+                    innerRadius="35%"
+                    outerRadius="85%"
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="name"

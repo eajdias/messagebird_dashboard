@@ -314,6 +314,7 @@ export interface AgentRow {
   rating_distribution: Record<string, number>;
   nps_score_distribution: Record<string, number>;
   good_art_chats: number;
+  acceptable_art_chats: number;
   bad_art_chats: number;
   total_art_chats: number;
 }

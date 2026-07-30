@@ -208,6 +208,7 @@ class AgentRow(BaseModel):
     rating_distribution: dict[str, int] = {}
     nps_score_distribution: dict[str, int] = {}
     good_art_chats: int = 0
+    acceptable_art_chats: int = 0
     bad_art_chats: int = 0
     total_art_chats: int = 0
 
