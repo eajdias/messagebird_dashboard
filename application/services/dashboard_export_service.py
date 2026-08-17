@@ -303,7 +303,7 @@ class DashboardExportService:
         hours = sorted({h for _, h in cells})
         ws.append(["Hora"] + [f"Dia {d}" for d in days])
         for h in hours:
-            row_data = [f"{h:02d}h"]
+            row_data: list[Any] = [f"{h:02d}h"]
             for d in days:
                 row_data.append(cells.get((d, h), 0))
             ws.append(row_data)

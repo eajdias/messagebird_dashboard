@@ -64,12 +64,21 @@ async def _sync_messages_internal(
         )
 
         if "error" in response:
-            await manager.log_sync_error(
-                conn,
-                "messages",
-                str(response["error"]),
-                context={"cnvs_bird": conversation_bird_id, "offset": offset},
-            )
+            error_msg = str(response["error"])
+            error_details = str(response.get("details", ""))
+            if "410" in error_msg and "deleted" in error_details.lower():
+                await conn.execute_query(
+                    "UPDATE conversations SET cnvs_status = 'archived' WHERE cnvs_bird = $1 AND cnvs_status = 'active'",
+                    (conversation_bird_id,),
+                )
+                logger.info("Conversation %s deleted on Bird, marked as archived", conversation_bird_id)
+            else:
+                await manager.log_sync_error(
+                    conn,
+                    "messages",
+                    error_msg,
+                    context={"cnvs_bird": conversation_bird_id, "offset": offset},
+                )
             break
 
         items: list[dict[str, Any]] = response.get("items", [])
@@ -127,15 +136,20 @@ async def _sync_messages_internal(
                     agnt_id = manager._agent_cache.get(agent["id"])
                     last_agent_id = agnt_id
 
+            status_val = m_data["status"]
+            type_val = m_data["type"]
+            content_val = m_data["content"]
+            bird_id_val = m_data["id"]
+
             batch_params.append(
                 (
-                    cnvs_id,
-                    agnt_id,
-                    direction,
-                    m_data["status"],
-                    m_data["type"],
-                    m_data["content"],
-                    m_data["id"],
+                    int(cnvs_id),
+                    int(agnt_id) if agnt_id is not None else None,
+                    str(direction or ""),
+                    str(status_val) if status_val is not None else "",
+                    str(type_val) if type_val is not None else "",
+                    str(content_val) if content_val is not None else "",
+                    str(bird_id_val),
                     parse_dt(m_data["created"]),
                     parse_dt(m_data["updated"]),
                 )
@@ -143,15 +157,17 @@ async def _sync_messages_internal(
 
         if batch_params:
             async with conn.transaction():
-                await conn.execute_many(
-                    "INSERT INTO messages "
-                    "(msgs_cnvs, msgs_agnt, msgs_direction, msgs_status, msgs_type, "
-                    "msgs_content, msgs_bird, msgs_created, msgs_updated) "
-                    "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) "
-                    "ON CONFLICT (msgs_bird) DO UPDATE SET "
-                    "msgs_status = EXCLUDED.msgs_status, msgs_updated = EXCLUDED.msgs_updated",
-                    batch_params,
-                )
+                for params in batch_params:
+                    await conn.execute_insert(
+                        "INSERT INTO messages "
+                        "(msgs_cnvs, msgs_agnt, msgs_direction, msgs_status, msgs_type, "
+                        "msgs_content, msgs_bird, msgs_created, msgs_updated) "
+                        "VALUES ($1::int4, $2::int4, $3::varchar, $4::varchar, $5::varchar, "
+                        "$6::text, $7::varchar, $8::timestamp, $9::timestamp) "
+                        "ON CONFLICT (msgs_cnvs, msgs_bird) DO UPDATE SET "
+                        "msgs_status = EXCLUDED.msgs_status, msgs_updated = EXCLUDED.msgs_updated",
+                        params,
+                    )
                 if last_agent_id:
                     await conn.execute_query(
                         "UPDATE conversations SET cnvs_agnt = $1 WHERE cnvs_id = $2",
@@ -169,16 +185,18 @@ async def _sync_messages_internal(
 async def sync_all_messages(manager: PgSyncManager, conn: PostgresSyncConnection):
     rows = await conn.fetch_all("SELECT cnvs_bird, cnvs_msgcount FROM conversations ORDER BY cnvs_updated DESC")
     total = len(rows)
+    raw_pool = conn._pool  # noqa: SLF001
     logger.info("Syncing messages for %d conversations...", total)
     start_time = __import__("time").time()
     semaphore = asyncio.Semaphore(2)
 
     async def fetch_with_limit(row):
         async with semaphore:
+            task_conn = PostgresSyncConnection(raw_pool)
             try:
                 bird_id = row["cnvs_bird"]
                 remote_count = row["cnvs_msgcount"]
-                local_count_row = await conn.fetch_one(
+                local_count_row = await task_conn.fetch_one(
                     "SELECT COUNT(*) as count, MAX(msgs_created) as last_msg_date "
                     "FROM messages WHERE msgs_cnvs = (SELECT cnvs_id FROM conversations WHERE cnvs_bird = $1)",
                     (bird_id,),
@@ -193,7 +211,7 @@ async def sync_all_messages(manager: PgSyncManager, conn: PostgresSyncConnection
                 if local_count > 0 and last_msg_date:
                     date_from = last_msg_date.isoformat() if isinstance(last_msg_date, datetime) else str(last_msg_date)
 
-                count, _ = await sync_messages(manager, conn, bird_id, date_from=date_from)
+                count, _ = await sync_messages(manager, task_conn, bird_id, date_from=date_from)
                 return count
             except Exception as e:
                 logger.error("Error syncing messages for %s: %s", row["cnvs_bird"], e)
@@ -227,11 +245,13 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
         (month_start.replace(tzinfo=None), next_month_start.replace(tzinfo=None)),
     )
     total = len(rows)
+    raw_pool = conn._pool  # noqa: SLF001
     logger.info("Syncing messages for %d conversations created in %04d-%02d...", total, year, month)
     semaphore = asyncio.Semaphore(2)
 
     async def fetch_with_limit(row):
         async with semaphore:
+            task_conn = PostgresSyncConnection(raw_pool)
             try:
                 # Determine date_from: use last_msg_date if available, otherwise use start_iso
                 date_from = start_iso
@@ -245,7 +265,7 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
 
                 count, _ = await sync_messages(
                     manager,
-                    conn,
+                    task_conn,
                     row["cnvs_bird"],
                     date_from=date_from,
                     cnvs_id=row["cnvs_id"],
@@ -287,6 +307,7 @@ async def sync_messages_for_range(
         (start_naive, end_naive),
     )
     total = len(rows)
+    raw_pool = conn._pool  # noqa: SLF001
     logger.info(
         "Syncing messages for %d conversations updated between %s and %s...",
         total,
@@ -297,8 +318,9 @@ async def sync_messages_for_range(
 
     async def fetch_with_limit(row):
         async with semaphore:
+            task_conn = PostgresSyncConnection(raw_pool)
             try:
-                count, _ = await sync_messages(manager, conn, row["cnvs_bird"], date_from=start_iso)
+                count, _ = await sync_messages(manager, task_conn, row["cnvs_bird"], date_from=start_iso)
                 return count
             except Exception as e:
                 logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
@@ -325,13 +347,15 @@ async def sync_messages_for_recent(manager: PgSyncManager, conn: PostgresSyncCon
         (str(days),),
     )
     total = len(rows)
+    raw_pool = conn._pool  # noqa: SLF001
     logger.info("Syncing messages for %d conversations updated in last %d days...", total, days)
     semaphore = asyncio.Semaphore(2)
 
     async def fetch_with_limit(row):
         async with semaphore:
+            task_conn = PostgresSyncConnection(raw_pool)
             try:
-                count, _ = await sync_messages(manager, conn, row["cnvs_bird"])
+                count, _ = await sync_messages(manager, task_conn, row["cnvs_bird"])
                 return count
             except Exception as e:
                 logger.error("Error syncing %s: %s", row["cnvs_bird"], e)
@@ -347,6 +371,7 @@ async def sync_messages_for_recent(manager: PgSyncManager, conn: PostgresSyncCon
         logger.info("  messages: %d/%d conversations done", min(i + chunk_size, total), total)
 
     logger.info("Recent messages sync completed: %d conversations, %d messages.", total, msg_count)
+    return msg_count
 
 
 async def sync_incomplete_conversations(

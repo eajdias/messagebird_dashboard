@@ -4,5 +4,5 @@ from domain.strategies.metrics_strategy import MetricStrategy
 
 
 class ARTCalculator(MetricStrategy):
-    def calculate(self, data: RawConversationData) -> float:
+    def calculate(self, data: RawConversationData) -> float | None:
         return _calculate_response_time(data)

@@ -11,7 +11,7 @@ DOW_NAMES = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domin
 class TemporalAggregator:
     def aggregate_heatmap(self, data: list[ProcessedReportData]) -> list[dict[str, Any]]:
         """Calcula a distribuição horária por dia da semana (Heatmap)."""
-        heatmap = {}
+        heatmap: dict[tuple[int, int], int] = {}
         for p in data:
             dt = parse_datetime(p.raw_created, apply_offset=True)
             if dt:
@@ -23,7 +23,7 @@ class TemporalAggregator:
 
     def aggregate_dow(self, data: list[ProcessedReportData]) -> list[dict[str, Any]]:
         """Calcula a distribuição de chats por dia da semana."""
-        dow_counts = Counter()
+        dow_counts: Counter[int] = Counter()
         for p in data:
             dt = parse_datetime(p.raw_created, apply_offset=True)
             if dt:
@@ -66,8 +66,8 @@ class RatingAggregator:
                 agent_map[p.agent].append(p)
 
         agents = sorted(agent_map.keys())
-        rating_rows = []
-        nps_rows = []
+        rating_rows: list[list[Any]] = []
+        nps_rows: list[list[Any]] = []
 
         for agent in agents:
             ratings = [p.rating for p in agent_map[agent] if p.rating is not None]
@@ -83,13 +83,13 @@ class RatingAggregator:
                 if 1 <= n <= 10:
                     nps_dist[str(int(n))] += 1
 
-            rating_row = [agent]
+            rating_row: list[Any] = [agent]
             for i in range(1, 6):
                 rating_row.append(rating_dist[str(i)])
             rating_row.append(len(ratings))
             rating_rows.append(rating_row)
 
-            nps_row = [agent]
+            nps_row: list[Any] = [agent]
             for i in range(1, 11):
                 nps_row.append(nps_dist[str(i)])
             nps_row.append(len(nps_scores))

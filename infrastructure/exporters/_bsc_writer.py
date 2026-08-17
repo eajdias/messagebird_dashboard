@@ -1,3 +1,5 @@
+from typing import Any
+
 from xlsxwriter.utility import xl_rowcol_to_cell
 
 _META_COL = 1
@@ -18,11 +20,11 @@ _TIPO_LABELS = {
 }
 
 
-def _is_empty(val) -> bool:
+def _is_empty(val: Any) -> bool:
     return val in ("", "N/D", "N/A", None)
 
 
-def _kpi_excel_formula(real_cell: str, kpi_def: dict) -> str:
+def _kpi_excel_formula(real_cell: str, kpi_def: dict[str, Any]) -> str:
     tipo = kpi_def.get("tipo")
     meta = kpi_def.get("meta")
     peso = kpi_def.get("peso")
@@ -96,19 +98,19 @@ def _kpi_excel_formula(real_cell: str, kpi_def: dict) -> str:
         elif tipo == "binaria":
             return f'=IF({guard},"",IF({real_cell}={meta},{peso},0))'
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "-"
     return "-"
 
 
 def write_bsc_kpi_table(
-    ws,
+    ws: Any,
     start_row: int,
     title: str,
-    bsc_header: list,
-    bsc_data: list,
-    kpi_config: list,
-    fmts: dict,
+    bsc_header: list[str],
+    bsc_data: list[list[Any]],
+    kpi_config: list[Any],
+    fmts: dict[str, Any],
     add_total_row: bool = True,
 ) -> int:
     agents = bsc_header[1:]

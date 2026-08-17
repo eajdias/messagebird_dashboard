@@ -276,7 +276,7 @@ class ExcelExporter(ReportExporter):
         desc_fmt = workbook.add_format({"font_size": 11, "text_wrap": True})
 
         # Legenda gerada a partir do KPI_CONFIG (genérica para qualquer empresa)
-        legends = []
+        legends: list[tuple[Any, Any, bool] | tuple[Any, Any]] = []
         for section_label, key in (
             ("QUALIDADE E SATISFAÇÃO", "t1"),
             ("AVALIAÇÕES EXTRAS", "t2"),
@@ -1050,9 +1050,9 @@ class ExcelExporter(ReportExporter):
         # Rating Distribution → Column chart
         data_sheet.write(0, 3, "Nota")
         data_sheet.write(0, 4, "Quantidade")
-        for i, (cat, val) in enumerate(dto.rating_distribution.items()):
+        for i, (cat, qty) in enumerate(dto.rating_distribution.items()):
             data_sheet.write(i + 1, 3, f"Nota {cat}")
-            data_sheet.write(i + 1, 4, val)
+            data_sheet.write(i + 1, 4, qty)
 
         chart_rating = workbook.add_chart({"type": "column"})
         chart_rating.add_series(
@@ -1162,8 +1162,9 @@ class ExcelExporter(ReportExporter):
         for j, h in enumerate(topic_header):
             ws.write(topics_start, j, h, header_fmt)
 
-        topic_sum = sum(x["value"] for x in dto.topic_data) or 1
-        for idx, item in enumerate(dto.topic_data):
+        topic_items = dto.topic_data or []
+        topic_sum = sum(x["value"] for x in topic_items) or 1
+        for idx, item in enumerate(topic_items):
             r = topics_start + 1 + idx
             is_alt = idx % 2 == 0
             c_fmt = alt_fmt if is_alt else cell_fmt
@@ -1173,7 +1174,7 @@ class ExcelExporter(ReportExporter):
             pct = round(item["value"] / topic_sum * 100, 1)
             ws.write(r, 2, f"{pct}%", n_fmt)
 
-        t_row = topics_start + 1 + len(dto.topic_data)
+        t_row = topics_start + 1 + len(topic_items)
         ws.write(t_row, 0, "TOTAL", total_fmt)
         ws.write(t_row, 1, topic_sum, total_num_fmt)
         ws.write(t_row, 2, "100%", total_num_fmt)
@@ -1187,8 +1188,9 @@ class ExcelExporter(ReportExporter):
         for j, h in enumerate(occ_header):
             ws.write(occ_start, j, h, header_fmt)
 
-        occ_sum = sum(x["value"] for x in dto.occurrence_data) or 1
-        for idx, item in enumerate(dto.occurrence_data):
+        occ_items = dto.occurrence_data or []
+        occ_sum = sum(x["value"] for x in occ_items) or 1
+        for idx, item in enumerate(occ_items):
             r = occ_start + 1 + idx
             is_alt = idx % 2 == 0
             c_fmt = alt_fmt if is_alt else cell_fmt
@@ -1198,7 +1200,7 @@ class ExcelExporter(ReportExporter):
             pct = round(item["value"] / occ_sum * 100, 1)
             ws.write(r, 2, f"{pct}%", n_fmt)
 
-        o_row = occ_start + 1 + len(dto.occurrence_data)
+        o_row = occ_start + 1 + len(occ_items)
         ws.write(o_row, 0, "TOTAL", total_fmt)
         ws.write(o_row, 1, occ_sum, total_num_fmt)
         ws.write(o_row, 2, "100%", total_num_fmt)
@@ -1342,6 +1344,7 @@ class ExcelExporter(ReportExporter):
         data_sheet.hide()
 
     def _write_monthly_evolution_tab(self, workbook: xlsxwriter.Workbook, dto: DashboardDTO):
+        monthly = dto.monthly_evolution or []
         ws = workbook.add_worksheet("Evolução Mensal")
 
         title_fmt = workbook.add_format({"bold": True, "font_size": 14, "font_color": COLOR_PRIMARY})
@@ -1380,7 +1383,7 @@ class ExcelExporter(ReportExporter):
         for j, h in enumerate(month_labels):
             ws.write(2, j, h, header_fmt)
 
-        for i, entry in enumerate(dto.monthly_evolution):
+        for i, entry in enumerate(monthly):
             r = 3 + i
             is_alt = i % 2 == 0
             c_fmt = alt_fmt if is_alt else cell_fmt
@@ -1394,7 +1397,7 @@ class ExcelExporter(ReportExporter):
                 else:
                     ws.write(r, j + 1, val, c_fmt)
 
-        data_end = 3 + len(dto.monthly_evolution)
+        data_end = 3 + len(monthly)
 
         chart_chats = workbook.add_chart({"type": "line"})
         chart_chats.add_series(

@@ -11,10 +11,10 @@ from domain.services.metrics_calculator import MetricsCalculator
 class ReportAggregator:
     def __init__(
         self,
-        strategies: list[Any] = None,
-        temporal_aggregator: TemporalAggregator = None,
-        topic_aggregator: TopicAggregator = None,
-        rating_aggregator: RatingAggregator = None,
+        strategies: list[Any] | None = None,
+        temporal_aggregator: TemporalAggregator | None = None,
+        topic_aggregator: TopicAggregator | None = None,
+        rating_aggregator: RatingAggregator | None = None,
     ):
         self._strategies = strategies or []
         self._temporal = temporal_aggregator or TemporalAggregator()
@@ -211,7 +211,7 @@ class ReportAggregator:
         title: str,
         start_date: str,
         end_date: str,
-        prev_month_metrics: dict[str, Any] = None,
+        prev_month_metrics: dict[str, Any] | None = None,
     ) -> DashboardDTO:
         # Build agent_map once for reuse
         agent_map: dict[str, list[ProcessedReportData]] = {}
@@ -232,7 +232,7 @@ class ReportAggregator:
 
         rows_t1 = []
 
-        def _pct_compliments(agent):
+        def _pct_compliments(agent: str) -> float | None:
             p_list = agent_map[agent]
             ratings = [p.rating for p in p_list if p.rating is not None]
             elogios = sum(1 for r in ratings if r >= 4)
@@ -240,7 +240,7 @@ class ReportAggregator:
                 return None
             return round(elogios / len(ratings) * 100, 1)
 
-        def _pct_negatives(agent):
+        def _pct_negatives(agent: str) -> float | None:
             p_list = agent_map[agent]
             ratings = [p.rating for p in p_list if p.rating is not None]
             neg = sum(1 for r in ratings if r <= 2)
@@ -248,21 +248,21 @@ class ReportAggregator:
                 return None
             return round(neg / len(ratings) * 100, 1)
 
-        def _nps_score(agent):
+        def _nps_score(agent: str) -> float | None:
             nps_scores = [p.nps for p in agent_map[agent] if p.nps is not None]
             return MetricsCalculator.calculate_nps(nps_scores)
 
-        def _avg_rating(agent):
+        def _avg_rating(agent: str) -> float:
             ratings = [p.rating for p in agent_map[agent] if p.rating is not None]
             return MetricsCalculator.calculate_rating_average(ratings) or 0
 
-        def _total_msgs(agent):
+        def _total_msgs(agent: str) -> int:
             return sum(p.msg_count for p in agent_map[agent])
 
-        def _count(agent):
+        def _count(agent: str) -> int:
             return len(agent_map[agent])
 
-        kpi_cfg = next(iter(constants.KPI_CONFIG.values()), {})
+        kpi_cfg: dict[str, Any] = next(iter(constants.KPI_CONFIG.values()), {})
         t1_defs = kpi_cfg.get("t1", [])
         t2_defs = kpi_cfg.get("t2", [])
 
@@ -279,7 +279,7 @@ class ReportAggregator:
             "Mensagens Totais": _total_msgs,
         }
 
-        def _zero(a):
+        def _zero(a: str) -> int:
             return 0
 
         rows_t1 = [[m["name"]] + [_t1_computers.get(m["name"], _zero)(a) for a in agents] for m in t1_defs]
@@ -311,7 +311,7 @@ class ReportAggregator:
         )
 
     def aggregate_monthly_breakdown(
-        self, processed_data_by_month: dict[str, list[ProcessedReportData]], prev_metrics: dict[str, Any] = None
+        self, processed_data_by_month: dict[str, list[ProcessedReportData]], prev_metrics: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
         months = []
         for month_key in sorted(processed_data_by_month.keys()):
@@ -353,7 +353,7 @@ class ReportAggregator:
             return self._build_departments_rows(processed_data)
         return []
 
-    def _build_agent_row(self, label: str, group: str, agent: str, stats: dict) -> list:
+    def _build_agent_row(self, label: str, group: str, agent: str, stats: dict[str, Any]) -> list[Any]:
         return [
             label,
             group,

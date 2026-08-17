@@ -175,6 +175,8 @@ class _OSPDF(FPDF):
 
         # Calculate message height
         lines = self.multi_cell(max_width - 10, 5, _sanitize(content), dry_run=True, output="LINES")
+        if not isinstance(lines, list):
+            lines = []
         msg_height = len(lines) * 5 + 4
 
         # Check if we need a new page
@@ -194,7 +196,7 @@ class PDFExporter:
         output_dir: str,
         header: list[str],
         data: list[list[Any]],
-        messages_dict: dict[int, list[dict[str, Any]]] = None,
+        messages_dict: dict[int, list[dict[str, Any]]] | None = None,
     ):
         os.makedirs(output_dir, exist_ok=True)
         generated = 0
@@ -456,4 +458,4 @@ class PDFExporter:
                 sender = cnts if is_client else agnt if agnt else "Agente"
                 pdf._chat_message(sender, str(content), str(timestamp), is_client)
 
-        return pdf.output()
+        return bytes(pdf.output())

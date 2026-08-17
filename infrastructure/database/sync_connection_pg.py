@@ -43,6 +43,14 @@ class PostgresSyncConnection:
             async with self._pool.acquire() as conn:
                 await conn.executemany(query, params_list)
 
+    async def execute_insert(self, query: str, params=()):
+        """Execute INSERT/UPDATE using execute() to avoid prepared statement type cache issues."""
+        if self._in_transaction and self._conn:
+            await self._conn.execute(query, *params)
+        else:
+            async with self._pool.acquire() as conn:
+                await conn.execute(query, *params)
+
     async def fetch_one(self, query: str, params=()):
         if self._in_transaction and self._conn:
             return await self._conn.fetchrow(query, *params)

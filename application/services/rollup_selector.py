@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 
 def select_granularity(start_date: str, end_date: str) -> str:
@@ -16,7 +16,7 @@ def select_granularity(start_date: str, end_date: str) -> str:
     try:
         start = date.fromisoformat(start_date)
         end = date.fromisoformat(end_date)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "monthly"
 
     days = (end - start).days
@@ -31,12 +31,12 @@ def select_granularity(start_date: str, end_date: str) -> str:
 
 def _snap_week_start(d: date) -> date:
     """Snap a date to the start of its ISO week (Monday)."""
-    return d - __import__("datetime").timedelta(days=d.weekday())
+    return d - timedelta(days=d.weekday())
 
 
 def _snap_week_end(d: date) -> date:
     """Snap a date to the end of its ISO week (Sunday)."""
-    return d + __import__("datetime").timedelta(days=6 - d.weekday())
+    return d + timedelta(days=6 - d.weekday())
 
 
 def get_rollup_table(granularity: str) -> str:
@@ -84,7 +84,7 @@ def build_rollup_query(
             query_end = _snap_week_end(end)
             query_start_str = query_start.isoformat()
             query_end_str = query_end.isoformat()
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             query_start_str = start_date
             query_end_str = end_date
     else:

@@ -1,0 +1,82 @@
+mkdir -p ~/zscan-lab/{worklist,pacs}
+cd ~/zscan-lab
+
+cat > worklist/orthanc.json <<'EOF'
+{
+  "Name": "WORKLIST",
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": false,
+
+  "Worklists": {
+    "Enable": true,
+    "SaveInOrthancDatabase": true,
+    "DeleteWorklistsOnStableStudy": false
+  }
+}
+EOF
+
+cat > pacs/orthanc.json <<'EOF'
+{
+  "Name": "PACS",
+  "RemoteAccessAllowed": true,
+  "AuthenticationEnabled": false
+}
+EOF
+
+docker run -d \
+  --name orthanc-worklist \
+  --restart unless-stopped \
+  -p 8042:8042 \
+  -p 4242:4242 \
+  -v "$(pwd)/worklist/orthanc.json:/etc/orthanc/orthanc.json:ro" \
+  orthancteam/orthanc:latest
+
+docker run -d \
+  --name orthanc-pacs \
+  --restart unless-stopped \
+  -p 8043:8042 \
+  -p 4243:4242 \
+  -v "$(pwd)/pacs/orthanc.json:/etc/orthanc/orthanc.json:ro" \
+  orthancteam/orthanc:latest
+
+####
+
+curl -X POST http://localhost:8042/worklists/create \
+-H "Content-Type: application/json" \
+-d '{
+  "Tags": {
+    "PatientID": "12345",
+    "PatientName": "PACIENTE^TESTE",
+    "AccessionNumber": "1001",
+    "ScheduledProcedureStepSequence": [
+      {
+        "Modality": "CR",
+        "ScheduledStationAETitle": "ZSCAN",
+        "ScheduledProcedureStepDescription": "RX TORAX",
+        "ScheduledProcedureStepStartDate": "20260725"
+      }
+    ]
+  }
+}'
+
+#####
+
+
+curl http://localhost:8042/worklists/?format=Full
+curl http://localhost:8042/system
+curl http://localhost:8043/system
+curl http://localhost:8043/studies | jq
+
+docker logs -f orthanc-worklist
+docker logs -f orthanc-pacs
+docker logs orthanc-worklist | grep -i worklist
+
+#####
+
+IP: IP_DO_SERVIDOR
+Porta: 4242
+AET: WORKLIST
+
+IP: IP_DO_SERVIDOR
+Porta: 4243
+A

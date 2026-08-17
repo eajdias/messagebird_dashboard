@@ -5,5 +5,5 @@ from domain.entities.report_data import RawConversationData
 
 class MetricStrategy(ABC):
     @abstractmethod
-    def calculate(self, data: RawConversationData) -> float:
+    def calculate(self, data: RawConversationData) -> float | None:
         pass

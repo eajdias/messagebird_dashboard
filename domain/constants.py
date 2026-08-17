@@ -1,5 +1,6 @@
 # ── ART / SLA ────────────────────────────────────────────────────────────────
 import os
+from typing import Any, cast
 
 import yaml
 
@@ -310,7 +311,16 @@ DEFAULT_KPI_CONFIG = {
 # ── Dynamic Configuration ──────────────
 
 
-def _load_business_yaml() -> tuple[dict, dict, dict, dict, dict, dict, dict, dict]:
+def _load_business_yaml() -> tuple[
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+    dict[Any, Any],
+]:
     """Load business + BSC config from YAML files.
 
     Called at module import time so constants are always populated before
@@ -325,9 +335,9 @@ def _load_business_yaml() -> tuple[dict, dict, dict, dict, dict, dict, dict, dic
     occurrence_map = dict(DEFAULT_OCCURRENCE_MAP)
     lang_map = dict(DEFAULT_LANG_MAP)
     channel_map = dict(DEFAULT_CHANNEL_MAP)
-    agents: dict = {}
+    agents: dict[str, Any] = {}
     kpi_config = dict(DEFAULT_KPI_CONFIG)
-    dept_routing: dict = {}
+    dept_routing: dict[str, Any] = {}
 
     def _keys_to_int(d):
         if not isinstance(d, dict):
@@ -393,14 +403,14 @@ def get_agent_group(agent_name: str | None) -> str:
     # Procura pelo nome no novo dicionário AGENTS
     for _, info in AGENTS.items():
         if info["name"] == norm_name:
-            return info["group"]
+            return cast(str, info["group"])
 
     return "Não categorizado"
 
 
 def resolve_conversation_group(agent_name: str | None, dept_label: str) -> str:
     if DEPT_ROUTING and dept_label in DEPT_ROUTING:
-        return DEPT_ROUTING[dept_label]
+        return cast(str, DEPT_ROUTING[dept_label])
     if not DEPT_ROUTING:
         return get_agent_group(agent_name)
     if not dept_label or dept_label in ("N/A", "None", ""):
@@ -418,21 +428,22 @@ def _to_int(val) -> int | None:
 def resolve_dept(dept_id, agent_name: str | None = None, agent_group: str | None = None) -> str:
     d = _to_int(dept_id)
     if d is not None:
-        return DEPT_MAP.get(d, str(dept_id))
+        label = DEPT_MAP.get(d)
+        return label if label is not None else "Outros"
     if agent_name:
         grp = get_agent_group(agent_name)
         if grp != "Não categorizado":
             return grp
     if agent_group and agent_group not in ("", "OUTROS", "Não categorizado"):
         return agent_group
-    return "Não categorizado"
+    return "Outros"
 
 
 def resolve_channel(channel_id) -> str:
     """Resolve UUID do canal para nome legível."""
     if not channel_id:
         return "Desconhecido"
-    return CHANNEL_MAP.get(str(channel_id), "Outro Canal")
+    return cast(str, CHANNEL_MAP.get(str(channel_id), "Outro Canal"))
 
 
 def resolve_reason(dept_id, reason_id, agent_name: str | None = None) -> str:
@@ -443,7 +454,7 @@ def resolve_reason(dept_id, reason_id, agent_name: str | None = None) -> str:
     if d is not None:
         label = REASON_MAP.get(d, {}).get(r)
         if label is not None:
-            return label
+            return cast(str, label)
     # Fallback: try agent's department
     if d is None and agent_name:
         agent_dept = get_agent_group(agent_name)
@@ -452,7 +463,7 @@ def resolve_reason(dept_id, reason_id, agent_name: str | None = None) -> str:
             if dept_label == agent_dept:
                 label = REASON_MAP.get(dept_num, {}).get(r)
                 if label is not None:
-                    return label
+                    return cast(str, label)
     return "Contato Direto"
 
 
@@ -467,12 +478,12 @@ def resolve_occurrence(dept_id, reason_id, occ_id, agent_name: str | None = None
         if reason_num is not None:
             reason_occs = OCCURRENCE_MAP.get(dept_num, {}).get(reason_num, {})
             if reason_occs:
-                return reason_occs.get(o)
+                return cast(str, reason_occs.get(o))
         # Try all reasons for this dept
         for reason_occs in OCCURRENCE_MAP.get(dept_num, {}).values():
             label = reason_occs.get(o)
             if label is not None:
-                return label
+                return cast(str, label)
         return None
 
     if d is not None:

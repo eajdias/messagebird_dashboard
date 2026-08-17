@@ -14,7 +14,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
     peso = kpi_def.get("peso")
     cap = kpi_def.get("cap")
 
-    if tipo in (None, "-") or meta == "-" or peso == "-":
+    if tipo in (None, "-") or meta == "-" or peso == "-" or peso is None:
         return None
 
     try:
@@ -22,7 +22,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             m = float(meta) if meta is not None else 0
             if m <= 0:
                 return 0.0
-            score = (raw_value / m) * peso
+            score = (raw_value / m) * float(peso) if peso is not None else 0.0
             if cap is not None:
                 score = min(float(cap), score)
             return round(score, 1)
@@ -55,7 +55,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             return float(peso) if raw_value == 0 else 0.0
 
         elif tipo == "penalidade":
-            return round(raw_value * peso, 1)
+            return round(raw_value * float(peso), 1)
 
         elif tipo == "penalidade_taxa":
             m = float(kpi_def.get("threshold", 10))
@@ -89,7 +89,7 @@ def compute_kpi_score(raw_value: float | None, kpi_def: dict[str, Any]) -> float
             score = max(0.0, p * (1 - raw_value / m))
             return round(score, 1)
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
     return None

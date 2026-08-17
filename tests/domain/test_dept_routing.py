@@ -92,7 +92,7 @@ class TestResolveConversationGroup(unittest.TestCase):
         self.assertEqual(constants.resolve_dept(1), constants.DEPT_MAP.get(1, "1"))
 
     def test_resolve_dept_unknown_int(self):
-        self.assertEqual(constants.resolve_dept(99), "99")
+        self.assertEqual(constants.resolve_dept(99), "Outros")
 
 
 if __name__ == "__main__":

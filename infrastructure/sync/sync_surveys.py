@@ -102,6 +102,8 @@ async def update_conversation_surveys(
             timestamp = msg["msgs_created"]
             if isinstance(timestamp, str):
                 timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            if not isinstance(timestamp, datetime):
+                continue
             for j in range(i + 1, min(i + 10, len(messages))):
                 next_msg = messages[j]
                 if next_msg["msgs_direction"] != "received":
@@ -109,6 +111,8 @@ async def update_conversation_surveys(
                 next_ts = next_msg["msgs_created"]
                 if isinstance(next_ts, str):
                     next_ts = datetime.fromisoformat(next_ts.replace("Z", "+00:00"))
+                if not isinstance(next_ts, datetime):
+                    continue
                 if next_ts - timestamp > timedelta(minutes=60):
                     break
                 resp = (next_msg["msgs_content"] or "").strip()
@@ -137,7 +141,7 @@ async def update_conversation_surveys(
                     num = int(m.group(1)) if m else None
                     if num is not None:
                         if matched_key == "lang" and 1 <= num <= 3:
-                            updates["cnvs_lang"] = num
+                            updates["cnvs_lang"] = str(num)
                             found = True
                         elif matched_key == "dept" and 1 <= num <= 5:
                             updates["cnvs_dept"] = num

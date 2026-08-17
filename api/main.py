@@ -2,6 +2,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -80,7 +81,7 @@ def scheduler_running() -> bool:
     return scheduler.running
 
 
-def scheduler_jobs() -> list[dict[str, object]]:
+def scheduler_jobs() -> list[dict[str, Any]]:
     return [
         {
             "id": job.id,
@@ -165,6 +166,7 @@ async def _init_schema():
         "007_users.sql",
         "008_performance_indexes.sql",
         "009_stats_rollups.sql",
+        "010_messages_bird_constraint.sql",
     ):
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):

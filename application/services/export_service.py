@@ -101,14 +101,24 @@ class ExportService:
             visit_count = len(convs)
             agents = sorted({str(c.get("agnt_name") or c.get("agent", "Desconhecido")) for c in convs})
             departments = sorted(
-                {constants.resolve_dept(int(c.get("cnvs_dept"))) for c in convs if c.get("cnvs_dept") is not None}
+                {
+                    constants.resolve_dept(int(c["cnvs_dept"]))
+                    for c in convs
+                    if isinstance(c.get("cnvs_dept"), (int, float, str)) and str(c.get("cnvs_dept")).strip().isdigit()
+                }
             )
             channels = sorted(
                 {constants.resolve_channel(str(c.get("cnvs_channel"))) for c in convs if c.get("cnvs_channel")}
             )
-            ratings = [c.get("cnvs_rating_agent") for c in convs if c.get("cnvs_rating_agent") is not None]
-            nps_vals = [c.get("cnvs_rating_nps") for c in convs if c.get("cnvs_rating_nps") is not None]
-            arts = [c.get("cnvs_art_minutes") for c in convs if c.get("cnvs_art_minutes") is not None]
+            ratings = [
+                c.get("cnvs_rating_agent") for c in convs if isinstance(c.get("cnvs_rating_agent"), (int, float))
+            ]
+            nps_vals = [c.get("cnvs_rating_nps") for c in convs if isinstance(c.get("cnvs_rating_nps"), (int, float))]
+            arts = [c.get("cnvs_art_minutes") for c in convs if isinstance(c.get("cnvs_art_minutes"), (int, float))]
+
+            ratings = [r for r in ratings if isinstance(r, (int, float))]
+            nps_vals = [r for r in nps_vals if isinstance(r, (int, float))]
+            arts = [r for r in arts if isinstance(r, (int, float))]
 
             motivos = sorted(
                 {
@@ -150,9 +160,11 @@ class ExportService:
                     "agentes": ", ".join(agents),
                     "departamentos": ", ".join(map(str, departments)),
                     "canais": ", ".join(map(str, channels)),
-                    "nota_media": round(sum(ratings) / len(ratings), 1) if ratings else "",
-                    "nps_medio": round(sum(nps_vals) / len(nps_vals), 0) if nps_vals else "",
-                    "art_medio_min": round(sum(arts) / len(arts), 1) if arts else "",
+                    "nota_media": round(sum(v for v in ratings if v is not None) / len(ratings), 1) if ratings else "",
+                    "nps_medio": round(sum(v for v in nps_vals if v is not None) / len(nps_vals), 0)
+                    if nps_vals
+                    else "",
+                    "art_medio_min": round(sum(v for v in arts if v is not None) / len(arts), 1) if arts else "",
                     "primeira_visita": _fmt_ts(last.get("cnvs_created", "")),
                     "ultima_visita": _fmt_ts(first.get("cnvs_created", "")),
                     "total_msgs": sum(c.get("cnvs_msgcount", 0) for c in convs),

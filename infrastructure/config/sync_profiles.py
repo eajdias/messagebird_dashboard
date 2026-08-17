@@ -110,3 +110,7 @@ def list_profiles() -> list[dict[str, object]]:
         }
         for p in PROFILES.values()
     ]
+
+
+def profile_names() -> list[str]:
+    return list(PROFILES.keys())

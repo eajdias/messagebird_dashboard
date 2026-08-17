@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -21,7 +22,7 @@ class RawConversationData:
     raw_created: str = ""
     raw_updated: str = ""
     msgs: list[RawMessageData] = field(default_factory=list)
-    metadata: dict = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     rating: float | None = None
     nps: float | None = None
     dept_label: str = "N/A"

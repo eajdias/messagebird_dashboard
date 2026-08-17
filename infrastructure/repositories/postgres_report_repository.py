@@ -1,7 +1,7 @@
 import asyncio
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from application.interfaces.repository import ReportRepository
 from domain import constants, logic
@@ -137,7 +137,7 @@ class PostgresReportRepository(ReportRepository):
             )
             return await asyncio.to_thread(_rows_to_conversations, rows, agent_group)
 
-        return await repo_cache.get_or_set(cache_key, _fetch)
+        return cast(list[RawConversationData], await repo_cache.get_or_set(cache_key, _fetch))
 
     async def fetch_raw_data_range_filtered(
         self,
@@ -166,7 +166,7 @@ class PostgresReportRepository(ReportRepository):
                 )
             return await asyncio.to_thread(_rows_to_conversations, rows)
 
-        return await repo_cache.get_or_set(cache_key, _fetch)
+        return cast(list[RawConversationData], await repo_cache.get_or_set(cache_key, _fetch))
 
     async def fetch_raw_data_all(self, agent_group: str | None = None) -> list[RawConversationData]:
         cache_key = f"raw_all:{agent_group or ''}"
@@ -175,7 +175,7 @@ class PostgresReportRepository(ReportRepository):
             rows = await self._pool.fetch_all(queries_pg.SURVEY_MV_ALL)
             return _rows_to_conversations(rows, agent_group)
 
-        return await repo_cache.get_or_set(cache_key, _fetch)
+        return cast(list[RawConversationData], await repo_cache.get_or_set(cache_key, _fetch))
 
     async def refresh_materialized_view(self) -> None:
         """Refresh the materialized view after sync. Call from sync pipeline."""

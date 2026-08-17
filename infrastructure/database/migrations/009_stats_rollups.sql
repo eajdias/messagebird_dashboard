@@ -168,7 +168,19 @@ BEGIN
     FROM conversations cv
     LEFT JOIN agents a ON cv.cnvs_agnt = a.agnt_id
     WHERE cv.cnvs_created >= CURRENT_DATE - INTERVAL '6 months'
-    GROUP BY DATE_TRUNC('day', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A');
+    GROUP BY DATE_TRUNC('day', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A')
+    ON CONFLICT (bucket_day, channel, dept) DO UPDATE SET
+        total_conversations = EXCLUDED.total_conversations,
+        total_messages = EXCLUDED.total_messages,
+        avg_rating = EXCLUDED.avg_rating,
+        rated_conversations = EXCLUDED.rated_conversations,
+        nps_score = EXCLUDED.nps_score,
+        nps_rated_conversations = EXCLUDED.nps_rated_conversations,
+        avg_art = EXCLUDED.avg_art,
+        art_conversations = EXCLUDED.art_conversations,
+        sla_compliance = EXCLUDED.sla_compliance,
+        returners = EXCLUDED.returners,
+        unique_contacts = EXCLUDED.unique_contacts;
 
     -- Refresh weekly rollup (last 2 years)
     DELETE FROM stats_weekly WHERE bucket_week >= CURRENT_DATE - INTERVAL '2 years';
@@ -198,7 +210,19 @@ BEGIN
     FROM conversations cv
     LEFT JOIN agents a ON cv.cnvs_agnt = a.agnt_id
     WHERE cv.cnvs_created >= CURRENT_DATE - INTERVAL '2 years'
-    GROUP BY DATE_TRUNC('week', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A');
+    GROUP BY DATE_TRUNC('week', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A')
+    ON CONFLICT (bucket_week, channel, dept) DO UPDATE SET
+        total_conversations = EXCLUDED.total_conversations,
+        total_messages = EXCLUDED.total_messages,
+        avg_rating = EXCLUDED.avg_rating,
+        rated_conversations = EXCLUDED.rated_conversations,
+        nps_score = EXCLUDED.nps_score,
+        nps_rated_conversations = EXCLUDED.nps_rated_conversations,
+        avg_art = EXCLUDED.avg_art,
+        art_conversations = EXCLUDED.art_conversations,
+        sla_compliance = EXCLUDED.sla_compliance,
+        returners = EXCLUDED.returners,
+        unique_contacts = EXCLUDED.unique_contacts;
 
     -- Refresh monthly rollup (all data)
     DELETE FROM stats_monthly;
@@ -227,7 +251,19 @@ BEGIN
         COUNT(DISTINCT cv.cnvs_cnts) AS unique_contacts
     FROM conversations cv
     LEFT JOIN agents a ON cv.cnvs_agnt = a.agnt_id
-    GROUP BY DATE_TRUNC('month', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A');
+    GROUP BY DATE_TRUNC('month', cv.cnvs_created), COALESCE(cv.cnvs_channel, 'unknown'), COALESCE(a.agnt_grp, 'N/A')
+    ON CONFLICT (bucket_month, channel, dept) DO UPDATE SET
+        total_conversations = EXCLUDED.total_conversations,
+        total_messages = EXCLUDED.total_messages,
+        avg_rating = EXCLUDED.avg_rating,
+        rated_conversations = EXCLUDED.rated_conversations,
+        nps_score = EXCLUDED.nps_score,
+        nps_rated_conversations = EXCLUDED.nps_rated_conversations,
+        avg_art = EXCLUDED.avg_art,
+        art_conversations = EXCLUDED.art_conversations,
+        sla_compliance = EXCLUDED.sla_compliance,
+        returners = EXCLUDED.returners,
+        unique_contacts = EXCLUDED.unique_contacts;
 
     -- Refresh materialized views
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_nps_by_month;

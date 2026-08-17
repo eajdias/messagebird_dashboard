@@ -13,20 +13,20 @@ class DashboardDTO:
     rating_distribution: dict[str, int]
     heatmap_data: list[dict[str, Any]]
     topic_data: list[dict[str, Any]]
-    occurrence_data: list[dict[str, Any]] = None
-    bsc_header: list[str] = None
-    bsc_data_t1: list[list[Any]] = None
-    bsc_data_t2: list[list[Any]] = None
-    bsc_kpi_config: dict[str, Any] = None
-    tabular_header: list[str] = None
-    tabular_data: list[list[Any]] = None
-    department_data: list[list[Any]] = None
-    department_header: list[str] = None
-    dow_data: list[dict[str, Any]] = None
-    agent_rating_detail: list[list[Any]] = None
-    agent_nps_detail: list[list[Any]] = None
-    prev_month_metrics: dict[str, Any] = None
-    monthly_evolution: list[dict[str, Any]] = None
+    occurrence_data: list[dict[str, Any]] | None = None
+    bsc_header: list[str] | None = None
+    bsc_data_t1: list[list[Any]] | None = None
+    bsc_data_t2: list[list[Any]] | None = None
+    bsc_kpi_config: dict[str, Any] | None = None
+    tabular_header: list[str] | None = None
+    tabular_data: list[list[Any]] | None = None
+    department_data: list[list[Any]] | None = None
+    department_header: list[str] | None = None
+    dow_data: list[dict[str, Any]] | None = None
+    agent_rating_detail: list[list[Any]] | None = None
+    agent_nps_detail: list[list[Any]] | None = None
+    prev_month_metrics: dict[str, Any] | None = None
+    monthly_evolution: list[dict[str, Any]] | None = None
     report_type: str = "monthly"
     period_label: str = ""
 

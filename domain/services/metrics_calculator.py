@@ -52,7 +52,7 @@ class MetricsCalculator:
         return round(sum(valid_values) / len(valid_values), 2)
 
     @staticmethod
-    def calculate_nps_distribution(scores: list[float]) -> dict:
+    def calculate_nps_distribution(scores: list[float]) -> dict[str, int]:
         """Calcula a distribuição quantitativa do NPS (Promotores, Neutros, Detratores)."""
         valid_scores = [v for v in scores if isinstance(v, (int, float))]
         dist = {"promoters": 0, "passives": 0, "detractors": 0}
@@ -66,7 +66,7 @@ class MetricsCalculator:
         return dist
 
     @staticmethod
-    def calculate_rating_distribution(values: list[float]) -> dict:
+    def calculate_rating_distribution(values: list[float]) -> dict[str, int]:
         """Calcula a distribuição quantitativa das notas (1 a 5)."""
         valid_values = [v for v in values if isinstance(v, (int, float))]
         dist = {str(i): 0 for i in range(1, 6)}

@@ -29,7 +29,7 @@ def parse_datetime(dt_string: str | None, apply_offset: bool = False) -> datetim
     else:
         try:
             dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
 
     if dt is None:
@@ -86,7 +86,7 @@ def _get_datetime(obj, keys, apply_offset=True):
     return parse_datetime(val, apply_offset=apply_offset)
 
 
-def calculate_ticket_duration(created_at: str, updated_at: str) -> float:
+def calculate_ticket_duration(created_at: str | None, updated_at: str | None) -> float:
     """Calculates minutes from ticket open to ticket close."""
     c_dt = parse_datetime(created_at, apply_offset=True)
     u_dt = parse_datetime(updated_at, apply_offset=True)
@@ -102,7 +102,7 @@ def calculate_ticket_duration(created_at: str, updated_at: str) -> float:
     return 0.0
 
 
-def get_effective_start_time(messages: list[Any], default_start: str) -> str:
+def get_effective_start_time(messages: list[Any], default_start: str | None) -> str | None:
     """
     Finds the start of the current activity episode:
     - Detects reopen gaps (inactivity >= REOPEN_GAP_HOURS) and focuses on the latest episode.

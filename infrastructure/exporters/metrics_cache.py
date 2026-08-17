@@ -1,7 +1,7 @@
 import json
 import os
 import re
-from typing import Any
+from typing import Any, cast
 
 CACHE_FILE = "reports/_metrics_cache.json"
 
@@ -11,7 +11,7 @@ def load_cache() -> dict[str, Any]:
         return {}
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
-            return json.load(f)
+            return cast(dict[str, Any], json.load(f))
     except json.JSONDecodeError, OSError:
         return {}
 
@@ -29,7 +29,7 @@ def get_previous_month_key(year: int, month: int) -> str:
 
 
 def get_year_accumulated(cache: dict[str, Any], year: int, upto_month: int) -> dict[str, Any] | None:
-    accumulated = {}
+    accumulated: dict[str, Any] = {}
     count = 0
     for m in range(1, upto_month + 1):
         key = f"{year}-{m:02d}"

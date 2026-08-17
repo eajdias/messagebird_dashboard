@@ -229,10 +229,6 @@ async def trigger_sync_pg(
                 )
             return f"Monthly sync completed for {year:04d}-{month:02d} ({synced_messages} messages)."
 
-        if backfill_incomplete:
-            inc_count = await sync_incomplete_conversations(manager, conn)
-            return f"Incomplete backfill completed: {inc_count} new messages."
-
         if sync_today:
             now = datetime.now(UTC)
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -271,18 +267,46 @@ async def trigger_sync_pg(
 
             return f"Today sync completed: {len(rows)} conversations, {msg_count} messages."
 
-        # Full structural sync always — only messages_days varies
+        # Incremental sync: only messages + incomplete backfill (no conversations sync)
+        if not full_sync and messages_days is not None:
+            inc_count = 0
+            if backfill_incomplete:
+                inc_count = await sync_incomplete_conversations(manager, conn)
+                logger.info("Incomplete backfill: %d new messages.", inc_count)
+            msg_count = await sync_messages_for_recent(manager, conn, days=messages_days)
+            if backfill_surveys:
+                count = await survey_backfill_fn(manager, conn)
+                return (
+                    f"Incremental sync completed: {msg_count} messages"
+                    f" for last {messages_days} days, {inc_count} incomplete,"
+                    f" {count} surveys."
+                )
+            return f"Incremental sync completed: {msg_count} messages for last {messages_days} days."
+
+        # Full daily sync: contacts + conversations (last 7 days) + messages + backfill
         if await manager.should_skip(conn, "contacts"):
             logger.info("Contacts synced recently, skipping.")
         else:
             await sync_contacts(manager, conn)
-        await sync_conversations(manager, conn)
+
+        now = datetime.now(UTC)
+        week_ago = (now - __import__("datetime").timedelta(days=7)).replace(tzinfo=UTC)
+        week_ago_iso = to_bird_iso(week_ago)
+        now_iso = to_bird_iso(now)
+        await sync_conversations(manager, conn, min_date=week_ago_iso, max_date=now_iso)
 
         if full_sync and sync_messages:
             await sync_all_messages(manager, conn)
+            if backfill_incomplete:
+                inc_count = await sync_incomplete_conversations(manager, conn)
             if backfill_surveys:
                 count = await survey_backfill_fn(manager, conn)
-                return f"Full sync + survey backfill completed: {count} surveys processed."
+                msg = f"Full sync + survey backfill completed: {count} surveys processed."
+                if backfill_incomplete:
+                    msg += f" {inc_count} incomplete messages."
+                return msg
+            if backfill_incomplete:
+                return f"Full sync completed with {inc_count} incomplete messages backfilled."
             return "Full sync with all messages completed."
 
         if messages_days is not None:

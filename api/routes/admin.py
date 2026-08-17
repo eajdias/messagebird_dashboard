@@ -205,6 +205,8 @@ async def sync_messages_endpoint(
                     await _get_pool(), request.year, request.month, request.backfill_surveys
                 )
             else:
+                if not request.start_date or not request.end_date:
+                    raise HTTPException(status_code=422, detail="start_date and end_date are required for range sync")
                 msg = await sync_messages_range(
                     await _get_pool(), request.start_date, request.end_date, request.backfill_surveys
                 )
@@ -273,7 +275,7 @@ def _resolve_agent(agent_name: str) -> dict[str, str]:
     raise HTTPException(status_code=404, detail=f"Agente '{agent_name}' não encontrado")
 
 
-def _get_available_metrics(department: str) -> list[dict[str, object]]:
+def _get_available_metrics(department: str) -> list[dict[str, Any]]:
     """Return manual-only metrics available for a department from KPI config."""
     auto_computers = {
         "Elogios de atendimento / Feedback",
@@ -282,7 +284,7 @@ def _get_available_metrics(department: str) -> list[dict[str, object]]:
         "Atendimentos Finalizados",
     }
     kpi_cfg = KPI_CONFIG.get(department, {})
-    metrics: list[dict[str, object]] = []
+    metrics: list[dict[str, Any]] = []
 
     for m in kpi_cfg.get("t1", []):
         if m.get("is_automatic_sum"):
@@ -519,9 +521,9 @@ async def update_scheduler_profile(
     import os
 
     from api.main import _configure_scheduler_jobs, start_scheduler, stop_scheduler
-    from infrastructure.config.sync_profiles import list_profiles
+    from infrastructure.config.sync_profiles import profile_names
 
-    profiles = {p["name"] for p in list_profiles()}
+    profiles = set(profile_names())
     if profile not in profiles:
         raise HTTPException(status_code=400, detail=f"Perfil inválido. Opções: {', '.join(sorted(profiles))}")
 
@@ -588,6 +590,8 @@ async def create_user(
         role,
         name,
     )
+    if not row:
+        raise HTTPException(status_code=500, detail="Falha ao criar usuário")
     return UserItem(
         id=row["id"],
         email=row["email"],
