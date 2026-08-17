@@ -19,8 +19,8 @@ class PostgresPool:
                 dsn=self._dsn,
                 min_size=self._min_size,
                 max_size=self._max_size,
-                command_timeout=30,
-                statement_cache_size=0,
+                command_timeout=120,
+                statement_cache_size=100,
             )
 
     async def stop(self):

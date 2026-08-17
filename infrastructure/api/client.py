@@ -59,7 +59,14 @@ class MessageBirdClient:
             except httpx.HTTPStatusError as e:
                 status = e.response.status_code
                 if status in (429, 500, 502, 503, 504) and attempt < MAX_RETRIES:
-                    delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    retry_after = e.response.headers.get("Retry-After")
+                    if retry_after:
+                        try:
+                            delay = float(retry_after)
+                        except ValueError:
+                            delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
+                    else:
+                        delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))
                     logger.warning(f"HTTP {status} on attempt {attempt}/{MAX_RETRIES}, retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
                     continue
@@ -112,9 +119,20 @@ class MessageBirdClient:
             params["createdDatetimeBefore"] = created_datetime_before
         return await self._make_request("GET", url, params)
 
-    async def get_messages(self, conversation_id: str, limit: int = 20, offset: int = 0, date_from: str | None = None):
+    async def get_messages(
+        self,
+        conversation_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        date_from: str | None = None,
+        page_token: str | None = None,
+    ):
         url = f"{self.base_url_conv}/conversations/{conversation_id}/messages"
-        params: dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit}
+        if page_token:
+            params["pageToken"] = page_token
+        else:
+            params["offset"] = offset
         if date_from:
             params["dateFrom"] = date_from
         return await self._make_request("GET", url, params)

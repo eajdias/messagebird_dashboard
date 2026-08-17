@@ -117,6 +117,14 @@ def build_rollup_query(
                 THEN ROUND(SUM(nps_score * nps_rated_conversations) / SUM(nps_rated_conversations), 1)
                 ELSE NULL END AS nps_score,
             SUM(nps_rated_conversations) AS nps_rated_conversations,
+            CASE WHEN SUM(art_conversations) > 0
+                THEN ROUND(SUM(avg_art * art_conversations) / SUM(art_conversations), 2)
+                ELSE NULL END AS avg_art,
+            SUM(art_conversations) AS art_conversations,
+            CASE WHEN SUM(art_conversations) > 0
+                THEN ROUND(SUM(sla_compliance * art_conversations) / SUM(art_conversations), 2)
+                ELSE NULL END AS sla_compliance,
+            SUM(returners) AS returners,
             SUM(unique_contacts) AS unique_contacts
         FROM {table}
         WHERE {where_clause}

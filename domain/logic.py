@@ -29,7 +29,7 @@ def parse_datetime(dt_string: str | None, apply_offset: bool = False) -> datetim
     else:
         try:
             dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return None
 
     if dt is None:

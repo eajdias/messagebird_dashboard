@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
 from infrastructure.api import config
 from infrastructure.database.sync_connection_pg import PostgresSyncConnection
@@ -13,8 +14,8 @@ async def update_conversation_surveys(
     manager: PgSyncManager,
     conn: PostgresSyncConnection,
     conversation_bird_id: str,
-    raw_messages: list[dict] | None = None,
-):
+    raw_messages: list[dict[str, Any]] | None = None,
+) -> None:
     """Update survey data for a conversation.
 
     If raw_messages is provided, use it directly instead of re-fetching from DB.
@@ -66,7 +67,35 @@ async def update_conversation_surveys(
             (cnvs_id,),
         )
 
-    updates: dict[str, int | str] = {}
+    # Normalize timestamps and sort chronologically. The Bird API can return
+    # messages in a different order than the actual conversation flow; pairing
+    # questions with answers only works with a strict chronological order.
+    def _to_datetime(value: object) -> datetime | None:
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except TypeError, ValueError:
+            return None
+
+    typed_messages: list[dict[str, Any]] = []
+    for row in messages:
+        ts = _to_datetime(row["msgs_created"])
+        if ts is None:
+            continue
+        typed_messages.append(
+            {
+                "msgs_content": row["msgs_content"] or "",
+                "msgs_direction": row["msgs_direction"],
+                "msgs_created": ts,
+            }
+        )
+    typed_messages.sort(key=lambda row: row["msgs_created"])
+    messages = typed_messages
+
+    updates: dict[str, int | str | None] = {}
+    missing_answers: dict[str, None] = {}
+    question_patterns = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in questions.values()]
     for i, msg in enumerate(messages):
         content = msg["msgs_content"] or ""
 
@@ -100,21 +129,19 @@ async def update_conversation_surveys(
 
         if matched_key:
             timestamp = msg["msgs_created"]
-            if isinstance(timestamp, str):
-                timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-            if not isinstance(timestamp, datetime):
-                continue
+            found_answer = False
             for j in range(i + 1, min(i + 10, len(messages))):
                 next_msg = messages[j]
-                if next_msg["msgs_direction"] != "received":
-                    continue
                 next_ts = next_msg["msgs_created"]
-                if isinstance(next_ts, str):
-                    next_ts = datetime.fromisoformat(next_ts.replace("Z", "+00:00"))
-                if not isinstance(next_ts, datetime):
-                    continue
                 if next_ts - timestamp > timedelta(minutes=60):
                     break
+                if next_msg["msgs_direction"] != "received":
+                    # The answer must come before the next question of the flow;
+                    # otherwise an answer for a later question could be captured.
+                    nxt_content = next_msg["msgs_content"]
+                    if nxt_content and any(pat.search(nxt_content) for pat in question_patterns):
+                        break
+                    continue
                 resp = (next_msg["msgs_content"] or "").strip()
                 if not resp:
                     continue
@@ -159,7 +186,10 @@ async def update_conversation_surveys(
                             updates["cnvs_rating_nps"] = num
                             found = True
                 if found:
+                    found_answer = True
                     break
+            if not found_answer:
+                missing_answers[matched_key] = None
 
     # Infer missing contact_reason from dept + occurrence (reverse lookup via OCCURRENCE_MAP)
     if "cnvs_dept" in updates and "cnvs_occurrence" in updates and "cnvs_contact_reason" not in updates:
@@ -169,6 +199,21 @@ async def update_conversation_surveys(
             if occ in reason_occs:
                 updates["cnvs_contact_reason"] = reason_id
                 break
+
+    # Questions asked without a usable answer must be reset to NULL, so stale
+    # values from previous (mis-ordered) parses are healed on re-runs.
+    question_columns = {
+        "lang": "cnvs_lang",
+        "software": "cnvs_software",
+        "tax_id": "cnvs_tax_id",
+        "dept": "cnvs_dept",
+        "contact_reason": "cnvs_contact_reason",
+        "occurrence": "cnvs_occurrence",
+        "rating_agent": "cnvs_rating_agent",
+        "rating_nps": "cnvs_rating_nps",
+    }
+    for key in missing_answers:
+        updates.setdefault(question_columns[key], None)
 
     if updates:
         # Use parameterized query to prevent SQL injection
@@ -197,13 +242,6 @@ async def backfill_surveys(manager: PgSyncManager, conn: PostgresSyncConnection)
         "  OR m.msgs_content LIKE '%Qual o motivo del contato%' "
         "  OR m.msgs_content LIKE '%Qual a sua dúvida%' "
         "  OR m.msgs_content LIKE '%Selecione o departamento%'"
-        ") "
-        "AND ("
-        "  cv.cnvs_rating_nps IS NULL "
-        "  OR cv.cnvs_rating_agent IS NULL "
-        "  OR cv.cnvs_contact_reason IS NULL "
-        "  OR cv.cnvs_dept IS NULL "
-        "  OR (cv.cnvs_occurrence IS NOT NULL AND cv.cnvs_contact_reason IS NULL)"
         ")"
     )
     total = len(rows)

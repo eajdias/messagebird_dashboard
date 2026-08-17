@@ -17,7 +17,9 @@ from infrastructure.config.config_loader import load_and_configure_business, loa
 logger = logging.getLogger("m_bird.scheduler")
 
 
-def _make_incremental_handler(messages_days: int | None, backfill_incomplete: bool = False):
+def _make_incremental_handler(
+    messages_days: int | None, backfill_incomplete: bool = False, backfill_metrics: bool = False
+):
     """Create an incremental sync handler bound to profile parameters."""
 
     async def _run():
@@ -30,6 +32,7 @@ def _make_incremental_handler(messages_days: int | None, backfill_incomplete: bo
                 sync_messages=messages_days is not None,
                 messages_days=messages_days,
                 backfill_incomplete=backfill_incomplete,
+                backfill_metrics=backfill_metrics,
             )
             from api.sync_utils import refresh_materialized_view
 
@@ -41,7 +44,12 @@ def _make_incremental_handler(messages_days: int | None, backfill_incomplete: bo
     return _run
 
 
-def _make_full_handler(messages_days: int | None, backfill_surveys: bool, backfill_incomplete: bool = False):
+def _make_full_handler(
+    messages_days: int | None,
+    backfill_surveys: bool,
+    backfill_incomplete: bool = False,
+    backfill_metrics: bool = False,
+):
     """Create a full sync handler bound to profile parameters."""
 
     async def _run():
@@ -55,6 +63,7 @@ def _make_full_handler(messages_days: int | None, backfill_surveys: bool, backfi
                 messages_days=messages_days,
                 backfill_surveys=backfill_surveys,
                 backfill_incomplete=backfill_incomplete,
+                backfill_metrics=backfill_metrics,
             )
             from api.sync_utils import refresh_materialized_view
 
@@ -100,7 +109,11 @@ def _configure_scheduler_jobs() -> int:
 
     if profile.has_incremental:
         assert profile.incremental_minutes is not None
-        handler = _make_incremental_handler(messages_days=profile.messages_days, backfill_incomplete=True)
+        handler = _make_incremental_handler(
+            messages_days=profile.messages_days,
+            backfill_incomplete=True,
+            backfill_metrics=profile.backfill_metrics,
+        )
         scheduler.add_job(
             handler,
             trigger=IntervalTrigger(minutes=profile.incremental_minutes),
@@ -116,6 +129,7 @@ def _configure_scheduler_jobs() -> int:
             messages_days=profile.messages_days,
             backfill_surveys=profile.backfill_surveys,
             backfill_incomplete=True,
+            backfill_metrics=profile.backfill_metrics,
         )
         full_hour = f"{profile.full_sync_hour:02d}:{profile.full_sync_minute:02d}"
         scheduler.add_job(
@@ -154,7 +168,26 @@ def stop_scheduler() -> str:
 
 
 async def _init_schema():
-    """Create tables + materialized view if they don't exist (idempotent)."""
+    """Create tables + materialized view if they don't exist (idempotent).
+
+    Uses a schema_migrations table to track applied migrations so destructive
+    operations (DROP MATERIALIZED VIEW) only run once instead of on every startup.
+    """
+    from api.dependencies import get_pool
+
+    pool = await get_pool()
+
+    # Ensure migration tracking table exists
+    await pool.execute("""
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version VARCHAR(50) PRIMARY KEY,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    applied_rows = await pool.fetch_all("SELECT version FROM schema_migrations")
+    applied = {row["version"] for row in applied_rows}
+
     migrations_dir = os.path.join(os.path.dirname(__file__), "..", "infrastructure", "database", "migrations")
     for sql_file in (
         "001_initial.sql",
@@ -167,20 +200,25 @@ async def _init_schema():
         "008_performance_indexes.sql",
         "009_stats_rollups.sql",
         "010_messages_bird_constraint.sql",
+        "011_fk_indexes.sql",
     ):
+        version = sql_file.replace(".sql", "")
+        if version in applied:
+            continue
         path = os.path.join(migrations_dir, sql_file)
         if not os.path.exists(path):
             continue
         with open(path) as f:
             sql = f.read()
-        from api.dependencies import get_pool
-
-        pool = await get_pool()
         try:
             for statement in _split_sql(sql):
                 stmt = statement.strip()
                 if stmt:
                     await pool.execute(stmt)
+            await pool.execute(
+                "INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING",
+                version,
+            )
             logger.info("Applied %s", sql_file)
         except Exception:
             logger.exception("Failed to apply %s", sql_file)
@@ -271,6 +309,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 def create_app() -> FastAPI:
+    # Load .env BEFORE any middleware or config reads os.getenv()
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
     app = FastAPI(
         title="MBird Reporting API",
         description="Omnichannel Reporting Tool - API REST",

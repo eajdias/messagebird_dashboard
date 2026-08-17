@@ -53,14 +53,14 @@ async def _sync_messages_internal(
             return 0, []
         cnvs_id = cnvs_row["cnvs_id"]
 
-    offset = 0
+    page_token: str | None = None
     limit = 20  # MessageBird messages API max is 20
     total_messages = 0
     all_raw_messages: list[dict[str, Any]] = []
 
     while True:
         response = await manager.client.get_messages(
-            conversation_bird_id, limit=limit, offset=offset, date_from=date_from
+            conversation_bird_id, limit=limit, date_from=date_from, page_token=page_token
         )
 
         if "error" in response:
@@ -77,7 +77,7 @@ async def _sync_messages_internal(
                     conn,
                     "messages",
                     error_msg,
-                    context={"cnvs_bird": conversation_bird_id, "offset": offset},
+                    context={"cnvs_bird": conversation_bird_id, "page_token": page_token},
                 )
             break
 
@@ -157,17 +157,16 @@ async def _sync_messages_internal(
 
         if batch_params:
             async with conn.transaction():
-                for params in batch_params:
-                    await conn.execute_insert(
-                        "INSERT INTO messages "
-                        "(msgs_cnvs, msgs_agnt, msgs_direction, msgs_status, msgs_type, "
-                        "msgs_content, msgs_bird, msgs_created, msgs_updated) "
-                        "VALUES ($1::int4, $2::int4, $3::varchar, $4::varchar, $5::varchar, "
-                        "$6::text, $7::varchar, $8::timestamp, $9::timestamp) "
-                        "ON CONFLICT (msgs_cnvs, msgs_bird) DO UPDATE SET "
-                        "msgs_status = EXCLUDED.msgs_status, msgs_updated = EXCLUDED.msgs_updated",
-                        params,
-                    )
+                await conn.execute_many(
+                    "INSERT INTO messages "
+                    "(msgs_cnvs, msgs_agnt, msgs_direction, msgs_status, msgs_type, "
+                    "msgs_content, msgs_bird, msgs_created, msgs_updated) "
+                    "VALUES ($1::int4, $2::int4, $3::varchar, $4::varchar, $5::varchar, "
+                    "$6::text, $7::varchar, $8::timestamp, $9::timestamp) "
+                    "ON CONFLICT (msgs_cnvs, msgs_bird) DO UPDATE SET "
+                    "msgs_status = EXCLUDED.msgs_status, msgs_updated = EXCLUDED.msgs_updated",
+                    batch_params,
+                )
                 if last_agent_id:
                     await conn.execute_query(
                         "UPDATE conversations SET cnvs_agnt = $1 WHERE cnvs_id = $2",
@@ -177,7 +176,9 @@ async def _sync_messages_internal(
 
         if len(items) < limit:
             break
-        offset += len(items)
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
 
     return total_messages, all_raw_messages
 
@@ -235,11 +236,14 @@ async def sync_messages_for_month(manager: PgSyncManager, conn: PostgresSyncConn
     month_start, next_month_start = month_bounds_utc(year, month)
     start_iso = to_bird_iso(month_start)
 
-    # Batch pre-fetch: cnvs_bird, cnvs_id, and last message date in one query
+    # Batch pre-fetch: cnvs_bird, cnvs_id, and last message date using JOIN (not correlated subquery)
     rows = await conn.fetch_all(
-        "SELECT c.cnvs_bird, c.cnvs_id, "
-        "  (SELECT MAX(m.msgs_created) FROM messages m WHERE m.msgs_cnvs = c.cnvs_id) as last_msg_date "
+        "SELECT c.cnvs_bird, c.cnvs_id, lm.last_msg_date "
         "FROM conversations c "
+        "LEFT JOIN LATERAL ("
+        "  SELECT MAX(m.msgs_created) AS last_msg_date "
+        "  FROM messages m WHERE m.msgs_cnvs = c.cnvs_id"
+        ") lm ON true "
         "WHERE c.cnvs_created >= $1::timestamp AND c.cnvs_created < $2::timestamp "
         "ORDER BY c.cnvs_created DESC",
         (month_start.replace(tzinfo=None), next_month_start.replace(tzinfo=None)),

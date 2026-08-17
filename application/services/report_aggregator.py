@@ -72,6 +72,7 @@ class ReportAggregator:
                 "avg_nps": None,
                 "real_nps": None,
                 "avg_art": None,
+                "avg_frt": None,
                 "avg_duration": None,
                 "sla_compliance": None,
                 "total_chats": 0,
@@ -106,6 +107,8 @@ class ReportAggregator:
         arts_sum = 0.0
         arts_count = 0
         sla_hits = 0
+        frts_sum = 0.0
+        frts_count = 0
         durations_sum = 0.0
         durations_count = 0
         total_msgs = 0
@@ -157,6 +160,10 @@ class ReportAggregator:
                 else:
                     art_buckets[5] += 1
 
+            if isinstance(p.frt_min, (int, float)) and 0 < p.frt_min <= constants.MAX_ART_MINUTES:
+                frts_count += 1
+                frts_sum += p.frt_min
+
             if isinstance(p.duration_min, (int, float)) and 0 < p.duration_min <= constants.MAX_DURATION_MINUTES:
                 durations_count += 1
                 durations_sum += p.duration_min
@@ -171,6 +178,7 @@ class ReportAggregator:
         avg_nps = round(nps_sum / nps_count, 2) if nps_count > 0 else None
         real_nps = round((nps_promoters - nps_detractors) / nps_count * 100, 2) if nps_count > 0 else None
         avg_art = round(arts_sum / arts_count, 2) if arts_count > 0 else None
+        avg_frt = round(frts_sum / frts_count, 2) if frts_count > 0 else None
         avg_duration = round(durations_sum / durations_count, 2) if durations_count > 0 else None
         sla_compliance = round(sla_hits / arts_count * 100, 2) if arts_count > 0 else None
         total_chats = len(processed_data)
@@ -180,6 +188,7 @@ class ReportAggregator:
             "avg_nps": avg_nps,
             "real_nps": real_nps,
             "avg_art": avg_art,
+            "avg_frt": avg_frt,
             "avg_duration": avg_duration,
             "sla_compliance": sla_compliance,
             "total_chats": total_chats,

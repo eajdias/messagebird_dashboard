@@ -421,7 +421,7 @@ def resolve_conversation_group(agent_name: str | None, dept_label: str) -> str:
 def _to_int(val) -> int | None:
     try:
         return int(val)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 

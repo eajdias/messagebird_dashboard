@@ -240,3 +240,93 @@ async def test_update_conversation_surveys_extracts_software(manager, mock_conn)
 
     await update_conversation_surveys(manager, mock_conn, "conv_test")
     assert mock_conn.execute_query.call_count >= 1
+
+
+def _agent_q(created: str):
+    return _survey_msg(content="Como você avalia o atendimento do técnico ? 😊", created=created)
+
+
+def _nps_q(created: str):
+    return _survey_msg(
+        content="👉 Avalie a nossa Empresa De 1 (não recomendaria) até 10 (recomendaria com certeza)",
+        created=created,
+    )
+
+
+def _conv_row():
+    return MagicMock(
+        **{
+            "__getitem__": lambda s, k: {
+                "cnvs_id": 1,
+                "cnvs_status": "active",
+                "cnvs_rating_agent": 1,
+                "cnvs_rating_nps": 5,
+            }[k]
+        }
+    )
+
+
+def _update_map(mock_conn):
+    import re as _re
+
+    sql, params = mock_conn.execute_query.call_args.args
+    mapping = {}
+    for m in _re.finditer(r"(\w+) = \$(\d+)", sql):
+        mapping[m.group(1)] = params[int(m.group(2)) - 1]
+    return mapping
+
+
+@pytest.mark.asyncio
+async def test_surveys_sort_out_of_order_messages(manager, mock_conn):
+    """Raw messages arriving out of chronological order must not swap answers."""
+    mock_conn.fetch_one = AsyncMock(return_value=_conv_row())
+    mock_conn.fetch_all = AsyncMock(
+        return_value=[
+            _nps_q("2026-08-15T12:33:31Z"),
+            _resp_msg("5", created="2026-08-15T12:33:27Z"),
+            _agent_q("2026-08-15T12:23:45Z"),
+        ]
+    )
+
+    await update_conversation_surveys(manager, mock_conn, "conv_test")
+    updates = _update_map(mock_conn)
+    assert updates["cnvs_rating_agent"] == 5
+    assert updates["cnvs_rating_nps"] is None
+
+
+@pytest.mark.asyncio
+async def test_surveys_answer_before_next_question_only(manager, mock_conn):
+    """A number typed for a later question must not be captured as the answer
+    to the previous question (which had no answer)."""
+    mock_conn.fetch_one = AsyncMock(return_value=_conv_row())
+    mock_conn.fetch_all = AsyncMock(
+        return_value=[
+            _agent_q("2026-08-15T12:23:45Z"),
+            _nps_q("2026-08-15T12:23:48Z"),
+            _resp_msg("5", created="2026-08-15T12:24:30Z"),
+        ]
+    )
+
+    await update_conversation_surveys(manager, mock_conn, "conv_test")
+    updates = _update_map(mock_conn)
+    assert updates["cnvs_rating_agent"] is None
+    assert updates["cnvs_rating_nps"] == 5
+
+
+@pytest.mark.asyncio
+async def test_surveys_question_without_answer_resets_field(manager, mock_conn):
+    """A stale value must be reset to NULL when the question was asked and the
+    client never answered it."""
+    mock_conn.fetch_one = AsyncMock(return_value=_conv_row())
+    mock_conn.fetch_all = AsyncMock(
+        return_value=[
+            _agent_q("2026-08-15T12:23:45Z"),
+            _resp_msg("obrigado", created="2026-08-15T12:24:30Z"),
+            _nps_q("2026-08-15T12:24:40Z"),
+        ]
+    )
+
+    await update_conversation_surveys(manager, mock_conn, "conv_test")
+    updates = _update_map(mock_conn)
+    assert updates["cnvs_rating_agent"] is None
+    assert updates["cnvs_rating_nps"] is None

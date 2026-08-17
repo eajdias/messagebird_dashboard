@@ -17,6 +17,7 @@ class SyncDatabaseUseCase:
         start_date: str | None = None,
         end_date: str | None = None,
         backfill_incomplete: bool = False,
+        backfill_metrics: bool = False,
     ):
         pool = self._pool
         if pool is None:
@@ -35,4 +36,5 @@ class SyncDatabaseUseCase:
             start_date=start_date,
             end_date=end_date,
             backfill_incomplete=backfill_incomplete,
+            backfill_metrics=backfill_metrics,
         )

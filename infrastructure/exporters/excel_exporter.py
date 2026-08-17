@@ -400,7 +400,7 @@ class ExcelExporter(ReportExporter):
                 else:
                     color = COLOR_ALERT if change >= 0 else COLOR_ACCENT
                 return f"{arrow} {abs(change):.1f}%", color
-            except TypeError, ValueError:
+            except (TypeError, ValueError):
                 return "", ""
 
         kpi_list = [

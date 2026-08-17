@@ -46,6 +46,11 @@ async def main():
     sync_parser.add_argument("--month", type=int, default=None, help="Mês para backfill mensal")
     sync_parser.add_argument("--backfill-surveys", action="store_true", help="Re-extrair NPS e avaliações")
     sync_parser.add_argument(
+        "--backfill-metrics",
+        action="store_true",
+        help="Recomputar FRT/ART de todas as conversas (idempotente)",
+    )
+    sync_parser.add_argument(
         "--backfill-incomplete", action="store_true", help="Re-sincronizar conversas com mensagens incompletas"
     )
     sync_parser.add_argument("--config-path", default="business_config.yaml", help="Caminho para business_config.yaml")
@@ -81,6 +86,7 @@ async def main():
             month=args.month,
             backfill_surveys=args.backfill_surveys,
             backfill_incomplete=args.backfill_incomplete,
+            backfill_metrics=args.backfill_metrics,
         )
         _print(f"[bold green]Resultado:[/] {result}")
 

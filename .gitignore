@@ -78,3 +78,6 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 reports/*
+
+# DB dumps locais
+backups/

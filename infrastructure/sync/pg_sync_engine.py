@@ -29,6 +29,7 @@ from infrastructure.sync.sync_messages import (
     sync_messages_for_range,
     sync_messages_for_recent,
 )
+from infrastructure.sync.sync_metrics import backfill_conversation_metrics as metrics_backfill_fn
 from infrastructure.sync.sync_surveys import backfill_surveys as survey_backfill_fn
 
 logger = logging.getLogger("m_bird.sync_pg")
@@ -87,7 +88,9 @@ async def sync_conversations_month(pool, year: int, month: int) -> str:
 # ── 3. Sync messages for conversations in DB (by month) ──────────────────
 
 
-async def sync_messages_month(pool, year: int, month: int, backfill_surveys: bool = False) -> str:
+async def sync_messages_month(
+    pool, year: int, month: int, backfill_surveys: bool = False, backfill_metrics: bool = False
+) -> str:
     """Fetch messages for conversations already in DB for a specific month.
 
     This does NOT fetch conversations from Bird API — it only syncs messages
@@ -109,6 +112,10 @@ async def sync_messages_month(pool, year: int, month: int, backfill_surveys: boo
             count = await survey_backfill_fn(manager, conn)
             result += f" Survey backfill: {count} conversations processed."
 
+        if backfill_metrics:
+            count = await metrics_backfill_fn(manager, conn)
+            result += f" Metrics backfill: {count} conversations."
+
         return result
     finally:
         await manager.client.close()
@@ -117,7 +124,9 @@ async def sync_messages_month(pool, year: int, month: int, backfill_surveys: boo
 # ── 4. Sync messages for conversations in DB (by date range) ─────────────
 
 
-async def sync_messages_range(pool, start_date: str, end_date: str, backfill_surveys: bool = False) -> str:
+async def sync_messages_range(
+    pool, start_date: str, end_date: str, backfill_surveys: bool = False, backfill_metrics: bool = False
+) -> str:
     """Fetch messages for conversations already in DB for a date range.
 
     This does NOT fetch conversations from Bird API — it only syncs messages
@@ -152,6 +161,10 @@ async def sync_messages_range(pool, start_date: str, end_date: str, backfill_sur
             count = await survey_backfill_fn(manager, conn)
             result += f" Survey backfill: {count} conversations processed."
 
+        if backfill_metrics:
+            count = await metrics_backfill_fn(manager, conn)
+            result += f" Metrics backfill: {count} conversations."
+
         return result
     finally:
         await manager.client.close()
@@ -172,6 +185,7 @@ async def trigger_sync_pg(
     start_date: str | None = None,
     end_date: str | None = None,
     backfill_incomplete: bool = False,
+    backfill_metrics: bool = False,
 ) -> str:
     """Legacy sync trigger — kept for backward compatibility with scheduler."""
     raw_pool = pool.pool if isinstance(pool, PostgresPool) else pool
@@ -208,7 +222,14 @@ async def trigger_sync_pg(
             end_iso = to_bird_iso(end_dt)
             await sync_conversations(manager, conn, min_date=start_iso, max_date=end_iso)
             msg_count = await sync_messages_for_range(manager, conn, start_dt, end_dt)
-            return f"Range sync completed for {start_date} → {end_date}: {msg_count} messages."
+            result = f"Range sync completed for {start_date} → {end_date}: {msg_count} messages."
+            if backfill_surveys:
+                count = await survey_backfill_fn(manager, conn)
+                result += f" Survey backfill: {count} conversations processed."
+            if backfill_metrics:
+                count = await metrics_backfill_fn(manager, conn)
+                result += f" Metrics backfill: {count} conversations."
+            return result
 
         if (year is None) != (month is None):
             raise ValueError("Use year and month together for monthly sync.")
@@ -220,14 +241,17 @@ async def trigger_sync_pg(
             end_iso = to_bird_iso(next_month_start)
             await sync_conversations(manager, conn, min_date=start_iso, max_date=end_iso)
             synced_messages = await sync_messages_for_month(manager, conn, year, month)
+            result = f"Monthly sync completed for {year:04d}-{month:02d} ({synced_messages} messages)."
             if backfill_incomplete:
                 incomplete_count = await sync_incomplete_conversations(manager, conn)
-                return (
-                    f"Monthly sync completed for {year:04d}-{month:02d} "
-                    f"({synced_messages} messages). "
-                    f"Incomplete backfill: {incomplete_count} messages."
-                )
-            return f"Monthly sync completed for {year:04d}-{month:02d} ({synced_messages} messages)."
+                result += f" Incomplete backfill: {incomplete_count} messages."
+            if backfill_surveys:
+                count = await survey_backfill_fn(manager, conn)
+                result += f" Survey backfill: {count} conversations processed."
+            if backfill_metrics:
+                count = await metrics_backfill_fn(manager, conn)
+                result += f" Metrics backfill: {count} conversations."
+            return result
 
         if sync_today:
             now = datetime.now(UTC)
@@ -258,12 +282,15 @@ async def trigger_sync_pg(
                 count, _ = await sync_msgs(manager, conn, row["cnvs_bird"], date_from=today_start_iso)
                 msg_count += count
 
-            if backfill_surveys:
-                count = await survey_backfill_fn(manager, conn)
-                return (
-                    f"Today sync + survey backfill completed: {len(rows)} conversations,"
-                    f" {msg_count} messages, {count} surveys."
-                )
+            if backfill_surveys or backfill_metrics:
+                parts = ["Today sync completed", f"{len(rows)} conversations", f"{msg_count} messages"]
+                if backfill_surveys:
+                    count = await survey_backfill_fn(manager, conn)
+                    parts.append(f"{count} surveys")
+                if backfill_metrics:
+                    mcount = await metrics_backfill_fn(manager, conn)
+                    parts.append(f"metrics on {mcount} conversations")
+                return " + ".join(parts) + "."
 
             return f"Today sync completed: {len(rows)} conversations, {msg_count} messages."
 
@@ -274,13 +301,18 @@ async def trigger_sync_pg(
                 inc_count = await sync_incomplete_conversations(manager, conn)
                 logger.info("Incomplete backfill: %d new messages.", inc_count)
             msg_count = await sync_messages_for_recent(manager, conn, days=messages_days)
-            if backfill_surveys:
-                count = await survey_backfill_fn(manager, conn)
-                return (
-                    f"Incremental sync completed: {msg_count} messages"
-                    f" for last {messages_days} days, {inc_count} incomplete,"
-                    f" {count} surveys."
-                )
+            if backfill_surveys or backfill_metrics:
+                parts = [
+                    f"Incremental sync completed: {msg_count} messages for last {messages_days} days",
+                    f"{inc_count} incomplete",
+                ]
+                if backfill_surveys:
+                    count = await survey_backfill_fn(manager, conn)
+                    parts.append(f"{count} surveys")
+                if backfill_metrics:
+                    mcount = await metrics_backfill_fn(manager, conn)
+                    parts.append(f"metrics on {mcount} conversations")
+                return ", ".join(parts) + "."
             return f"Incremental sync completed: {msg_count} messages for last {messages_days} days."
 
         # Full daily sync: contacts + conversations (last 7 days) + messages + backfill
@@ -299,29 +331,45 @@ async def trigger_sync_pg(
             await sync_all_messages(manager, conn)
             if backfill_incomplete:
                 inc_count = await sync_incomplete_conversations(manager, conn)
-            if backfill_surveys:
-                count = await survey_backfill_fn(manager, conn)
-                msg = f"Full sync + survey backfill completed: {count} surveys processed."
+            if backfill_surveys or backfill_metrics:
+                parts = ["Full sync completed"]
+                if backfill_surveys:
+                    count = await survey_backfill_fn(manager, conn)
+                    parts.append(f"{count} surveys processed")
+                if backfill_metrics:
+                    mcount = await metrics_backfill_fn(manager, conn)
+                    parts.append(f"metrics on {mcount} conversations")
                 if backfill_incomplete:
-                    msg += f" {inc_count} incomplete messages."
-                return msg
+                    parts.append(f"{inc_count} incomplete messages")
+                return ", ".join(parts) + "."
             if backfill_incomplete:
                 return f"Full sync completed with {inc_count} incomplete messages backfilled."
             return "Full sync with all messages completed."
 
         if messages_days is not None:
             msg_count = await sync_messages_for_recent(manager, conn, days=messages_days)
-            if backfill_surveys:
-                count = await survey_backfill_fn(manager, conn)
-                return (
-                    f"Sync + survey backfill completed: {msg_count} messages"
-                    f" for last {messages_days} days, {count} surveys."
-                )
+            if backfill_surveys or backfill_metrics:
+                parts = [
+                    f"Sync completed: {msg_count} messages for last {messages_days} days",
+                ]
+                if backfill_surveys:
+                    count = await survey_backfill_fn(manager, conn)
+                    parts.append(f"{count} surveys")
+                if backfill_metrics:
+                    mcount = await metrics_backfill_fn(manager, conn)
+                    parts.append(f"metrics on {mcount} conversations")
+                return ", ".join(parts) + "."
             return f"Sync completed ({msg_count} messages for last {messages_days} days)."
 
-        if backfill_surveys:
-            count = await survey_backfill_fn(manager, conn)
-            return f"Structural sync + survey backfill completed: {count} surveys."
+        if backfill_surveys or backfill_metrics:
+            parts = ["Structural sync completed"]
+            if backfill_surveys:
+                count = await survey_backfill_fn(manager, conn)
+                parts.append(f"{count} surveys")
+            if backfill_metrics:
+                mcount = await metrics_backfill_fn(manager, conn)
+                parts.append(f"metrics on {mcount} conversations")
+            return ", ".join(parts) + "."
 
         return "Structural sync completed (no messages)."
     finally:

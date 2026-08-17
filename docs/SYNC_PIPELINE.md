@@ -30,7 +30,8 @@ O pipeline suporta múltiplos modos:
 | **Full+Messages** | `--full-messages` | Full sync + **todas** as mensagens |
 | **Mensal** | `--year Y --month M` | Sync de conversas e mensagens de um mês específico |
 | **Hoje** | (API) | Sync de contatos + conversas + mensagens do dia atual |
-| **Backfill Surveys** | `--backfill-surveys` | Re-extrair NPS e avaliações de surveys |
+| **Backfill Surveys** | `--backfill-surveys` | Re-extrair NPS e avaliações de surveys (reprocessa **todas** as conversas com perguntas de survey, sem chamar a API; campos sem resposta válida são zerados) |
+| **Backfill Metrics** | `--backfill-metrics` | Recomputar FRT/ART de **todas** as conversas (idempotente, sem chamar a API). Roda automaticamente nos perfis de scheduler |
 
 ## Perfis de Agendamento
 
@@ -64,6 +65,12 @@ python main.py sync --year 2026 --month 6
 
 # Backfill de surveys
 python main.py sync --backfill-surveys
+
+# Backfill de métricas (FRT/ART em todas as conversas)
+python main.py sync --backfill-metrics
+
+# Sync mensal com backfills
+python main.py sync --year 2026 --month 8 --backfill-surveys --backfill-metrics
 ```
 
 ## API de Sync

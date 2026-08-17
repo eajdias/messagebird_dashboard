@@ -321,5 +321,5 @@ class DashboardExportService:
             return ""
         try:
             return f"{float(val):.1f}%"
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return str(val)

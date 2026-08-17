@@ -23,6 +23,8 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans`}>
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- necessário antes do paint p/ evitar FOUC */}
+        <script src="/theme-init.js" />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

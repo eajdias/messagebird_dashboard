@@ -15,6 +15,7 @@ class SyncProfile:
     full_sync_minute: int
     sync_messages: bool
     backfill_surveys: bool
+    backfill_metrics: bool
 
     @property
     def has_incremental(self) -> bool:
@@ -34,6 +35,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
     "short": SyncProfile(
         name="short",
@@ -43,6 +45,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
     "hourly": SyncProfile(
         name="hourly",
@@ -52,6 +55,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
     "daily": SyncProfile(
         name="daily",
@@ -61,6 +65,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
     "weekly": SyncProfile(
         name="weekly",
@@ -70,6 +75,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
     "monthly": SyncProfile(
         name="monthly",
@@ -79,6 +85,7 @@ PROFILES: dict[str, SyncProfile] = {
         full_sync_minute=0,
         sync_messages=True,
         backfill_surveys=True,
+        backfill_metrics=True,
     ),
 }
 
@@ -107,6 +114,7 @@ def list_profiles() -> list[dict[str, object]]:
             "full_sync_minute": p.full_sync_minute,
             "sync_messages": p.sync_messages,
             "backfill_surveys": p.backfill_surveys,
+            "backfill_metrics": p.backfill_metrics,
         }
         for p in PROFILES.values()
     ]

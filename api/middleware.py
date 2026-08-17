@@ -53,11 +53,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 def setup_middleware(app: FastAPI) -> None:
-    """Configure CORS, request logging, and other middleware."""
+    """Configure CORS, request logging, and other middleware.
+
+    CORSMiddleware MUST be the outermost middleware so it intercepts
+    OPTIONS preflight requests before any other middleware touches them.
+    FastAPI processes add_middleware in reverse — last added = outermost.
+    """
     import os
 
     cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
 
+    # Logging first (inner) — CORS last (outermost)
+    app.add_middleware(RequestLoggingMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_origins,
@@ -66,5 +73,3 @@ def setup_middleware(app: FastAPI) -> None:
         allow_headers=["*"],
         expose_headers=["*"],
     )
-
-    app.add_middleware(RequestLoggingMiddleware)

@@ -170,7 +170,7 @@ async def get_summary(
     return DashboardSummaryResponse(
         total_conversations=stats.get("total_chats", 0),
         nps_score=stats.get("real_nps"),
-        frt_avg_minutes=None,  # FRT requires per-conversation first-response timestamps
+        frt_avg_minutes=stats.get("avg_frt"),
         art_avg_minutes=stats.get("avg_art"),
         rating_avg=stats.get("avg_rating"),
         sla_compliance_pct=stats.get("sla_compliance"),

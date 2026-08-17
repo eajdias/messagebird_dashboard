@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from collections import OrderedDict
@@ -14,9 +15,8 @@ logger = logging.getLogger("m_bird.cache")
 class TTLCache:
     """Thread-safe in-memory cache with per-key TTL expiration and LRU eviction.
 
-    Uses asyncio locks for thread safety. For request coalescing at the
-    application level, the ``_load_executive_processed`` function handles
-    deduplication via ``processed_cache.get_or_set``.
+    Uses asyncio locks for thread safety. Per-key locks prevent thundering herd
+    — only one coroutine computes each cache key at a time.
 
     Usage:
         cache = TTLCache(default_ttl=300)  # 5 min default
@@ -30,6 +30,7 @@ class TTLCache:
         self._maxsize = maxsize
         self._store: OrderedDict[str, tuple[float, Any]] = OrderedDict()
         self._lock = asyncio.Lock()
+        self._key_locks: dict[str, asyncio.Lock] = {}
 
     async def get_or_set(
         self,
@@ -40,6 +41,7 @@ class TTLCache:
         """Return cached value or call factory, cache, and return.
 
         ``factory`` may be a coroutine function or a plain callable.
+        Uses per-key locks to prevent thundering herd on cache miss.
         """
         now = time.monotonic()
         effective_ttl = ttl if ttl is not None else self._default_ttl
@@ -51,18 +53,31 @@ class TTLCache:
                     logger.debug("cache HIT: %s", key)
                     return value
                 del self._store[key]
+            # Get or create per-key lock
+            if key not in self._key_locks:
+                self._key_locks[key] = asyncio.Lock()
+            key_lock = self._key_locks[key]
 
-        # Outside lock: compute value
-        logger.debug("cache MISS: %s", key)
-        if asyncio.iscoroutinefunction(factory):
-            value = await factory()
-        else:
-            value = factory()
+        async with key_lock:
+            # Double-check: another coroutine may have populated while we waited
+            async with self._lock:
+                if key in self._store:
+                    expires, value = self._store[key]
+                    if now < expires:
+                        logger.debug("cache HIT (after wait): %s", key)
+                        return value
+                    del self._store[key]
 
-        async with self._lock:
-            self._store[key] = (now + effective_ttl, value)
+            logger.debug("cache MISS: %s", key)
+            if inspect.iscoroutinefunction(factory):
+                value = await factory()
+            else:
+                value = factory()
 
-        return value
+            async with self._lock:
+                self._store[key] = (now + effective_ttl, value)
+
+            return value
 
     async def get(self, key: str) -> Any | None:
         """Return cached value if present and not expired, else None."""
