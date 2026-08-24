@@ -53,14 +53,16 @@ async def _sync_messages_internal(
             return 0, []
         cnvs_id = cnvs_row["cnvs_id"]
 
-    page_token: str | None = None
+    assert cnvs_id is not None
+
+    offset = 0
     limit = 20  # MessageBird messages API max is 20
     total_messages = 0
     all_raw_messages: list[dict[str, Any]] = []
 
     while True:
         response = await manager.client.get_messages(
-            conversation_bird_id, limit=limit, date_from=date_from, page_token=page_token
+            conversation_bird_id, limit=limit, date_from=date_from, offset=offset
         )
 
         if "error" in response:
@@ -77,7 +79,7 @@ async def _sync_messages_internal(
                     conn,
                     "messages",
                     error_msg,
-                    context={"cnvs_bird": conversation_bird_id, "page_token": page_token},
+                    context={"cnvs_bird": conversation_bird_id, "offset": offset},
                 )
             break
 
@@ -176,9 +178,7 @@ async def _sync_messages_internal(
 
         if len(items) < limit:
             break
-        page_token = response.get("nextPageToken")
-        if not page_token:
-            break
+        offset += len(items)
 
     return total_messages, all_raw_messages
 
