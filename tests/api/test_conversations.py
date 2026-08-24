@@ -53,11 +53,11 @@ class TestListConversations:
 
     def test_list_pagination_out_of_range(self, authed_client: TestClient):
         resp = authed_client.get("/api/v1/conversations/?page=0")
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_list_per_page_too_large(self, authed_client: TestClient):
         resp = authed_client.get("/api/v1/conversations/?per_page=200")
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestGetConversation:

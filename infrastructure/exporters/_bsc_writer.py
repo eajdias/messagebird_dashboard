@@ -98,7 +98,7 @@ def _kpi_excel_formula(real_cell: str, kpi_def: dict[str, Any]) -> str:
         elif tipo == "binaria":
             return f'=IF({guard},"",IF({real_cell}={meta},{peso},0))'
 
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "-"
     return "-"
 

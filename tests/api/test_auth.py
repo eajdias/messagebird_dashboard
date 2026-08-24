@@ -29,7 +29,7 @@ class TestAuthLogin:
             "/api/v1/auth/login",
             json={"email": "", "password": "admin123"},
         )
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestAuthRegister:
@@ -48,7 +48,7 @@ class TestAuthRegister:
             "/api/v1/auth/register",
             json={"email": "invalido", "password": "senha123", "name": "Test"},
         )
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestAuthRefresh:

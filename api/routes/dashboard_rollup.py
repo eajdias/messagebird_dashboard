@@ -77,7 +77,7 @@ async def get_evolution_rollup(
     try:
         req_start = _date.fromisoformat(start_date)
         req_end = _date.fromisoformat(end_date)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         req_start = None
         req_end = None
 
@@ -225,7 +225,7 @@ async def _fallback_evolution(
                 else:
                     key = dt.strftime("%Y-%m-%d")
                 buckets_map[key].append(p)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
 
     buckets = []

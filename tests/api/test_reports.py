@@ -19,14 +19,14 @@ class TestGenerateReport:
             "/api/v1/reports/generate",
             json={"type": "invalid", "year": 2026},
         )
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_generate_missing_year(self, authed_client: TestClient):
         resp = authed_client.post(
             "/api/v1/reports/generate",
             json={"type": "monthly", "month": 7},
         )
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_generate_unauthorized(self, client: TestClient):
         resp = client.post(

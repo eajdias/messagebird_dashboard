@@ -108,14 +108,14 @@ class TestExporterStyle(unittest.TestCase):
 
         from xlsxwriter import Workbook
 
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as f:
-            wb = Workbook(f.name)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "test.xlsx")
+            wb = Workbook(filename)
             ws = wb.add_worksheet()
             header = ["Name", "Value"]
             data = [["Alice", 100], ["Bob", 200]]
             auto_width(ws, header, data)
             wb.close()
-            os.unlink(f.name)
 
     def test_tab_names_no_special_chars(self):
         allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwXYZ0123456789 _-çãáàâéêíóôúü")

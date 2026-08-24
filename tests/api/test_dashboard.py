@@ -90,11 +90,11 @@ class TestDashboardEvolution:
 
     def test_evolution_invalid_months(self, authed_client: TestClient):
         resp = authed_client.get("/api/v1/dashboard/evolution?months=0")
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_evolution_too_many_months(self, authed_client: TestClient):
         resp = authed_client.get("/api/v1/dashboard/evolution?months=25")
-        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert resp.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 class TestDashboardAgents:
