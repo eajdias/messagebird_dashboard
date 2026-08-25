@@ -1,10 +1,13 @@
 """Idempotent backfill of conversation metrics (FRT / ART).
 
 Recomputes first-response time and average-response time for every
-conversation directly from the raw messages table, using the same
-definition as the conversations list query (first agent reply with a
-department group, last client message within the 24h window before the
-first reply, capped at MAX_ART_MINUTES).
+conversation directly from the raw messages table.
+
+FRT: last client message within the 24h window before the first agent
+reply (with a department group) -> that first reply, capped at MAX_ART_MINUTES.
+
+ART: mean of every client-message -> next-agent-reply delta, capped per
+pair at MAX_ART_MINUTES.
 
 Idempotent: re-running always produces the same deterministic values,
 overwriting stale ones, so it can be safely executed after every sync.
@@ -37,7 +40,7 @@ last_client AS (
       AND m.msgs_created >= fr.sent_at - INTERVAL '24 hours'
     GROUP BY fr.msgs_cnvs
 ),
-metrics AS (
+frt AS (
     SELECT
         c.cnvs_id,
         CASE
@@ -52,16 +55,43 @@ metrics AS (
                 1
             )::numeric
             ELSE NULL
-        END AS art
+        END AS frt_minutes
     FROM conversations c
     LEFT JOIN first_resp fr ON fr.msgs_cnvs = c.cnvs_id
     LEFT JOIN last_client lc ON lc.msgs_cnvs = c.cnvs_id
+),
+msg_pairs AS (
+    SELECT
+        msgs_cnvs,
+        msgs_created,
+        msgs_direction,
+        LAG(msgs_created) OVER (PARTITION BY msgs_cnvs ORDER BY msgs_created) AS prev_created,
+        LAG(msgs_direction) OVER (PARTITION BY msgs_cnvs ORDER BY msgs_created) AS prev_direction
+    FROM messages
+),
+resp_pairs AS (
+    SELECT
+        msgs_cnvs,
+        LEAST(
+            EXTRACT(EPOCH FROM (msgs_created - prev_created)) / 60.0,
+            {constants.MAX_ART_MINUTES}.0
+        ) AS delta_min
+    FROM msg_pairs
+    WHERE msgs_direction = 'sent'
+      AND prev_direction = 'received'
+      AND msgs_created > prev_created
+),
+art AS (
+    SELECT msgs_cnvs, ROUND(AVG(delta_min), 1)::numeric AS art_minutes
+    FROM resp_pairs
+    GROUP BY msgs_cnvs
 )
 UPDATE conversations c SET
-    cnvs_frt_minutes = metrics.art,
-    cnvs_art_minutes = metrics.art
-FROM metrics
-WHERE metrics.cnvs_id = c.cnvs_id
+    cnvs_frt_minutes = frt.frt_minutes,
+    cnvs_art_minutes = art.art_minutes
+FROM frt
+LEFT JOIN art ON art.msgs_cnvs = frt.cnvs_id
+WHERE frt.cnvs_id = c.cnvs_id
 """
 
 
