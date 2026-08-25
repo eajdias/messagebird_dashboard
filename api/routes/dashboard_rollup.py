@@ -109,12 +109,12 @@ async def get_evolution_rollup(
                 high_notes=detail.get("high_notes", 0),
                 low_notes=detail.get("low_notes", 0),
                 neutral_notes=detail.get("neutral_notes", 0),
-                art_bucket_0_5=0,
-                art_bucket_5_10=0,
-                art_bucket_10_30=0,
-                art_bucket_30_60=0,
-                art_bucket_60_120=0,
-                art_bucket_120_plus=0,
+                art_bucket_0_5=detail.get("art_bucket_0_5", 0),
+                art_bucket_5_10=detail.get("art_bucket_5_10", 0),
+                art_bucket_10_30=detail.get("art_bucket_10_30", 0),
+                art_bucket_30_60=detail.get("art_bucket_30_60", 0),
+                art_bucket_60_120=detail.get("art_bucket_60_120", 0),
+                art_bucket_120_plus=detail.get("art_bucket_120_plus", 0),
             )
         )
 
@@ -163,7 +163,13 @@ async def _fetch_notes_breakdown(
             {bucket_expr} AS bucket,
             COUNT(*) FILTER (WHERE cnvs_rating_agent >= 4) AS high_notes,
             COUNT(*) FILTER (WHERE cnvs_rating_agent <= 2) AS low_notes,
-            COUNT(*) FILTER (WHERE cnvs_rating_agent = 3) AS neutral_notes
+            COUNT(*) FILTER (WHERE cnvs_rating_agent = 3) AS neutral_notes,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 0 AND cnvs_art_minutes <= 5) AS art_0_5,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 5 AND cnvs_art_minutes <= 10) AS art_5_10,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 10 AND cnvs_art_minutes <= 30) AS art_10_30,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 30 AND cnvs_art_minutes <= 60) AS art_30_60,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 60 AND cnvs_art_minutes <= 120) AS art_60_120,
+            COUNT(*) FILTER (WHERE cnvs_art_minutes > 120 AND cnvs_art_minutes <= 480) AS art_120_plus
         FROM conversations
         WHERE {where}
         GROUP BY bucket
@@ -180,6 +186,12 @@ async def _fetch_notes_breakdown(
                 "high_notes": row["high_notes"],
                 "low_notes": row["low_notes"],
                 "neutral_notes": row["neutral_notes"],
+                "art_bucket_0_5": row["art_0_5"],
+                "art_bucket_5_10": row["art_5_10"],
+                "art_bucket_10_30": row["art_10_30"],
+                "art_bucket_30_60": row["art_30_60"],
+                "art_bucket_60_120": row["art_60_120"],
+                "art_bucket_120_plus": row["art_120_plus"],
             }
         return result
     except Exception as e:
