@@ -143,7 +143,12 @@ async def _fetch_notes_breakdown(
         bucket_expr = "cnvs_created::date"
 
     conditions = ["cnvs_created >= $1", "cnvs_created <= $2::timestamp + interval '1 day'"]
-    params: list[str] = [start_date, end_date]
+    from datetime import date as _date
+
+    try:
+        params: list[_date | str] = [_date.fromisoformat(start_date), _date.fromisoformat(end_date)]
+    except (ValueError, TypeError):
+        params = [start_date, end_date]
 
     if channel:
         params.append(channel)

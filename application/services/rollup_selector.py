@@ -65,7 +65,7 @@ def build_rollup_query(
     end_date: str,
     channel: str | None = None,
     department: str | None = None,
-) -> tuple[str, list[str]]:
+) -> tuple[str, list[date | str]]:
     """Build a SQL query to fetch aggregated stats from rollup tables.
 
     For weekly granularity, expands the query range to cover full ISO weeks
@@ -80,19 +80,21 @@ def build_rollup_query(
         try:
             start = date.fromisoformat(start_date)
             end = date.fromisoformat(end_date)
-            query_start = _snap_week_start(start)
-            query_end = _snap_week_end(end)
-            query_start_str = query_start.isoformat()
-            query_end_str = query_end.isoformat()
-        except ValueError, TypeError:
-            query_start_str = start_date
-            query_end_str = end_date
+            query_start: date | str = _snap_week_start(start)
+            query_end: date | str = _snap_week_end(end)
+        except (ValueError, TypeError):
+            query_start = start_date
+            query_end = end_date
     else:
-        query_start_str = start_date
-        query_end_str = end_date
+        try:
+            query_start = date.fromisoformat(start_date)
+            query_end = date.fromisoformat(end_date)
+        except (ValueError, TypeError):
+            query_start = start_date
+            query_end = end_date
 
     conditions = [f"{bucket_col} >= $1", f"{bucket_col} <= $2"]
-    params: list[str] = [query_start_str, query_end_str]
+    params: list[date | str] = [query_start, query_end]
 
     if channel:
         params.append(channel)
