@@ -22,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans`}>
+      <body className={`${inter.variable} font-sans`} suppressHydrationWarning>
         {/* eslint-disable-next-line @next/next/no-sync-scripts -- necessário antes do paint p/ evitar FOUC */}
         <script src="/theme-init.js" />
         <ThemeProvider
