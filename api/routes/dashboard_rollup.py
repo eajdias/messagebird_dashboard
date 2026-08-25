@@ -136,7 +136,7 @@ async def _fetch_notes_breakdown(
     if granularity == "monthly":
         bucket_expr = "date_trunc('month', cnvs_created)::date"
     elif granularity == "weekly":
-        bucket_expr = "(cnvs_created - INTERVAL '1 day' * EXTRACT(DOW FROM cnvs_created)::int) ::date"
+        bucket_expr = "(cnvs_created - ((EXTRACT(DOW FROM cnvs_created)::int + 6) % 7) * INTERVAL '1 day') ::date"
     else:
         bucket_expr = "cnvs_created::date"
 
