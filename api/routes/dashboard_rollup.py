@@ -86,10 +86,8 @@ async def get_evolution_rollup(
     buckets = []
     for row in rows:
         bucket = row["bucket"]
-        if req_start and req_end and hasattr(bucket, "date"):
-            bucket_date = bucket.date() if callable(bucket.date) else bucket
-            if bucket_date < req_start or bucket_date > req_end:
-                continue
+        if req_start and req_end and hasattr(bucket, "year") and (bucket < req_start or bucket > req_end):
+            continue
         label = _format_bucket_label(bucket, granularity)
         bucket_key = bucket.isoformat() if hasattr(bucket, "isoformat") else str(bucket)[:10]
         detail = detail_map.get(bucket_key, {})

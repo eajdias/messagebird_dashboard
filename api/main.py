@@ -201,6 +201,7 @@ async def _init_schema():
         "009_stats_rollups.sql",
         "010_messages_bird_constraint.sql",
         "011_fk_indexes.sql",
+        "012_conversation_metrics.sql",
     ):
         version = sql_file.replace(".sql", "")
         if version in applied:
