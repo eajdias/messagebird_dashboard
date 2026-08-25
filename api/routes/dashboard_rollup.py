@@ -134,13 +134,13 @@ async def _fetch_notes_breakdown(
     Uses the same bucket expression as rollup tables for consistent matching.
     """
     if granularity == "monthly":
-        bucket_expr = "date_trunc('month', cnvs_created)::date"
+        bucket_expr = "date_trunc('month', cnvs_updated)::date"
     elif granularity == "weekly":
-        bucket_expr = "(cnvs_created - ((EXTRACT(DOW FROM cnvs_created)::int + 6) % 7) * INTERVAL '1 day') ::date"
+        bucket_expr = "(cnvs_updated - ((EXTRACT(DOW FROM cnvs_updated)::int + 6) % 7) * INTERVAL '1 day') ::date"
     else:
-        bucket_expr = "cnvs_created::date"
+        bucket_expr = "cnvs_updated::date"
 
-    conditions = ["cnvs_created >= $1", "cnvs_created <= $2::timestamp + interval '1 day'"]
+    conditions = ["cnvs_updated >= $1", "cnvs_updated <= $2::timestamp + interval '1 day'"]
     from datetime import date as _date
 
     try:
@@ -229,7 +229,7 @@ async def _fallback_evolution(
 
     buckets_map: dict[str, list[Any]] = defaultdict(list)
     for p in processed:
-        raw_str = getattr(p, "raw_created", None) or ""
+        raw_str = getattr(p, "raw_updated", None) or getattr(p, "raw_created", None) or ""
         if raw_str:
             try:
                 dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")

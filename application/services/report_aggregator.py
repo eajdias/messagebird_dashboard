@@ -55,6 +55,7 @@ class ReportAggregator:
             start_time=raw_data.start_time,
             end_time=raw_data.end_time,
             raw_created=raw_data.raw_created,
+            raw_updated=raw_data.raw_updated,
         )
 
     def process_all(self, raw_data_list: list[RawConversationData]) -> list[ProcessedReportData]:

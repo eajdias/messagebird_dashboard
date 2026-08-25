@@ -50,3 +50,4 @@ class ProcessedReportData:
     start_time: str = ""
     end_time: str = ""
     raw_created: str = ""
+    raw_updated: str = ""

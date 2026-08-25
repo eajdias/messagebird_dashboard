@@ -63,6 +63,20 @@ logger = logging.getLogger("api.dashboard")
 
 router = APIRouter()
 
+
+def _event_date(p: Any) -> str:
+    """Return the date of the event (updated when available, else created).
+
+    Conversas avaliadas (survey respondido) atualizam cnvs_updated; usar a
+    data do evento alinha os gráficos com o painel de conversas, que filtra
+    por created OR updated.
+    """
+    raw = getattr(p, "raw_updated", None) or ""
+    if not raw:
+        raw = getattr(p, "raw_created", None) or ""
+    return raw
+
+
 MONTH_NAMES = [
     "",
     "Jan",
@@ -537,7 +551,7 @@ async def get_evolution(
 
     # Split processed data by month
     def _month_key(p: Any) -> tuple[int, int]:
-        raw_str = getattr(p, "raw_created", None) or ""
+        raw_str = _event_date(p)
         if raw_str:
             try:
                 dt = datetime.strptime(str(raw_str)[:19], "%Y-%m-%d %H:%M:%S")
@@ -742,7 +756,7 @@ async def get_evolution_granular(
 
     # Split into buckets by granularity
     def _bucket_key(p: Any) -> str:
-        raw_str = getattr(p, "raw_created", None) or ""
+        raw_str = _event_date(p)
         if not raw_str:
             return ""
         # raw_created already has timezone offset applied by _format_dt_direct
@@ -1404,7 +1418,7 @@ async def get_executive_returners(
     contact_days: dict[int, set[str]] = {}
     for p in processed:
         if p.contact_id:
-            day = p.raw_created[:10]
+            day = _event_date(p)[:10]
             contact_days.setdefault(p.contact_id, set()).add(day)
 
     effective: dict[int, int] = {}
