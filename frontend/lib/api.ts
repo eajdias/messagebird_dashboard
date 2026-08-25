@@ -3,8 +3,10 @@ import axios from "axios";
 import { logger } from "./logger";
 
 function getApiBaseURL(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
   if (typeof window === "undefined") {
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8050";
+    return "http://localhost:8050";
   }
   const { hostname } = window.location;
   if (hostname === "localhost" || hostname === "127.0.0.1") {
